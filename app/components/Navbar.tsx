@@ -32,7 +32,7 @@ const availableVillas = [
     location: "Greater Accra • Lakeside",
     price: 2000,
     image:
-      "https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=2071&auto=format&fit=crop",
+      "/Lake1.jpg",
   },
   {
     id: 2,
@@ -40,7 +40,16 @@ const availableVillas = [
     location: "Eastern Region • Aburi",
     price: 600,
     image:
-      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=2070&auto=format&fit=crop",
+      "/Aburi1.jpeg",
+  },
+
+  {
+    id: 3,
+    title: "Adenta Mountain Retreat",
+    location: "Greater Accra • Adenta",
+    price: 600,
+    image:
+      "/Adenta1.jpg",
   },
 ];
 
@@ -155,7 +164,7 @@ const BookingFormModal = ({
       // Prepare the WhatsApp URL but DO NOT open it yet.
       // In a real app with backend, you would trigger an API here.
       // For now, we will open it in the Success Modal as a "Confirmation" step.
-      const phoneNumber = "233556284813";
+      const phoneNumber = "233534770274";
       const receipt = `🧾 *BOOKING RECEIPT*
 --------------------------------
 *Status:* ⏳ Pending Confirmation

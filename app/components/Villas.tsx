@@ -48,6 +48,7 @@ interface VillaProps {
   description: string;
   amenities?: string[];
   rates?: { option: string; amount: number }[];
+  monthlyRate?: { option: string; amount: number }[];
 }
 
 // --- Helpers ---
@@ -227,7 +228,7 @@ const VillaModal = ({
   };
 
   const handleBookNow = () => {
-    const phoneNumber = "233XXXXXXXXX";
+    const phoneNumber = "233534770274";
     const imageUrl = villa.image.startsWith("http")
       ? villa.image
       : `${window.location.origin}${villa.image}`;
@@ -464,22 +465,16 @@ const Villas: React.FC<{
   const villasData: VillaProps[] = [
     {
       id: 1,
-      title: "Lakeside Serenity",
+      title: "Lakeside Estate",
       location: "Greater Accra • Lakeside",
-      coordinates: { lat: 5.683, lng: -0.136 }, // Mock coordinates for Lakeside
+      coordinates: { lat: 5.683, lng: -0.136 },
       price: 2000,
       guests: 4,
-      bedrooms: 4,
+      bedrooms: 3,
       hasPool: true,
       bathrooms: 5,
-      image:
-        "https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=2071&auto=format&fit=crop",
-      images: [
-        "https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=2071&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?q=80&w=2070&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1560185007-cde436f6a4d0?q=80&w=2070&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1584622050111-993a426fbf0a?q=80&w=2070&auto=format&fit=crop",
-      ],
+      image: "/lake1.jpg",
+      images: ["/lake1.jpg", "/lake2.jpg", "/lake3.jpg", "/lake4.jpg"],
       video: "/lakeside.mp4",
       description:
         "Experience comfort, privacy, and elegance in this beautifully furnished apartment located in the serene and secure Lakeside Estate.",
@@ -489,10 +484,13 @@ const Villas: React.FC<{
         "Pool",
         "Well-furnished hall",
         "Television in all rooms",
+        "PS5 Gaming Console",
       ],
       rates: [
+        { option: "One bedrooms", amount: 1500 },
         { option: "Two bedrooms", amount: 2000 },
-        { option: "Whole apartment (4 bedrooms)", amount: 3500 },
+        { option: "Monthly Rate (Whole apartment)", amount: 30000 },
+        { option: "Whole apartment (4 bedrooms)", amount: 36000 },
       ],
     },
     {
@@ -505,12 +503,8 @@ const Villas: React.FC<{
       bedrooms: 4,
       hasPool: true,
       bathrooms: 5,
-      image:
-        "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=2070&auto=format&fit=crop",
-      images: [
-        "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=2070&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1616594039964-40891a909d72?q=80&w=2066&auto=format&fit=crop",
-      ],
+      image: "Aburi1.jpeg",
+      images: ["Aburi1.jpeg", "Aburi2.jpeg", "Aburi3.jpeg", "Aburi4.jpeg"],
       video: "/aburi.mp4",
       description:
         "Nestled in the serene and refreshing environment of Aburi, this beautifully furnished apartment offers comfort.",
@@ -520,12 +514,49 @@ const Villas: React.FC<{
         "Pool",
         "Well-furnished hall",
         "Television in all rooms",
+        "PS5 Gaming Console",
+      ],
+      monthlyRate: [{ option: "Whole apartment", amount: 30000 }],
+      rates: [
+        { option: "Single bedroom", amount: 600 },
+        { option: "Studio", amount: 800 },
+        { option: "One bedrooms", amount: 1200 },
+        { option: "Two bedrooms", amount: 2000 },
+        { option: "Whole apartment (4 bedrooms)", amount: 3500 },
+        { option: "Monthly Rate (Whole apartment)", amount: 30000 },
+      ],
+    },
+
+    {
+      id: 3,
+      title: "Adenta Serenity",
+      location: "Greater Accra • Adenta",
+      coordinates: { lat: 5.845, lng: -0.177 },
+      price: 600,
+      guests: 4,
+      bedrooms: 4,
+      hasPool: true,
+      bathrooms: 5,
+      image: "Adenta1.jpg",
+      images: ["Adenta1.jpg", "Adenta2.jpg", "Adenta3.jpg", "Adenta4.jpg"],
+      // video: "/adenta.mp4",
+      description:
+        "Located in the heart of Adenta, this premium apartment combines luxury, comfort, and entertainment with modern furnishings, a grand piano, and a PS5 gaming console.",
+      amenities: [
+        "Free Wi-Fi",
+        "Kitchen",
+        "Pool",
+        "Well-furnished hall",
+        "Television in all rooms",
+        "Grand Piano",
+        "PS5 Gaming Console",
       ],
       rates: [
         { option: "Single bedroom", amount: 600 },
         { option: "Studio", amount: 800 },
         { option: "Two bedrooms", amount: 2000 },
-        { option: "Whole apartment (4 bedrooms)", amount: 3500 },
+        { option: "Monthly Rate (Whole apartment)", amount: 30000 },
+        { option: "Whole apartment (4 bedrooms)", amount: 42000 },
       ],
     },
   ];
@@ -585,7 +616,7 @@ const Villas: React.FC<{
 
         {/* Conditional Rendering based on View Mode */}
         {viewMode === "grid" ? (
-          <div className="grid md:grid-cols-2 gap-10 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-7xl mx-auto">
             {filteredVillas.map((villa) => (
               <VillaCard
                 key={villa.id}
