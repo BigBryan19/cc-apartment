@@ -1,24 +1,21 @@
+// page.tsx
 "use client";
 
 import React, { useState } from "react";
 import Hero from "./components/Hero";
-import Villas from "./components/Villas";
+import Villas from "./components/villas/Villas";
 import Regions from "./components/Regions";
 import Specialties from "./components/Specialties";
 import AboutUs from "./components/AboutUs";
 import Footer from "./components/Footer";
 
-// --- Define Filter Interface globally ---
-export interface SearchFilters {
-  location: string;
-  guests: number;
-  maxPrice: number;
-}
+// Import the shared interface from your new types file
+import { SearchFilters } from "./components/villas/types";
 
 const App: React.FC = () => {
   const [currency, setCurrency] = useState<"GHS" | "USD">("GHS");
 
-  // --- NEW: Search Filter State ---
+  // Search Filter State
   // Default: Empty location, 1 guest, high max price so everything shows initially
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
     location: "",
