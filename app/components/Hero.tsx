@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Search } from "lucide-react";
 import Navbar from "./Navbar";
 // Import the filter type from your main page file
-import { SearchFilters } from "../page";
+import { SearchFilters } from "./villas/types";
 
 interface HeroProps {
   currency: "GHS" | "USD";

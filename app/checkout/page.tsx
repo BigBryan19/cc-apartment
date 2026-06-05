@@ -1,7 +1,7 @@
 // app/checkout/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
@@ -9,22 +9,34 @@ import {
   Smartphone,
   ShieldCheck,
   MapPin,
+  Loader2,
 } from "lucide-react";
-import { villasData } from "../components/villas/villasData"; // Adjust path if needed
-import { VillaProps } from "../components/villas/types"; // Adjust path if needed
 
-const CheckoutPage = () => {
+import { villasData } from "../components/villas/villasData";
+import { VillaProps } from "../components/villas/types";
+
+const CheckoutContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [villa, setVilla] = useState<VillaProps | null>(null);
   const [selectedRate, setSelectedRate] = useState<string>("");
   const [currency, setCurrency] = useState<string>("GHS");
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "momo">("card");
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "mobile_money">(
+    "card",
+  );
+
+  // Simulated loading state for the fake payment
   const [loading, setLoading] = useState(false);
 
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+  });
+
   useEffect(() => {
-    // Grab details from the URL
     const id = searchParams.get("villaId");
     const rate = searchParams.get("rate");
     const curr = searchParams.get("currency");
@@ -37,15 +49,22 @@ const CheckoutPage = () => {
     if (curr) setCurrency(curr);
   }, [searchParams]);
 
-  const handlePayment = (e: React.FormEvent) => {
+  // --- SIMULATED PAYMENT LOGIC ---
+  const handlePaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.email) return alert("Please enter your email address.");
+
     setLoading(true);
 
-    // Simulate payment processing
+    // Simulate a 2-second payment processing delay
     setTimeout(() => {
       setLoading(false);
-      alert("Payment Successful! Redirecting to confirmation...");
-      // router.push('/success'); // We will build this next!
+      alert(
+        "Payment Successful! We will redirect you to the success page shortly.",
+      );
+
+      // We will uncomment this once we build the success page!
+      // router.push(`/success?ref=CC_${Math.floor(Math.random() * 100000)}`);
     }, 2000);
   };
 
@@ -65,7 +84,6 @@ const CheckoutPage = () => {
   return (
     <div className="min-h-screen bg-stone-50 py-12 px-4 md:px-12 font-sans">
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
         <button
           onClick={() => router.back()}
           className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-900 transition mb-8 uppercase tracking-widest"
@@ -73,19 +91,17 @@ const CheckoutPage = () => {
           <ChevronLeft size={16} /> Back to Villa
         </button>
 
-        <h1 className="text-4xl text-slate-900 mb-8">
+        <h1 className="text-4xl font-serif text-slate-900 mb-8">
           Secure Checkout
         </h1>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
-          {/* Left Column: Form & Payment */}
           <div className="md:col-span-7 space-y-8">
             <form
-              onSubmit={handlePayment}
+              onSubmit={handlePaymentSubmit}
               className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100"
             >
-              {/* Personal Details */}
-              <h2 className="text-xl text-slate-900 mb-4">
+              <h2 className="text-xl font-serif text-slate-900 mb-4">
                 Guest Information
               </h2>
               <div className="grid grid-cols-2 gap-4 mb-8">
@@ -96,6 +112,10 @@ const CheckoutPage = () => {
                   <input
                     required
                     type="text"
+                    value={formData.firstName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, firstName: e.target.value })
+                    }
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-slate-900 outline-none transition"
                     placeholder="John"
                   />
@@ -107,6 +127,10 @@ const CheckoutPage = () => {
                   <input
                     required
                     type="text"
+                    value={formData.lastName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, lastName: e.target.value })
+                    }
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-slate-900 outline-none transition"
                     placeholder="Doe"
                   />
@@ -118,6 +142,10 @@ const CheckoutPage = () => {
                   <input
                     required
                     type="email"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-slate-900 outline-none transition"
                     placeholder="john@example.com"
                   />
@@ -129,14 +157,17 @@ const CheckoutPage = () => {
                   <input
                     required
                     type="tel"
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-slate-900 outline-none transition"
                     placeholder="+233 50 000 0000"
                   />
                 </div>
               </div>
 
-              {/* Payment Method Toggle */}
-              <h2 className="text-xl text-slate-900 mb-4">
+              <h2 className="text-xl font-serif text-slate-900 mb-4">
                 Payment Method
               </h2>
               <div className="grid grid-cols-2 gap-4 mb-6">
@@ -150,8 +181,8 @@ const CheckoutPage = () => {
                   </span>
                 </div>
                 <div
-                  onClick={() => setPaymentMethod("momo")}
-                  className={`border rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition ${paymentMethod === "momo" ? "border-slate-900 bg-slate-50 text-slate-900 shadow-inner" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+                  onClick={() => setPaymentMethod("mobile_money")}
+                  className={`border rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition ${paymentMethod === "mobile_money" ? "border-slate-900 bg-slate-50 text-slate-900 shadow-inner" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
                 >
                   <Smartphone size={24} />
                   <span className="text-xs font-bold uppercase tracking-widest">
@@ -160,15 +191,18 @@ const CheckoutPage = () => {
                 </div>
               </div>
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-slate-800 transition shadow-lg mt-4 flex items-center justify-center gap-2"
               >
-                {loading
-                  ? "Processing..."
-                  : `Pay ${selectedRate.split("(")[1]?.replace(")", "") || ""}`}
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Processing...
+                  </>
+                ) : (
+                  `Pay ${selectedRate.split("(")[1]?.replace(")", "") || `${currency} ${villa.price}`}`
+                )}
               </button>
 
               <div className="flex items-center justify-center gap-2 mt-4 text-xs text-slate-400 font-medium">
@@ -177,10 +211,9 @@ const CheckoutPage = () => {
             </form>
           </div>
 
-          {/* Right Column: Order Summary */}
           <div className="md:col-span-5">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-24">
-              <h2 className="text-xl text-slate-900 mb-6">
+              <h2 className="text-xl font-serif text-slate-900 mb-6">
                 Booking Summary
               </h2>
 
@@ -216,7 +249,7 @@ const CheckoutPage = () => {
 
               <div className="flex justify-between items-center mb-6">
                 <span className="font-bold text-slate-900">Total</span>
-                <span className="text-2xl text-slate-900">
+                <span className="text-2xl font-serif text-slate-900">
                   {selectedRate.split("(")[1]?.replace(")", "") ||
                     `${currency} ${villa.price}`}
                 </span>
@@ -229,4 +262,21 @@ const CheckoutPage = () => {
   );
 };
 
-export default CheckoutPage;
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-stone-50">
+          <div className="animate-pulse flex flex-col items-center">
+            <div className="w-8 h-8 border-4 border-slate-900 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-slate-500 text-sm font-medium tracking-widest uppercase">
+              Preparing Checkout...
+            </p>
+          </div>
+        </div>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
+  );
+}
