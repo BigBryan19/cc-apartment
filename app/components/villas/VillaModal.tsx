@@ -70,7 +70,7 @@ const VillaModal: React.FC<VillaModalProps> = ({
 
   // --- NEW: Updated Booking Handlers ---
   const handleWhatsAppBooking = () => {
-    const phoneNumber = "233534770274";
+    const phoneNumber = "2330540534870";
     const imageUrl = villa.image.startsWith("http")
       ? villa.image
       : `${window.location.origin}${villa.image}`;
