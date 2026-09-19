@@ -6,11 +6,17 @@ Next.js (App Router) + TypeScript + Tailwind v4 + Supabase, with Paystack paymen
 
 ## Getting started
 
+> **First time here?** Follow **[SETUP.md](SETUP.md)** — a step-by-step guide to
+> creating the Supabase project, running the schema, and getting Paystack keys.
+
 ```bash
 npm install
 cp .env.example .env.local   # then fill in the values below
 npm run dev                  # http://localhost:3000
 ```
+
+Until Supabase is configured the app falls back to the property catalogue
+bundled in `app/lib/data.ts`, so the site is browsable but nothing persists.
 
 ### Required environment variables
 
@@ -30,11 +36,14 @@ npm run dev                  # http://localhost:3000
 ### Database
 
 Run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL editor.
-It is idempotent and creates:
+It is idempotent and bootstraps a project from empty:
 
-- `blocked_dates` — admin-defined unavailable ranges per property (+ RLS policies)
-- the `bookings` columns used by the payment flow (`check_out_date`, `nights`,
-  `currency`, `packages`, `payment_reference`, `payment_status`, `paid_at`, `amount_paid`)
+- `villas` — the property catalogue, seeded with the three starter properties
+- `bookings` — reservations plus the payment columns (`check_out_date`,
+  `nights`, `currency`, `packages`, `payment_reference`, `payment_status`,
+  `paid_at`, `amount_paid`)
+- `blocked_dates` — admin-defined unavailable ranges per property
+- RLS policies for all three (see the security note at the top of the file)
 
 ### Paystack webhook
 
