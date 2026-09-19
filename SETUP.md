@@ -50,11 +50,36 @@ In the dashboard go to **Settings → API Keys** (on older projects this is
 - **anon** / **publishable** key — the public one
 - **service_role** / **secret** key — click reveal, then copy
 
-> Supabase is migrating key names. If your project shows `anon` and
-> `service_role`, use those. If it shows a newer *publishable* / *secret* pair,
-> use those instead. The names in this codebase are just slots — what matters is
-> that the **public** key goes in the `ANON_KEY` variable and the **secret** one
-> goes in the `SERVICE_ROLE_KEY` variable.
+The Project URL is **not** on the API Keys page — click the **Connect** button
+in the dashboard's top bar and it is shown there as
+`https://<project-ref>.supabase.co`.
+
+The panel has two tabs: **Publishable and secret API keys**, and **Legacy anon,
+service_role API keys**. Supabase is retiring the legacy pair by the end of
+2026, so prefer the new tab where your project has it. The mapping is:
+
+| Dashboard | Example | Environment variable |
+| --- | --- | --- |
+| Publishable key | `sb_publishable_Rm67p…` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+| Secret key | `sb_secret_206Eh…` | `SUPABASE_SERVICE_ROLE_KEY` |
+| *(legacy)* anon | `eyJhbGci…` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+| *(legacy)* service_role | `eyJhbGci…` | `SUPABASE_SERVICE_ROLE_KEY` |
+
+The variable names are just slots — what matters is that the **publicly
+shareable** key goes in `ANON_KEY` and the **privileged** key goes in
+`SERVICE_ROLE_KEY`.
+
+Two things to know about the new keys:
+
+- **They are not JWTs.** Send them on the `apikey` header.
+  `@supabase/supabase-js` additionally mirrors the key into
+  `Authorization: Bearer …` when nobody is signed in; Supabase accepts this for
+  migration compatibility, but if you ever see a bare `Invalid JWT` response,
+  that header is the cause.
+- **A secret key returns HTTP 401 if used in a browser.** Supabase matches on
+  the `User-Agent`. That is a safety net, not a licence to expose it: this
+  project reads it only in `app/lib/supabase-server.ts`, which imports
+  `server-only` so it can never be bundled into client code.
 
 ### A3. Create or upgrade the tables
 
