@@ -1,6 +1,6 @@
 // app/layout.tsx
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,7 +13,22 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Display serif used by every `font-serif` heading (properties, prices, admin
+// titles). Without a mapped serif these fell back to the browser default Times.
+const displaySerif = Playfair_Display({
+  variable: "--font-display-serif",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+// Absolute base so Open Graph / Twitter image URLs resolve instead of
+// falling back to localhost (which produced a build warning).
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+  "https://www.cosycrest.com";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Cosy Crest - Luxury Villa & Apartment Rentals",
   description:
     "Experience comfort, privacy, and elegance in our premium furnished apartments in Accra and Aburi. Perfect for vacations, honeymoons, and getaways.",
@@ -21,7 +36,7 @@ export const metadata: Metadata = {
     title: "Cosy Crest Luxury Apartments",
     description:
       "Book premium furnished apartments in Lakeside, Adenta, and Aburi. Exclusive packages for honeymoons and birthday celebrations.",
-    url: "https://www.cosycrest.com", // Replace with your actual domain when live
+    url: SITE_URL, // Set NEXT_PUBLIC_SITE_URL to your live domain
     siteName: "Cosy Crest",
     images: [
       {
@@ -51,7 +66,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${displaySerif.variable} antialiased`}
       >
         {children}
       </body>

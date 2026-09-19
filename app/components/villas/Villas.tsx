@@ -44,10 +44,11 @@ const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
       if (error) {
         console.error("Error fetching villas:", error);
       } else if (data) {
-        // Map 'has_pool' from the database to 'hasPool' in our React interface
-        const formattedData = data.map((v: any) => ({
+        // Map the snake_case `has_pool` column onto the React interface.
+        type VillaRow = Omit<VillaProps, "hasPool"> & { has_pool?: boolean };
+        const formattedData: VillaProps[] = (data as VillaRow[]).map((v) => ({
           ...v,
-          hasPool: v.has_pool,
+          hasPool: Boolean(v.has_pool),
         }));
         setVillasData(formattedData);
       }

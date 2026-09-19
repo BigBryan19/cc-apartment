@@ -1,13 +1,27 @@
 // app/admin/invoice/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Printer, MessageCircle, Mail } from "lucide-react";
+import { toDateKey } from "../../lib/dates";
+
+const MONTH_CODES = [
+  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+];
+
+/** e.g. "SEP-0412". Previously hardcoded to "JUN" regardless of the month. */
+function makeInvoiceNumber(now: Date = new Date()): string {
+  const month = MONTH_CODES[now.getMonth()];
+  const sequence = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+  return `${month}-${sequence}`;
+}
 
 export default function CreateInvoicePage() {
-  const [invoiceData, setInvoiceData] = useState({
-    invoiceNumber: `JUN-${Math.floor(Math.random() * 10000)}`,
-    issueDate: new Date().toISOString().split("T")[0],
+  const [invoiceData, setInvoiceData] = useState(() => ({
+    invoiceNumber: makeInvoiceNumber(),
+    // Local-time key; `toISOString()` would shift the date near midnight.
+    issueDate: toDateKey(new Date()),
     dueDate: "",
     guestName: "",
     guestEmail: "", // Added guest email for the mailto link
@@ -19,7 +33,7 @@ export default function CreateInvoicePage() {
     price: 0,
     paid: 0,
     tax: 0,
-  });
+  }));
 
   // Auto-calculate the amounts
   const subtotal = Number(invoiceData.price) || 0;

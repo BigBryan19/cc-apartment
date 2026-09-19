@@ -105,7 +105,7 @@ export default function AdminDashboard() {
           </button>
         </div>
         <div className="p-12 text-center text-slate-500 text-sm">
-          No bookings yet. Let's get some customers!
+          No bookings yet. Let&apos;s get some customers!
         </div>
       </div>
     </div>

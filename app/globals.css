@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Design tokens
+   The site is a single light theme (stone/slate); a prefers-color-scheme dark
+   override would flip the page background to near-black while the components
+   still assume light surfaces, so it is intentionally not defined here.
+   --------------------------------------------------------------------------- */
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -10,17 +16,79 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* `font-serif` is used throughout for headings — map it to the display
+     serif loaded in app/layout.tsx instead of falling back to Times. */
+  --font-serif: var(--font-display-serif);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
+html {
+  /* Anchor links (#villas, #aboutus, ...) must clear the fixed navbar. */
+  scroll-padding-top: 6rem;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Prevent horizontal jitter from decorative off-canvas elements. */
+  overflow-x: hidden;
+}
+
+/* Consistent, visible keyboard focus across the app. */
+:focus-visible {
+  outline: 2px solid #0f172a;
+  outline-offset: 2px;
+}
+
+/* Respect users who prefer reduced motion (scroll + framer-motion sections). */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Slimmer, consistent scrollbars inside admin data panels. */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+    background-clip: content-box;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Print (used by /admin/invoice "Save as PDF")
+   --------------------------------------------------------------------------- */
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+  }
+  @page {
+    margin: 12mm;
+  }
 }

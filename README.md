@@ -1,37 +1,121 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cosy Crest — Apartment Booking Platform
 
-## Getting Started
+Next.js (App Router) + TypeScript + Tailwind v4 + Supabase, with Paystack payments.
 
-First, run the development server:
+---
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # then fill in the values below
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Required environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Scope | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | public | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public | Supabase anon key (browser reads) |
+| `SUPABASE_SERVICE_ROLE_KEY` | **server only** | Webhook writes booking status, bypassing RLS |
+| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | public | `pk_test_xxx` / `pk_live_xxx` |
+| `PAYSTACK_SECRET_KEY` | **server only** | `sk_test_xxx` / `sk_live_xxx` — signs + verifies transactions |
+| `NEXT_PUBLIC_SITE_URL` | public | Absolute origin, used for Paystack `callback_url` and OG tags |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> The app renders even when these are unset — Supabase calls degrade to empty
+> states and the booking calendar falls back to the default date window. Payment
+> cannot be taken until the Paystack secret key is present.
 
-## Learn More
+### Database
 
-To learn more about Next.js, take a look at the following resources:
+Run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL editor.
+It is idempotent and creates:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `blocked_dates` — admin-defined unavailable ranges per property (+ RLS policies)
+- the `bookings` columns used by the payment flow (`check_out_date`, `nights`,
+  `currency`, `packages`, `payment_reference`, `payment_status`, `paid_at`, `amount_paid`)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Paystack webhook
 
-## Deploy on Vercel
+In **Paystack Dashboard → Settings → API Keys & Webhooks**, set the webhook URL to:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+https://<your-domain>/api/payments/paystack/webhook
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-"# cc-apartment" 
+The endpoint accepts `charge.success` and flips the booking to **paid /
+confirmed**. It is unauthenticated by design and instead verifies the
+`x-paystack-signature` header (HMAC-SHA512 of the raw body with the secret key).
+
+---
+
+## Architecture
+
+### Booking availability
+
+| Module | Responsibility |
+| --- | --- |
+| [`app/lib/dates.ts`](app/lib/dates.ts) | Date engine: local-time `YYYY-MM-DD` keys, window boundaries, nights, range expansion, conflict detection, `validateStay` |
+| [`app/lib/availability.ts`](app/lib/availability.ts) | `useVillaAvailability(villaId)` merges admin blockouts + existing bookings; fails soft |
+| [`app/components/booking/DateRangePicker.tsx`](app/components/booking/DateRangePicker.tsx) | Availability-aware calendar that greys out unavailable nights |
+
+**Booking window.** The window is a rolling "current year + next calendar year":
+
+- In 2026, bookings are open through **31 Dec 2027**; 2028 is blocked.
+- Once the calendar reaches 2027, **2028 opens automatically**.
+
+The tuning point is `MID_YEAR_EXTENSION_MONTH` in `app/lib/dates.ts`.
+
+**Conflict rule.** A stay occupies the half-open interval `[check-in, check-out)`.
+The check-out day itself is free for the next guest's check-in, so a booking may
+begin on the day another ends. Past dates, dates beyond the window, admin-blocked
+dates, and already-booked nights are all disabled in the picker.
+
+### Payments
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/api/payments/paystack/initialize` | POST | Validates the request, re-checks availability server-side, creates a `pending` booking, returns the Paystack checkout URL |
+| `/api/payments/paystack/verify` | GET | Called by `/checkout/success`; confirms the transaction against Paystack so a delayed webhook cannot lose a sale |
+| `/api/payments/paystack/webhook` | POST | Verifies the signature and marks the booking paid/confirmed on `charge.success` |
+
+Amounts are converted to the currency subunit (pesewas/cents) with `toSubunit()`.
+Card, mobile money, bank transfer and USSD channels are enabled.
+
+---
+
+## Admin
+
+| Route | Purpose |
+| --- | --- |
+| `/admin` | Dashboard stats |
+| `/admin/villas` | Add / delete properties |
+| `/admin/availability` | Block or release date ranges per property |
+| `/admin/bookings` | Review reservations, payment status, confirm/cancel |
+| `/admin/invoice` | Build and print/share an invoice |
+| `/admin/settings` | Change the admin password |
+
+---
+
+## Scripts
+
+```bash
+npm run dev     # development server
+npm run build   # production build
+npm run start   # serve the production build
+npm run lint    # eslint
+npx tsc --noEmit  # typecheck
+```
+
+---
+
+## Deployment (Vercel)
+
+1. Push the repo and import it into Vercel.
+2. Add every variable from `.env.example` under **Project → Settings → Environment Variables**.
+3. Deploy. Route Handlers run as serverless functions.
+
+> **Note on `next.config.ts`:** this project previously used `output: "export"`
+> (static HTML export). That was removed because a static export cannot host
+> Route Handlers, which the Paystack endpoints require.

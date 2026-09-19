@@ -28,7 +28,7 @@ const Footer: React.FC = () => {
           {/* Left Side: Dark Info Panel */}
           <div className="bg-slate-900 text-white p-12 md:w-5/12 relative flex flex-col justify-between">
             <div>
-              <h3 className="text-3xl font-serif mb-10">Let's connect</h3>
+              <h3 className="text-3xl font-serif mb-10">Let&apos;s connect</h3>
 
               <div className="space-y-8 text-sm text-gray-400">
                 <div className="flex gap-4 items-start">

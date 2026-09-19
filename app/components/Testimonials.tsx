@@ -54,8 +54,8 @@ const Testimonials: React.FC = () => {
             Guest Experiences
           </h2>
           <p className="text-white/60 text-sm max-w-xl">
-            Don't just take our word for it. Here is what our guests have to say
-            about their stay.
+            Don&apos;t just take our word for it. Here is what our guests have to
+            say about their stay.
           </p>
         </div>
 
@@ -80,7 +80,7 @@ const Testimonials: React.FC = () => {
                     ))}
                   </div>
                   <p className="text-xl md:text-3xl font-light leading-relaxed text-white/90 mb-8 italic">
-                    "{review.text}"
+                     &quot;{review.text}&quot;
                   </p>
                   <div>
                     <h4 className="font-bold text-sm tracking-widest uppercase">

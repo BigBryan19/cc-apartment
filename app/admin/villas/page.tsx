@@ -146,7 +146,8 @@ export default function ManageVillas() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 text-xs font-bold uppercase tracking-wider">
                 <th className="py-4 px-6">Property</th>
@@ -191,12 +192,13 @@ export default function ManageVillas() {
                   <td colSpan={5} className="py-12 text-center text-slate-400">
                     No villas found in the database.
                   </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+                 </tr>
+               )}
+             </tbody>
+           </table>
+           </div>
+         </div>
+       )}
 
       {/* Add New Villa Slide-out / Modal Overlay */}
       {isModalOpen && (
