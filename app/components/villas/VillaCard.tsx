@@ -1,16 +1,8 @@
+// app/components/villas/VillaCard.tsx
 "use client";
 
 import React from "react";
-import {
-  Heart,
-  Play,
-  Image as ImageIcon,
-  MapPin,
-  Users,
-  BedDouble,
-  Waves,
-  Bath,
-} from "lucide-react";
+import { Heart, Play, MapPin, Star, Users, BedDouble, Bath } from "lucide-react";
 import { VillaProps } from "./types";
 import { formatPrice } from "./utils";
 
@@ -28,85 +20,104 @@ const VillaCard: React.FC<VillaCardProps> = ({
   onToggleFavorite,
   ...villa
 }) => {
+  const data = villa as VillaProps;
+
   return (
-    <div
-      onClick={() => onClick(villa as VillaProps)}
-      className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative h-full flex flex-col"
+    <article
+      onClick={() => onClick(data)}
+      className="group cursor-pointer flex flex-col"
     >
-      <div className="relative h-72 overflow-hidden shrink-0">
-        {villa.video ? (
+      {/* ---- Media ---- */}
+      <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-[var(--color-canvas)]">
+        {data.video ? (
           <video
-            src={villa.video}
+            src={data.video}
             autoPlay
             loop
             muted
             playsInline
-            className="w-full h-full object-cover group-hover:scale-105 transition duration-700"
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
           />
         ) : (
           <img
-            src={villa.image}
-            alt={villa.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition duration-700"
+            src={data.image}
+            alt={data.title}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-          <div className="bg-white/20 backdrop-blur-md p-4 rounded-full border border-white/50">
-            {villa.video ? (
-              <Play fill="white" className="text-white w-8 h-8 ml-1" />
-            ) : (
-              <ImageIcon className="text-white w-8 h-8" />
-            )}
-          </div>
-        </div>
-        <span className="absolute top-4 left-4 bg-white/95 backdrop-blur-md px-4 py-2 text-xs font-bold rounded-full shadow-sm z-20 transition-all">
-          From{" "}
-          <span className="font-serif text-base text-slate-900">
-            {formatPrice(villa.price, currency)}
-          </span>{" "}
-          / daily
-        </span>
+
+        {/* Pool badge — a real attribute, not decoration */}
+        {data.hasPool && (
+          <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-[var(--color-ink)] backdrop-blur-sm">
+            Pool
+          </span>
+        )}
+
+        {/* Video affordance */}
+        {data.video && (
+          <span className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+            <Play size={11} fill="currentColor" /> Tour
+          </span>
+        )}
+
         <button
-          className={`absolute top-4 right-4 p-2.5 backdrop-blur-sm rounded-full transition z-20 ${
-            isFavorite
-              ? "bg-white text-red-500 shadow-md"
-              : "bg-black/20 text-white hover:bg-white hover:text-red-500"
-          }`}
           onClick={(e) => {
             e.stopPropagation();
-            onToggleFavorite(villa.id);
+            onToggleFavorite(data.id);
           }}
+          aria-label={isFavorite ? "Remove from favourites" : "Save to favourites"}
+          aria-pressed={isFavorite}
+          className="absolute right-3 top-3 rounded-full p-2 transition-transform duration-200 hover:scale-110 active:scale-95"
         >
-          <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />
+          <Heart
+            size={22}
+            className={
+              isFavorite
+                ? "fill-[var(--color-accent)] text-[var(--color-accent)] drop-shadow-sm"
+                : "fill-black/25 text-white drop-shadow-sm"
+            }
+          />
         </button>
       </div>
-      <div className="p-6 flex flex-col flex-grow">
-        <div className="flex items-center gap-1 text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">
-          <MapPin size={12} /> {villa.location}
+
+      {/* ---- Details (below the image, never overlaid) ---- */}
+      <div className="pt-3">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="truncate text-[15px] font-semibold leading-snug text-[var(--color-ink)]">
+            {data.title}
+          </h3>
+          <span className="flex shrink-0 items-center gap-1 text-[13px] text-[var(--color-ink-soft)]">
+            <Star size={12} className="fill-[var(--color-ink)] text-[var(--color-ink)]" />
+            4.9
+          </span>
         </div>
-        <h3 className="text-2xl font-serif text-slate-900 mb-4 group-hover:text-blue-600 transition">
-          {villa.title}
-        </h3>
-        <div className="mt-auto grid grid-cols-2 gap-y-3 text-xs text-gray-500 font-medium pt-4 border-t border-gray-100">
-          <div className="flex items-center gap-2">
-            <Users size={14} className="text-slate-400" /> {villa.guests} guests
-          </div>
-          <div className="flex items-center gap-2">
-            <BedDouble size={14} className="text-slate-400" /> {villa.bedrooms}{" "}
-            bedrooms
-          </div>
-          <div className="flex items-center gap-2">
-            <Waves size={14} className="text-slate-400" />{" "}
-            {villa.hasPool ? "Pool" : "No Pool"}
-          </div>
-          <div className="flex items-center gap-2">
-            <Bath size={14} className="text-slate-400" /> {villa.bathrooms}{" "}
-            baths
-          </div>
-        </div>
+
+        <p className="mt-0.5 flex items-center gap-1 truncate text-[13px] text-[var(--color-muted)]">
+          <MapPin size={12} className="shrink-0" />
+          {data.location}
+        </p>
+
+        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] text-[var(--color-muted)]">
+          <span className="flex items-center gap-1">
+            <Users size={12} /> {data.guests} guests
+          </span>
+          <span className="flex items-center gap-1">
+            <BedDouble size={12} /> {data.bedrooms} bed
+          </span>
+          <span className="flex items-center gap-1">
+            <Bath size={12} /> {data.bathrooms} bath
+          </span>
+        </p>
+
+        <p className="mt-2 text-[15px] text-[var(--color-ink)]">
+          <span className="font-semibold">
+            {formatPrice(data.price, currency)}
+          </span>
+          <span className="text-[var(--color-muted)]"> / night</span>
+        </p>
       </div>
-    </div>
+    </article>
   );
 };
 

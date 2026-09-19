@@ -39,7 +39,7 @@ export default function ManageVillas() {
     guests: "2",
     bedrooms: "1",
     bathrooms: "1",
-    image: "/lake1.jpg", // Temporary default image string path
+    image: "/Lake1.jpg", // Default image for newly added properties
     description: "",
   });
 
@@ -95,7 +95,7 @@ export default function ManageVillas() {
         guests: "2",
         bedrooms: "1",
         bathrooms: "1",
-        image: "/lake1.jpg",
+        image: "/Lake1.jpg",
         description: "",
       });
       fetchVillas(); // Refresh table
@@ -124,7 +124,7 @@ export default function ManageVillas() {
       {/* Header section */}
       <div className="flex justify-between items-center mb-10">
         <div>
-          <h1 className="text-3xl font-serif text-slate-900 mb-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)] mb-2">
             Manage Villas
           </h1>
           <p className="text-slate-500 text-sm">
@@ -133,7 +133,7 @@ export default function ManageVillas() {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-slate-700 hover:bg-slate-800 text-white px-5 py-3 rounded-xl text-sm font-bold shadow-md transition-all active:scale-95"
+          className="btn-ink flex items-center gap-2 rounded-xl px-5 py-3 text-sm"
         >
           <Plus size={18} /> Add New Villa
         </button>
@@ -145,7 +145,7 @@ export default function ManageVillas() {
           <Loader2 className="animate-spin text-slate-900" size={40} />
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-[var(--color-line-soft)] shadow-[var(--shadow-raise)] overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left border-collapse">
             <thead>
@@ -358,7 +358,7 @@ export default function ManageVillas() {
                 type="submit"
                 form="add-villa-form"
                 disabled={isSubmitting}
-                className="w-2/3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                className="btn-ink flex w-2/3 items-center justify-center gap-2 rounded-xl py-3.5 text-sm"
               >
                 {isSubmitting ? (
                   <>

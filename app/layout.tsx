@@ -13,12 +13,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Display serif used by every `font-serif` heading (properties, prices, admin
-// titles). Without a mapped serif these fell back to the browser default Times.
-const displaySerif = Playfair_Display({
-  variable: "--font-display-serif",
+// Display serif, applied deliberately via the `.font-display` utility on large
+// headings only — UI text is sans throughout.
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
   subsets: ["latin"],
   display: "swap",
+  weight: ["400", "500", "600"],
 });
 
 // Absolute base so Open Graph / Twitter image URLs resolve instead of
@@ -66,7 +67,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${displaySerif.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased`}
       >
         {children}
       </body>

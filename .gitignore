@@ -42,3 +42,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local UI review screenshots (not part of the app)
+/shots/
+/shots2/

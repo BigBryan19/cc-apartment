@@ -83,7 +83,7 @@ export default function CreateInvoicePage() {
       {/* Page Header - Hidden when printing */}
       <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 print:hidden">
         <div>
-          <h1 className="text-3xl font-serif text-slate-900 mb-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)] mb-2">
             Create Invoice
           </h1>
           <p className="text-slate-500 text-sm">
@@ -117,7 +117,7 @@ export default function CreateInvoicePage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
         {/* LEFT COLUMN: Input Form */}
-        <div className="xl:col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 print:hidden space-y-6 sticky top-6">
+        <div className="xl:col-span-4 bg-white p-6 rounded-2xl border border-[var(--color-line-soft)] shadow-[var(--shadow-raise)] print:hidden space-y-6 sticky top-6">
           <h2 className="font-serif text-lg text-slate-900 border-b border-slate-100 pb-4">
             Invoice Data
           </h2>

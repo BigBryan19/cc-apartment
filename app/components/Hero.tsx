@@ -1,9 +1,9 @@
+// app/components/Hero.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search } from "lucide-react";
+import { Search, MapPin, Users, Wallet, ChevronDown } from "lucide-react";
 import Navbar from "./Navbar";
-// Import the filter type from your main page file
 import { SearchFilters } from "./villas/types";
 
 interface HeroProps {
@@ -12,195 +12,291 @@ interface HeroProps {
   setSearchFilters: React.Dispatch<React.SetStateAction<SearchFilters>>;
 }
 
-// --- NEW: Define your slider images and locations ---
 const heroSlides = [
   { id: 1, image: "/Lake1.jpg", location: "LAKESIDE" },
   { id: 2, image: "/Aburi1.jpeg", location: "ABURI" },
   { id: 3, image: "/Adenta1.jpg", location: "ADENTA" },
 ];
 
+const ANY_PRICE = 10000;
+
 const Hero: React.FC<HeroProps> = ({
   currency,
   toggleCurrency,
   setSearchFilters,
 }) => {
-  // Local state for inputs before pressing search
-  const [localLocation, setLocalLocation] = useState("");
-  const [localGuests, setLocalGuests] = useState(2);
-  const [maxPrice, setMaxPrice] = useState(3000);
+  const [location, setLocation] = useState("");
+  const [guests, setGuests] = useState(2);
+  const [maxPrice, setMaxPrice] = useState(ANY_PRICE);
 
-  // --- NEW: State for Slider and Typewriter ---
   const [currentSlide, setCurrentSlide] = useState(0);
   const [displayText, setDisplayText] = useState("");
 
-  // 1. Background Image Slider Interval
+  // Background rotation
   useEffect(() => {
-    const slideInterval = setInterval(() => {
-      setCurrentSlide((prev) =>
-        prev === heroSlides.length - 1 ? 0 : prev + 1,
-      );
-    }, 6000); // Change slide every 6 seconds
-
-    return () => clearInterval(slideInterval);
+    const id = setInterval(() => {
+      setCurrentSlide((prev) => (prev === heroSlides.length - 1 ? 0 : prev + 1));
+    }, 7000);
+    return () => clearInterval(id);
   }, []);
 
-  // 2. Typewriter Effect Logic
+  // Typewriter headline
   useEffect(() => {
-    const fullText = `BE OUR GUEST IN ${heroSlides[currentSlide].location}`;
-    setDisplayText(""); // Reset text when slide changes
+    const fullText = `Be our guest in ${heroSlides[currentSlide].location}`;
+    setDisplayText("");
     let i = 0;
-
-    const typingInterval = setInterval(() => {
+    const id = setInterval(() => {
       if (i < fullText.length) {
         setDisplayText(fullText.substring(0, i + 1));
-        i++;
+        i += 1;
       } else {
-        clearInterval(typingInterval);
+        clearInterval(id);
       }
-    }, 100); // Speed of typing (100ms per character)
-
-    return () => clearInterval(typingInterval);
+    }, 55);
+    return () => clearInterval(id);
   }, [currentSlide]);
 
-  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setMaxPrice(Number(e.target.value));
+  const symbol = currency === "GHS" ? "₵" : "$";
+  // Price brackets track the active currency so the filter always matches.
+  const brackets =
+    currency === "GHS" ? [1000, 2000, 3500, 5000] : [100, 150, 250, 400];
+
+  const handleSearch = () => {
+    setSearchFilters({ location, guests, maxPrice });
+    document.getElementById("villas")?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const currencySymbol = currency === "GHS" ? "₵" : "$";
-
-  // --- Handle Search Click ---
-  const handleSearchClick = () => {
-    setSearchFilters({
-      location: localLocation,
-      guests: localGuests,
-      maxPrice: maxPrice,
-    });
-
-    const villasSection = document.getElementById("villas");
-    if (villasSection) {
-      villasSection.scrollIntoView({ behavior: "smooth" });
-    }
-  };
+  /* Shared segment shell: label on top, control underneath — the Airbnb
+     ".field" pattern. */
+  const segment =
+    "group relative flex-1 min-w-0 px-8 py-3.5 text-left transition-colors";
+  const label =
+    "block text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--color-ink)] mb-0.5";
 
   return (
-    <div className="relative h-[90vh] w-full overflow-hidden bg-slate-900">
-      {/* --- NEW: Dynamic Background Image Slider --- */}
+    <section className="relative min-h-[92svh] w-full overflow-hidden bg-[#111]">
+      {/* Background slider */}
       {heroSlides.map((slide, index) => (
         <div
           key={slide.id}
-          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-            index === currentSlide ? "opacity-100 z-0" : "opacity-0 z-0"
+          className={`absolute inset-0 transition-opacity duration-[1200ms] ease-in-out ${
+            index === currentSlide ? "opacity-100" : "opacity-0"
           }`}
+          aria-hidden={index !== currentSlide}
         >
           <img
             src={slide.image}
-            alt={`Hero Luxury Villa ${slide.location}`}
-            className="w-full h-full object-cover"
+            alt={`Luxury apartment in ${slide.location}`}
+            className={`h-full w-full object-cover ${
+              index === currentSlide ? "animate-kenburns" : ""
+            }`}
           />
-          {/* Dark overlay to make white text readable */}
-          <div className="absolute inset-0 bg-black/40"></div>
         </div>
       ))}
 
-      {/* Navbar with props passed down */}
+      {/* Legibility scrims — the mid-stop is kept dark enough that the
+          sub-heading stays readable over bright areas of the photo. */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/45 to-black/70" />
+
       <div className="relative z-20">
         <Navbar currency={currency} toggleCurrency={toggleCurrency} />
       </div>
 
-      <div className="relative z-10 flex flex-col items-center justify-center h-full text-white px-4">
-        {/* --- NEW: Typewriter Header --- */}
-        <h1 className="text-4xl md:text-7xl lg:text-8xl font-serif mb-6 text-center shadow-sm drop-shadow-lg h-[80px] md:h-[120px] flex items-center justify-center">
+      <div className="relative z-10 shell flex min-h-[92svh] flex-col items-center justify-center pt-28 pb-16 text-center">
+        <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-md">
+          Accra · Aburi · Adenta
+        </span>
+
+        <h1 className="font-display text-[2.6rem] leading-[1.05] text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.45)] sm:text-6xl lg:text-7xl min-h-[3.5rem] sm:min-h-[4.5rem] flex items-center justify-center">
           <span>{displayText}</span>
-          {/* Blinking Cursor */}
-          <span className="animate-pulse ml-1 inline-block w-1 md:w-2 h-10 md:h-20 bg-white"></span>
+          <span className="ml-1.5 inline-block h-[0.85em] w-[3px] animate-pulse bg-white/90 align-middle" />
         </h1>
 
-        <p className="text-xs md:text-sm uppercase tracking-[0.2em] mb-12 bg-gray-900/30 px-6 py-3 backdrop-blur-md rounded-full border border-white/10">
-          Live like a king in our best houses
+        <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/85 sm:text-base">
+          Fully furnished, privately managed apartments with pools, fast Wi-Fi
+          and hotel-grade housekeeping.
         </p>
 
-        {/* Search Bar Component */}
-        <div className="bg-white rounded-lg p-2 flex flex-col md:flex-row gap-0 md:gap-4 items-center text-gray-700 shadow-2xl max-w-5xl w-full mx-4">
-          {/* Input Group: Location */}
-          <div className="flex-1 px-6 py-3 border-b md:border-b-0 md:border-r border-gray-100 w-full">
-            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-              Location
-            </label>
-            <select
-              className="w-full bg-transparent outline-none font-serif text-lg text-slate-800 cursor-pointer"
-              value={localLocation}
-              onChange={(e) => setLocalLocation(e.target.value)}
-            >
-              <option value="">All Locations</option>
-              <option value="Aburi">Aburi (Eastern Region)</option>
-              <option value="Lakeside">Lakeside (Greater Accra)</option>
-            </select>
-          </div>
-
-          {/* Input Group: Dates */}
-          <div className="flex-1 px-6 py-3 border-b md:border-b-0 md:border-r border-gray-100 w-full">
-            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-              Dates
-            </label>
-            <input
-              type="date"
-              className="w-full bg-transparent outline-none font-serif text-sm text-slate-800"
-            />
-          </div>
-
-          {/* Input Group: Guests */}
-          <div className="flex-1 px-6 py-3 border-b md:border-b-0 md:border-r border-gray-100 w-full">
-            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-              Guests
-            </label>
-            <select
-              className="w-full bg-transparent outline-none font-serif text-lg text-slate-800 cursor-pointer"
-              value={localGuests}
-              onChange={(e) => setLocalGuests(Number(e.target.value))}
-            >
-              <option value="2">2 Guests</option>
-              <option value="4">4 Guests</option>
-              <option value="6">6+ Guests</option>
-            </select>
-          </div>
-
-          {/* Input Group: Price Slider */}
-          <div className="flex-1 px-6 py-3 w-full min-w-[200px]">
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Max Price
+        {/* ---------------- Search ---------------- */}
+        <div className="mt-9 w-full max-w-4xl">
+          <div className="hidden md:flex items-stretch rounded-full bg-white p-2 shadow-[var(--shadow-pill)]">
+            <div className={`${segment} rounded-full hover:bg-[var(--color-canvas)]`}>
+              <label htmlFor="hero-location" className={label}>
+                Where
               </label>
-              <span className="font-serif text-sm font-bold text-slate-900">
-                Up to {currencySymbol}
-                {maxPrice}
-              </span>
+              <div className="relative">
+                <select
+                  id="hero-location"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="w-full cursor-pointer appearance-none bg-transparent pr-5 text-sm text-[var(--color-muted)] outline-none"
+                >
+                  <option value="">Anywhere in Ghana</option>
+                  <option value="Aburi">Aburi, Eastern Region</option>
+                  <option value="Lakeside">Lakeside, Greater Accra</option>
+                  <option value="Adenta">Adenta, Greater Accra</option>
+                </select>
+                <ChevronDown
+                  size={14}
+                  className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-[var(--color-faint)]"
+                />
+              </div>
             </div>
 
-            <input
-              type="range"
-              min="100"
-              max="5000"
-              step="100"
-              value={maxPrice}
-              onChange={handlePriceChange}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-slate-800"
-            />
-            <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-              <span>{currencySymbol}100</span>
-              <span>{currencySymbol}5k+</span>
+            <div className="my-2 w-px bg-[var(--color-line-soft)]" />
+
+            <div className={`${segment} rounded-full hover:bg-[var(--color-canvas)]`}>
+              <label htmlFor="hero-guests" className={label}>
+                Guests
+              </label>
+              <div className="relative">
+                <select
+                  id="hero-guests"
+                  value={guests}
+                  onChange={(e) => setGuests(Number(e.target.value))}
+                  className="w-full cursor-pointer appearance-none bg-transparent pr-5 text-sm text-[var(--color-muted)] outline-none"
+                >
+                  <option value="1">1 guest</option>
+                  <option value="2">2 guests</option>
+                  <option value="4">4 guests</option>
+                  <option value="6">6+ guests</option>
+                </select>
+                <ChevronDown
+                  size={14}
+                  className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-[var(--color-faint)]"
+                />
+              </div>
             </div>
+
+            <div className="my-2 w-px bg-[var(--color-line-soft)]" />
+
+            <div className={`${segment} rounded-full hover:bg-[var(--color-canvas)]`}>
+              <label htmlFor="hero-price" className={label}>
+                Nightly budget
+              </label>
+              <div className="relative">
+                <select
+                  id="hero-price"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(Number(e.target.value))}
+                  className="w-full cursor-pointer appearance-none bg-transparent pr-5 text-sm text-[var(--color-muted)] outline-none"
+                >
+                  <option value={ANY_PRICE}>Any price</option>
+                  {brackets.map((b) => (
+                    <option key={b} value={b}>
+                      Up to {symbol}
+                      {b.toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={14}
+                  className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-[var(--color-faint)]"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleSearch}
+              className="btn-accent ml-2 flex shrink-0 items-center gap-2 rounded-full px-7 text-sm"
+              aria-label="Search properties"
+            >
+              <Search size={17} />
+              <span>Search</span>
+            </button>
           </div>
 
-          {/* Functional Search Button */}
-          <button
-            onClick={handleSearchClick}
-            className="bg-slate-700 hover:bg-slate-800 text-white px-8 py-4 rounded-md md:ml-2 flex items-center gap-2 w-full md:w-auto justify-center transition duration-300 shadow-lg active:scale-95"
-          >
-            Search <Search size={18} />
-          </button>
+          {/* Mobile: stacked card */}
+          <div className="md:hidden rounded-2xl bg-white p-3 shadow-[var(--shadow-pill)] text-left">
+            <div className="flex items-center gap-3 px-2 py-2.5 border-b border-[var(--color-line-soft)]">
+              <MapPin size={17} className="text-[var(--color-muted)] shrink-0" />
+              <div className="flex-1 min-w-0">
+                <label htmlFor="hero-location-m" className={label}>
+                  Where
+                </label>
+                <select
+                  id="hero-location-m"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="w-full appearance-none bg-transparent text-sm text-[var(--color-ink)] outline-none"
+                >
+                  <option value="">Anywhere in Ghana</option>
+                  <option value="Aburi">Aburi, Eastern Region</option>
+                  <option value="Lakeside">Lakeside, Greater Accra</option>
+                  <option value="Adenta">Adenta, Greater Accra</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 px-2 py-2.5 border-b border-[var(--color-line-soft)]">
+              <Users size={17} className="text-[var(--color-muted)] shrink-0" />
+              <div className="flex-1 min-w-0">
+                <label htmlFor="hero-guests-m" className={label}>
+                  Guests
+                </label>
+                <select
+                  id="hero-guests-m"
+                  value={guests}
+                  onChange={(e) => setGuests(Number(e.target.value))}
+                  className="w-full appearance-none bg-transparent text-sm text-[var(--color-ink)] outline-none"
+                >
+                  <option value="1">1 guest</option>
+                  <option value="2">2 guests</option>
+                  <option value="4">4 guests</option>
+                  <option value="6">6+ guests</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 px-2 py-2.5">
+              <Wallet size={17} className="text-[var(--color-muted)] shrink-0" />
+              <div className="flex-1 min-w-0">
+                <label htmlFor="hero-price-m" className={label}>
+                  Nightly budget
+                </label>
+                <select
+                  id="hero-price-m"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(Number(e.target.value))}
+                  className="w-full appearance-none bg-transparent text-sm text-[var(--color-ink)] outline-none"
+                >
+                  <option value={ANY_PRICE}>Any price</option>
+                  {brackets.map((b) => (
+                    <option key={b} value={b}>
+                      Up to {symbol}
+                      {b.toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSearch}
+              className="btn-accent mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm"
+            >
+              <Search size={17} /> Search
+            </button>
+          </div>
+        </div>
+
+        {/* Slide indicators */}
+        <div className="mt-8 flex items-center gap-2">
+          {heroSlides.map((slide, index) => (
+            <button
+              key={slide.id}
+              onClick={() => setCurrentSlide(index)}
+              aria-label={`Show ${slide.location}`}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                index === currentSlide
+                  ? "w-8 bg-white"
+                  : "w-1.5 bg-white/45 hover:bg-white/70"
+              }`}
+            />
+          ))}
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

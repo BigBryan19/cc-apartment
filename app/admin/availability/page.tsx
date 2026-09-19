@@ -169,7 +169,7 @@ export default function ManageAvailability() {
   return (
     <div className="max-w-6xl mx-auto animate-in fade-in duration-500">
       <header className="mb-10">
-        <h1 className="text-3xl font-serif text-slate-900 mb-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)] mb-2">
           Manage Availability
         </h1>
         <p className="text-slate-500 text-sm leading-relaxed">
@@ -196,7 +196,7 @@ export default function ManageAvailability() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* ---------------- Blockout form ---------------- */}
-        <div className="lg:col-span-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-[var(--color-line-soft)] shadow-[var(--shadow-raise)]">
           <h2 className="font-serif text-lg text-slate-900 pb-4 mb-6 border-b border-slate-100 flex items-center gap-2">
             <CalendarOff size={18} className="text-slate-500" /> Block Dates
           </h2>
@@ -314,7 +314,7 @@ export default function ManageAvailability() {
         {/* ---------------- Existing ranges ---------------- */}
         <div className="lg:col-span-7 space-y-6">
           {/* Blocked */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-2xl border border-[var(--color-line-soft)] shadow-[var(--shadow-raise)] overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 className="font-serif text-lg text-slate-900 flex items-center gap-2">
                 <CalendarOff size={18} className="text-amber-500" /> Blocked Ranges
@@ -363,7 +363,7 @@ export default function ManageAvailability() {
           </div>
 
           {/* Booked (read-only) */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-2xl border border-[var(--color-line-soft)] shadow-[var(--shadow-raise)] overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 className="font-serif text-lg text-slate-900 flex items-center gap-2">
                 <CalendarCheck size={18} className="text-green-500" /> Reserved by

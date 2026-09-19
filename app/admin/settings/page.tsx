@@ -41,7 +41,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
       <div className="mb-10">
-        <h1 className="text-3xl font-serif text-slate-900 mb-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)] mb-2">
           Admin Settings
         </h1>
         <p className="text-slate-500 text-sm">
@@ -49,7 +49,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden max-w-xl">
+      <div className="bg-white rounded-2xl border border-[var(--color-line-soft)] shadow-[var(--shadow-raise)] overflow-hidden max-w-xl">
         <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
           <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
             <KeyRound size={20} />

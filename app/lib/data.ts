@@ -11,8 +11,8 @@ export const villasData: VillaProps[] = [
     bedrooms: 3,
     hasPool: true,
     bathrooms: 5,
-    image: "/lake1.jpg",
-    images: ["/lake1.jpg", "/lake2.jpg", "/lake3.jpg", "/lake4.jpg"],
+    image: "/Lake1.jpg",
+    images: ["/Lake1.jpg", "/Lake2.jpg", "/Lake3.jpg", "/Lake4.jpg"],
     description:
       "Experience comfort, privacy, and elegance in this beautifully furnished apartment located in the serene and secure Lakeside Estate.",
     amenities: [

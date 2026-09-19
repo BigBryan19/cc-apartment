@@ -19,6 +19,13 @@ import type { DateRange } from "./dates";
 
 export const BLOCKED_DATES_TABLE = "blocked_dates";
 
+/**
+ * Hard cap on how long the calendar will wait for availability. Without this a
+ * slow or unreachable database leaves the picker showing "Checking…" forever;
+ * after the timeout we render the default window plus a warning instead.
+ */
+export const AVAILABILITY_TIMEOUT_MS = 6000;
+
 /** Rows are stored per-property and may be a single day or a range. */
 export interface BlockedDateRow {
   id?: string | number;
@@ -80,16 +87,26 @@ export function useVillaAvailability(villaId: number | null): AvailabilityState 
     const load = async () => {
       const supabase = createClient();
 
+      // Abort the lookups if the backend does not answer in time so the
+      // skeleton state can never become permanent.
+      const controller = new AbortController();
+      const timer = setTimeout(
+        () => controller.abort(),
+        AVAILABILITY_TIMEOUT_MS,
+      );
+
       try {
         const [blockedResult, bookedResult] = await Promise.all([
           supabase
             .from(BLOCKED_DATES_TABLE)
             .select("id, villa_id, start_date, end_date, reason")
-            .eq("villa_id", villaId),
+            .eq("villa_id", villaId)
+            .abortSignal(controller.signal),
           supabase
             .from("bookings")
             .select("check_in_date, check_out_date, status")
-            .eq("villa_id", villaId),
+            .eq("villa_id", villaId)
+            .abortSignal(controller.signal),
         ]);
 
         if (cancelled) return;
@@ -130,9 +147,16 @@ export function useVillaAvailability(villaId: number | null): AvailabilityState 
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Unknown error");
+          setError(
+            controller.signal.aborted
+              ? "Availability lookup timed out."
+              : err instanceof Error
+                ? err.message
+                : "Unknown error",
+          );
         }
       } finally {
+        clearTimeout(timer);
         if (!cancelled) setIsLoading(false);
       }
     };

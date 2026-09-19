@@ -1,50 +1,68 @@
 import React from "react";
+import { ArrowUpRight } from "lucide-react";
+
+const REGIONS = [
+  {
+    id: "eastern",
+    title: "Eastern Region",
+    subtitle: "Aburi, near Aburi Girls School",
+    image:
+      "https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?q=80&w=2070&auto=format&fit=crop",
+    alt: "Lush hills of the Eastern Region",
+  },
+  {
+    id: "accra",
+    title: "Greater Accra",
+    subtitle: "Lakeside Estate & Adenta",
+    image:
+      "https://images.unsplash.com/photo-1534008897995-27a23e859048?q=80&w=2070&auto=format&fit=crop",
+    alt: "Greater Accra coastline",
+  },
+];
 
 const Regions: React.FC = () => {
   return (
-    <section className="py-24 bg-[#d8cdbf] px-4 md:px-12">
-      <div className="text-center mb-16">
-        <h2 className="text-4xl md:text-5xl font-serif text-slate-900 mb-6">
-          OUR REGIONS
-        </h2>
-        <p className="text-slate-700 max-w-2xl mx-auto text-sm leading-relaxed opacity-70">
-          Discover our carefully selected locations, each offering a unique
-          blend of comfort, convenience, and unforgettable experiences tailored
-          to your stay.
-        </p>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-10 max-w-6xl mx-auto">
-        {/* Card 1: Rounded Top Right, Bottom Left */}
-        <div className="relative h-[450px] group overflow-hidden rounded-tr-[100px] rounded-bl-[100px] shadow-2xl cursor-pointer">
-          <img
-            src="https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?q=80&w=2070&auto=format&fit=crop"
-            alt="Eastern Region"
-            className="w-full h-full object-cover group-hover:scale-110 transition duration-1000"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-          <div className="absolute bottom-10 left-10 text-white">
-            <h3 className="text-4xl font-serif mb-2">Eastern Region</h3>
-            <p className="text-sm opacity-80 font-light">
-              Aburi - Aburi near Aburi Girls School
-            </p>
-          </div>
+    <section className="section-y bg-white">
+      <div className="shell">
+        <div className="max-w-2xl">
+          <span className="eyebrow">Destinations</span>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-4xl">
+            Where you&apos;ll be staying
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-[var(--color-muted)]">
+            Two regions, each with its own pace — the cool hills of Aburi and the
+            easy coastal energy of Greater Accra.
+          </p>
         </div>
 
-        {/* Card 2: Rounded Top Left, Bottom Right */}
-        <div className="relative h-[450px] group overflow-hidden rounded-tl-[100px] rounded-br-[100px] shadow-2xl cursor-pointer">
-          <img
-            src="https://images.unsplash.com/photo-1534008897995-27a23e859048?q=80&w=2070&auto=format&fit=crop"
-            alt="Greater Accra"
-            className="w-full h-full object-cover group-hover:scale-110 transition duration-1000"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-          <div className="absolute bottom-10 left-10 text-white">
-            <h3 className="text-4xl font-serif mb-2">Greater Accra</h3>
-            <p className="text-sm opacity-80 font-light">
-              Accra - Lakeside Estate
-            </p>
-          </div>
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          {REGIONS.map((region) => (
+            <a
+              key={region.id}
+              href="#villas"
+              className="group relative block h-[380px] overflow-hidden rounded-2xl md:h-[440px]"
+            >
+              <img
+                src={region.image}
+                alt={region.alt}
+                loading="lazy"
+                className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
+
+              <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-6 md:p-7">
+                <div>
+                  <h3 className="text-2xl font-semibold tracking-tight text-white md:text-3xl">
+                    {region.title}
+                  </h3>
+                  <p className="mt-1 text-sm text-white/80">{region.subtitle}</p>
+                </div>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-md transition-colors group-hover:bg-white group-hover:text-[var(--color-ink)]">
+                  <ArrowUpRight size={18} />
+                </span>
+              </div>
+            </a>
+          ))}
         </div>
       </div>
     </section>

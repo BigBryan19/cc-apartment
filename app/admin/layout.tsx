@@ -33,7 +33,7 @@ export default function AdminLayout({
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans">
       {/* ---------------- Desktop sidebar ---------------- */}
-      <aside className="w-64 bg-slate-700 text-white flex-col hidden md:flex fixed h-full z-10">
+      <aside className="w-64 bg-[var(--color-ink)] text-white flex-col hidden md:flex fixed h-full z-10">
         <div className="h-20 px-6 flex items-center border-b border-slate-800/60">
           <img
             src="/cc-horinzontal.png"
@@ -75,7 +75,7 @@ export default function AdminLayout({
       </aside>
 
       {/* ---------------- Mobile top bar + horizontal nav ---------------- */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-20 bg-slate-700 text-white">
+      <div className="md:hidden fixed top-0 inset-x-0 z-20 bg-[var(--color-ink)] text-white">
         <div className="h-16 px-5 flex items-center border-b border-slate-800/60">
           <img
             src="/cc-horinzontal.png"

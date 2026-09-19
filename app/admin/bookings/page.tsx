@@ -95,7 +95,7 @@ export default function ManageBookings() {
   return (
     <div className="max-w-6xl mx-auto animate-in fade-in duration-500">
       <div className="mb-10">
-        <h1 className="text-3xl font-serif text-slate-900 mb-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)] mb-2">
           Manage Bookings
         </h1>
         <p className="text-slate-500 text-sm">
@@ -108,7 +108,7 @@ export default function ManageBookings() {
           <Loader2 className="animate-spin text-slate-900" size={40} />
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-[var(--color-line-soft)] shadow-[var(--shadow-raise)] overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left border-collapse">
             <thead>
