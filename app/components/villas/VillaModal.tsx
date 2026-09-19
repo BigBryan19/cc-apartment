@@ -17,6 +17,9 @@ import {
 import { VillaProps } from "./types";
 import { formatPrice, getAmenityIcon } from "./utils";
 import { useRouter } from "next/navigation";
+import DateRangePicker from "../booking/DateRangePicker";
+import { useVillaAvailability } from "../../lib/availability";
+import { validateStay } from "../../lib/dates";
 
 interface VillaModalProps {
   villa: VillaProps;
@@ -52,6 +55,9 @@ const VillaModal: React.FC<VillaModalProps> = ({
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
 
   const router = useRouter();
+
+  // Live availability: admin blockouts + existing reservations for this villa.
+  const availability = useVillaAvailability(villa.id);
 
   const slides = villa.video
     ? [
@@ -108,13 +114,14 @@ const VillaModal: React.FC<VillaModalProps> = ({
     }
   };
 
-  const getTodayDateString = () => {
-    const today = new Date();
-    return today.toISOString().split("T")[0];
-  };
-
   const pricePerNight = selectedRateAmount;
   const computedTotalPrice = totalNights * pricePerNight;
+
+  // Blocks the booking CTA when the chosen stay crosses an unavailable night.
+  const stayError =
+    checkInDate && checkOutDate
+      ? validateStay(checkInDate, checkOutDate, availability.all)
+      : null;
 
   // --- NEW: Toggle Package Selection ---
   const togglePackage = (pkgId: string) => {
@@ -283,46 +290,34 @@ const VillaModal: React.FC<VillaModalProps> = ({
             {villa.description}
           </p>
 
-          {/* Broad Day Range Picker Interface */}
+          {/* Availability-aware calendar: past, booked and blocked nights are
+              disabled so only continuously available ranges can be chosen. */}
           <div className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <div className="flex items-center gap-2 mb-3 text-slate-700">
-              <Calendar size={16} />
-              <span className="text-xs font-bold uppercase tracking-widest">
-                Select Rental Days
+            <div className="flex items-center justify-between mb-1 text-slate-700">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+                <Calendar size={16} /> Select Rental Days
               </span>
+              {availability.isLoading && (
+                <span className="text-[10px] uppercase tracking-wider text-slate-400">
+                  Checking…
+                </span>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-3 mb-2">
-              <div>
-                <label className="block text-[10px] text-gray-400 font-bold uppercase mb-1">
-                  Check-In
-                </label>
-                <input
-                  type="date"
-                  min={getTodayDateString()}
-                  value={checkInDate}
-                  onChange={(e) => {
-                    setCheckInDate(e.target.value);
-                    if (checkOutDate && e.target.value >= checkOutDate) {
-                      setCheckOutDate("");
-                    }
-                  }}
-                  className="w-full bg-white border border-gray-200 rounded-lg p-2 text-xs outline-none text-slate-800 focus:border-slate-400 transition"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] text-gray-400 font-bold uppercase mb-1">
-                  Check-Out
-                </label>
-                <input
-                  type="date"
-                  min={checkInDate || getTodayDateString()}
-                  disabled={!checkInDate}
-                  value={checkOutDate}
-                  onChange={(e) => setCheckOutDate(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-lg p-2 text-xs outline-none text-slate-800 disabled:opacity-50 focus:border-slate-400 transition"
-                />
-              </div>
-            </div>
+
+            <DateRangePicker
+              checkIn={checkInDate}
+              checkOut={checkOutDate}
+              unavailableRanges={availability.all}
+              onChange={(nextIn, nextOut) => {
+                setCheckInDate(nextIn);
+                setCheckOutDate(nextOut);
+              }}
+              message={
+                availability.error
+                  ? "Live availability is unavailable — showing the default booking window only."
+                  : undefined
+              }
+            />
           </div>
 
           {/* --- NEW: Special Packages Selector --- */}
@@ -386,15 +381,27 @@ const VillaModal: React.FC<VillaModalProps> = ({
           {/* Booking Button Trigger Panel */}
           <div className="mt-auto pt-4">
             {!showBookingOptions ? (
-              <button
-                onClick={() => setShowBookingOptions(true)}
-                disabled={!checkInDate || !checkOutDate || totalNights === 0}
-                className="w-full bg-slate-900 text-white py-4 font-bold uppercase tracking-widest text-xs hover:bg-slate-800 transition rounded-lg flex items-center justify-center gap-2 shadow-lg hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {!checkInDate || !checkOutDate
-                  ? "Select Dates to Book"
-                  : "Proceed to Book"}
-              </button>
+              <>
+                {stayError && (
+                  <p className="mb-3 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-2 leading-relaxed">
+                    {stayError}
+                  </p>
+                )}
+                <button
+                  onClick={() => setShowBookingOptions(true)}
+                  disabled={
+                    !checkInDate ||
+                    !checkOutDate ||
+                    totalNights === 0 ||
+                    Boolean(stayError)
+                  }
+                  className="w-full bg-slate-900 text-white py-4 font-bold uppercase tracking-widest text-xs hover:bg-slate-800 transition rounded-lg flex items-center justify-center gap-2 shadow-lg hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {!checkInDate || !checkOutDate
+                    ? "Select Dates to Book"
+                    : "Proceed to Book"}
+                </button>
+              </>
             ) : (
               <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
                 <span className="text-center text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">

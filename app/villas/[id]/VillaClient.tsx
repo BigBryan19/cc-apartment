@@ -19,6 +19,9 @@ import { villasData } from "../../lib/data";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 import { formatPrice, getAmenityIcon } from "../../components/villas/utils";
+import DateRangePicker from "../../components/booking/DateRangePicker";
+import { useVillaAvailability } from "../../lib/availability";
+import { validateStay } from "../../lib/dates";
 
 const AVAILABLE_PACKAGES = [
   { id: "Honeymoon Setup", icon: Heart, label: "Honeymoon" },
@@ -36,6 +39,11 @@ export default function VillaClient({
   const router = useRouter();
   const villaId = parseInt(unwrappedParams.id);
   const villa = villasData.find((v) => v.id === villaId);
+
+  // Admin blockouts + existing reservations for this property.
+  const availability = useVillaAvailability(
+    Number.isNaN(villaId) ? null : villaId,
+  );
 
   // States
   const [currency, setCurrency] = useState<"GHS" | "USD">("GHS");
@@ -87,6 +95,11 @@ export default function VillaClient({
   };
 
   const computedTotalPrice = totalNights * selectedRateAmount;
+
+  const stayError =
+    checkInDate && checkOutDate
+      ? validateStay(checkInDate, checkOutDate, availability.all)
+      : null;
 
   const handleCheckoutBooking = () => {
     const queryParams = new URLSearchParams({
@@ -249,37 +262,33 @@ export default function VillaClient({
                 })}
               </div>
 
-              {/* Date Selection */}
+              {/* Date Selection — booked and admin-blocked nights are disabled */}
               <div className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="grid grid-cols-2 gap-3 mb-2">
-                  <div>
-                    <label className="block text-[10px] text-gray-400 font-bold uppercase mb-1">
-                      Check-In
-                    </label>
-                    <input
-                      type="date"
-                      min={new Date().toISOString().split("T")[0]}
-                      value={checkInDate}
-                      onChange={(e) => setCheckInDate(e.target.value)}
-                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-xs outline-none text-slate-800 focus:border-slate-400 transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-400 font-bold uppercase mb-1">
-                      Check-Out
-                    </label>
-                    <input
-                      type="date"
-                      min={
-                        checkInDate || new Date().toISOString().split("T")[0]
-                      }
-                      disabled={!checkInDate}
-                      value={checkOutDate}
-                      onChange={(e) => setCheckOutDate(e.target.value)}
-                      className="w-full bg-white border border-gray-200 rounded-lg p-3 text-xs outline-none text-slate-800 disabled:opacity-50 focus:border-slate-400 transition"
-                    />
-                  </div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500">
+                    <Calendar size={14} /> Stay Dates
+                  </span>
+                  {availability.isLoading && (
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400">
+                      Checking…
+                    </span>
+                  )}
                 </div>
+
+                <DateRangePicker
+                  checkIn={checkInDate}
+                  checkOut={checkOutDate}
+                  unavailableRanges={availability.all}
+                  onChange={(nextIn, nextOut) => {
+                    setCheckInDate(nextIn);
+                    setCheckOutDate(nextOut);
+                  }}
+                  message={
+                    availability.error
+                      ? "Live availability is unavailable — showing the default booking window only."
+                      : undefined
+                  }
+                />
               </div>
 
               {/* Packages */}
@@ -331,9 +340,20 @@ export default function VillaClient({
                 </div>
               )}
 
+              {stayError && (
+                <p className="mb-3 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-2 leading-relaxed">
+                  {stayError}
+                </p>
+              )}
+
               <button
                 onClick={handleCheckoutBooking}
-                disabled={!checkInDate || !checkOutDate || totalNights === 0}
+                disabled={
+                  !checkInDate ||
+                  !checkOutDate ||
+                  totalNights === 0 ||
+                  Boolean(stayError)
+                }
                 className="w-full bg-slate-900 text-white py-4 font-bold uppercase tracking-widest text-xs hover:bg-slate-800 transition rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {!checkInDate || !checkOutDate
