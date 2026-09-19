@@ -41,6 +41,11 @@ const CheckoutContent = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successNote, setSuccessNote] = useState("");
+  /**
+   * Set when the property cannot be resolved. Without this the page rendered
+   * the loading spinner forever, because `villa` simply never arrived.
+   */
+  const [loadError, setLoadError] = useState("");
 
   const [checkInDate, setCheckInDate] = useState<string>("");
   const [checkOutDate, setCheckOutDate] = useState<string>("");
@@ -73,16 +78,28 @@ const CheckoutContent = () => {
     const packagesParam = searchParams.get("packages");
 
     const fetchVilla = async () => {
-      if (villaIdParam) {
+      if (!villaIdParam) {
+        setLoadError("No property was specified. Please choose an apartment first.");
+        return;
+      }
+      try {
         const { data, error } = await supabase
           .from("villas")
           .select("*")
           .eq("id", villaIdParam)
           .single();
 
-        if (data && !error) {
-          setVilla({ ...data, hasPool: data.has_pool } as VillaProps);
+        if (error || !data) {
+          setLoadError(
+            "We could not load this property. It may have been removed, or the booking system is temporarily unavailable.",
+          );
+          return;
         }
+        setVilla({ ...data, hasPool: data.has_pool } as VillaProps);
+      } catch {
+        setLoadError(
+          "We could not reach the booking system. Please check your connection and try again.",
+        );
       }
     };
     fetchVilla();
@@ -224,13 +241,13 @@ const CheckoutContent = () => {
   // --- Success screen -----------------------------------------------------
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-stone-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-canvas)] px-4">
         <div className="bg-white p-10 md:p-12 rounded-3xl shadow-lg text-center max-w-md w-full">
           <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
             <ShieldCheck size={40} />
           </div>
-          <h2 className="text-3xl font-serif text-slate-900 mb-4">
-            Booking Received!
+          <h2 className="mb-4 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
+            Booking received
           </h2>
           <p className="text-slate-500 mb-6 leading-relaxed">
             Thank you, {formData.firstName}. We have received your reservation
@@ -242,8 +259,41 @@ const CheckoutContent = () => {
               {successNote}
             </p>
           )}
-          <div className="animate-pulse text-xs font-bold text-slate-400 uppercase tracking-widest">
-            Redirecting to home...
+          <div className="animate-pulse text-xs font-semibold text-[var(--color-faint)]">
+            Redirecting to home…
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Unresolvable property ----------------------------------------------
+  if (loadError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-canvas)] px-4">
+        <div className="w-full max-w-md rounded-2xl border border-[var(--color-line)] bg-white p-8 text-center shadow-[var(--shadow-raise)]">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+            <AlertTriangle size={26} />
+          </div>
+          <h2 className="text-xl font-semibold tracking-tight text-[var(--color-ink)]">
+            This booking can&apos;t be completed
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">
+            {loadError}
+          </p>
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <button
+              onClick={() => router.push("/")}
+              className="btn-ink rounded-lg px-6 py-3 text-sm"
+            >
+              Browse apartments
+            </button>
+            <button
+              onClick={() => router.back()}
+              className="rounded-lg border border-[var(--color-line)] px-6 py-3 text-sm font-semibold text-[var(--color-ink)] transition-colors hover:bg-[var(--color-canvas)]"
+            >
+              Go back
+            </button>
           </div>
         </div>
       </div>
@@ -253,11 +303,11 @@ const CheckoutContent = () => {
   // --- Loading screen -----------------------------------------------------
   if (!villa) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-stone-50">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="w-8 h-8 border-4 border-slate-900 border-t-transparent rounded-full animate-spin mb-4" />
-          <p className="text-slate-500 text-sm font-medium tracking-widest uppercase">
-            Loading Checkout...
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-canvas)]">
+        <div className="flex animate-pulse flex-col items-center">
+          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-ink)] border-t-transparent" />
+          <p className="text-sm font-medium text-[var(--color-muted)]">
+            Loading checkout…
           </p>
         </div>
       </div>
@@ -265,33 +315,36 @@ const CheckoutContent = () => {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 py-10 md:py-12 px-4 md:px-8 lg:px-12 font-sans">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-[var(--color-canvas)] px-4 py-10 font-sans md:px-8 md:py-14 lg:px-12">
+      <div className="mx-auto max-w-5xl">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-900 transition mb-8 uppercase tracking-widest"
+          className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-muted)] transition-colors hover:text-[var(--color-ink)]"
         >
-          <ChevronLeft size={16} /> Back to Villa
+          <ChevronLeft size={16} /> Back to villa
         </button>
 
-        <h1 className="text-3xl md:text-4xl font-serif text-slate-900 mb-8">
-          Secure Checkout
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-3xl">
+          Confirm and pay
         </h1>
+        <p className="mt-2 text-sm text-[var(--color-muted)]">
+          Your reservation is confirmed as soon as payment succeeds.
+        </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
           {/* ---------------- Left: form ---------------- */}
           <div className="lg:col-span-7 space-y-6">
             <form
               onSubmit={handlePaymentSubmit}
-              className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100"
+              className="rounded-2xl border border-[var(--color-line-soft)] bg-white p-6 shadow-[var(--shadow-raise)] md:p-8"
             >
-              <h2 className="text-xl font-serif text-slate-900 mb-6">
-                Guest Information
+              <h2 className="mb-6 text-lg font-semibold tracking-tight text-[var(--color-ink)]">
+                Guest information
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  <label className="eyebrow mb-2 block">
                     First Name
                   </label>
                   <input
@@ -301,12 +354,12 @@ const CheckoutContent = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, firstName: e.target.value })
                     }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-slate-900 outline-none transition"
+                    className="w-full rounded-lg border border-[var(--color-line)] bg-white px-3.5 py-3 text-sm text-[var(--color-ink)] outline-none transition-colors placeholder:text-[var(--color-faint)] focus:border-[var(--color-ink)]"
                     placeholder="John"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  <label className="eyebrow mb-2 block">
                     Last Name
                   </label>
                   <input
@@ -316,12 +369,12 @@ const CheckoutContent = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, lastName: e.target.value })
                     }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-slate-900 outline-none transition"
+                    className="w-full rounded-lg border border-[var(--color-line)] bg-white px-3.5 py-3 text-sm text-[var(--color-ink)] outline-none transition-colors placeholder:text-[var(--color-faint)] focus:border-[var(--color-ink)]"
                     placeholder="Doe"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  <label className="eyebrow mb-2 block">
                     Email Address
                   </label>
                   <input
@@ -331,12 +384,12 @@ const CheckoutContent = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, email: e.target.value })
                     }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-slate-900 outline-none transition"
+                    className="w-full rounded-lg border border-[var(--color-line)] bg-white px-3.5 py-3 text-sm text-[var(--color-ink)] outline-none transition-colors placeholder:text-[var(--color-faint)] focus:border-[var(--color-ink)]"
                     placeholder="john@example.com"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  <label className="eyebrow mb-2 block">
                     Phone Number
                   </label>
                   <input
@@ -346,17 +399,18 @@ const CheckoutContent = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, phone: e.target.value })
                     }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-slate-900 outline-none transition"
+                    className="w-full rounded-lg border border-[var(--color-line)] bg-white px-3.5 py-3 text-sm text-[var(--color-ink)] outline-none transition-colors placeholder:text-[var(--color-faint)] focus:border-[var(--color-ink)]"
                     placeholder="+233 50 000 0000"
                   />
                 </div>
               </div>
 
               {/* Dates */}
-              <h2 className="text-xl font-serif text-slate-900 mb-4 flex items-center gap-2">
-                <Calendar size={18} className="text-slate-400" /> Stay Dates
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-tight text-[var(--color-ink)]">
+                <Calendar size={17} className="text-[var(--color-muted)]" /> Stay
+                dates
               </h2>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-8">
+              <div className="mb-8 rounded-xl border border-[var(--color-line)] p-4">
                 <DateRangePicker
                   checkIn={checkInDate}
                   checkOut={checkOutDate}
@@ -374,8 +428,8 @@ const CheckoutContent = () => {
               </div>
 
               {/* Payment method */}
-              <h2 className="text-xl font-serif text-slate-900 mb-4">
-                Payment Method
+              <h2 className="mb-4 text-lg font-semibold tracking-tight text-[var(--color-ink)]">
+                Payment method
               </h2>
               <div className="grid grid-cols-2 gap-4 mb-2">
                 <div
@@ -383,14 +437,14 @@ const CheckoutContent = () => {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => e.key === "Enter" && setPaymentMethod("card")}
-                  className={`border rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition ${
+                  className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-colors ${
                     paymentMethod === "card"
-                      ? "border-slate-900 bg-slate-50 text-slate-900 shadow-inner"
-                      : "border-slate-200 text-slate-500 hover:border-slate-300"
+                      ? "border-[var(--color-ink)] bg-[var(--color-canvas)] text-[var(--color-ink)]"
+                      : "border-[var(--color-line)] text-[var(--color-muted)] hover:border-[var(--color-ink)]"
                   }`}
                 >
-                  <CreditCard size={24} />
-                  <span className="text-xs font-bold uppercase tracking-widest text-center">
+                  <CreditCard size={22} />
+                  <span className="text-center text-[13px] font-semibold">
                     Card
                   </span>
                 </div>
@@ -401,19 +455,19 @@ const CheckoutContent = () => {
                   onKeyDown={(e) =>
                     e.key === "Enter" && setPaymentMethod("mobile_money")
                   }
-                  className={`border rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition ${
+                  className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-colors ${
                     paymentMethod === "mobile_money"
-                      ? "border-slate-900 bg-slate-50 text-slate-900 shadow-inner"
-                      : "border-slate-200 text-slate-500 hover:border-slate-300"
+                      ? "border-[var(--color-ink)] bg-[var(--color-canvas)] text-[var(--color-ink)]"
+                      : "border-[var(--color-line)] text-[var(--color-muted)] hover:border-[var(--color-ink)]"
                   }`}
                 >
-                  <Smartphone size={24} />
-                  <span className="text-xs font-bold uppercase tracking-widest text-center">
-                    Mobile Money
+                  <Smartphone size={22} />
+                  <span className="text-center text-[13px] font-semibold">
+                    Mobile money
                   </span>
                 </div>
               </div>
-              <p className="text-[11px] text-slate-400 mb-6">
+              <p className="mb-6 text-xs text-[var(--color-muted)]">
                 You will be redirected to Paystack to complete payment securely.
               </p>
 
@@ -426,7 +480,7 @@ const CheckoutContent = () => {
               <button
                 type="submit"
                 disabled={loading || Boolean(stayError) || totalNights === 0}
-                className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-slate-800 transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-accent flex w-full items-center justify-center gap-2 rounded-xl py-4 text-sm"
               >
                 {loading ? (
                   <>
@@ -434,22 +488,22 @@ const CheckoutContent = () => {
                     payment...
                   </>
                 ) : totalNights === 0 ? (
-                  "Select Dates to Continue"
+                  "Select dates to continue"
                 ) : (
                   `Pay ${formatPrice(displayAmount, currency)}`
                 )}
               </button>
-              <div className="flex items-center justify-center gap-2 mt-4 text-xs text-slate-400 font-medium">
-                <ShieldCheck size={14} /> Payments are secure and encrypted
+              <div className="mt-4 flex items-center justify-center gap-2 text-xs font-medium text-[var(--color-muted)]">
+                <ShieldCheck size={14} /> Secured by Paystack
               </div>
             </form>
           </div>
 
           {/* ---------------- Right: summary ---------------- */}
           <div className="lg:col-span-5">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:sticky lg:top-24">
-              <h2 className="text-xl font-serif text-slate-900 mb-6">
-                Booking Summary
+            <div className="rounded-2xl border border-[var(--color-line)] bg-white p-6 shadow-[var(--shadow-card)] lg:sticky lg:top-24">
+              <h2 className="mb-6 text-lg font-semibold tracking-tight text-[var(--color-ink)]">
+                Booking summary
               </h2>
 
               <div className="flex gap-4 mb-6 pb-6 border-b border-slate-100">
@@ -459,9 +513,11 @@ const CheckoutContent = () => {
                   className="w-24 h-24 object-cover rounded-xl shrink-0"
                 />
                 <div className="min-w-0">
-                  <h3 className="font-bold text-slate-900">{villa.title}</h3>
-                  <div className="flex items-center gap-1 text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1 mb-2">
-                    <MapPin size={10} /> {villa.location}
+                  <h3 className="font-semibold text-[var(--color-ink)]">
+                    {villa.title}
+                  </h3>
+                  <div className="mb-2 mt-1 flex items-center gap-1 text-xs text-[var(--color-muted)]">
+                    <MapPin size={11} /> {villa.location}
                   </div>
                   <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md font-medium">
                     {villa.bedrooms} Beds • {villa.guests} Guests
@@ -472,7 +528,7 @@ const CheckoutContent = () => {
               <div className="space-y-4 mb-6 pb-6 border-b border-slate-100 text-sm">
                 <div className="flex justify-between text-slate-600">
                   <span>Selected Rate</span>
-                  <span className="font-medium text-slate-900">
+                  <span className="font-medium text-[var(--color-ink)]">
                     {selectedRate || "Standard"}
                   </span>
                 </div>
@@ -480,19 +536,19 @@ const CheckoutContent = () => {
                   <>
                     <div className="flex justify-between text-slate-600">
                       <span>Check-in</span>
-                      <span className="font-medium text-slate-900">
+                      <span className="font-medium text-[var(--color-ink)]">
                         {checkInDate}
                       </span>
                     </div>
                     <div className="flex justify-between text-slate-600">
                       <span>Check-out</span>
-                      <span className="font-medium text-slate-900">
+                      <span className="font-medium text-[var(--color-ink)]">
                         {checkOutDate}
                       </span>
                     </div>
                     <div className="flex justify-between text-slate-600">
                       <span>Duration</span>
-                      <span className="font-medium text-slate-900">
+                      <span className="font-medium text-[var(--color-ink)]">
                         {totalNights} Night{totalNights === 1 ? "" : "s"}
                       </span>
                     </div>
@@ -530,7 +586,7 @@ const CheckoutContent = () => {
                     {currency} Currency
                   </span>
                 </div>
-                <span className="text-2xl md:text-3xl font-serif text-slate-900 leading-none">
+                <span className="text-2xl font-semibold tracking-tight leading-none text-[var(--color-ink)] md:text-3xl">
                   {formatPrice(displayAmount, currency)}
                 </span>
               </div>
@@ -546,7 +602,7 @@ export default function CheckoutPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-stone-50">
+        <div className="min-h-screen flex items-center justify-center bg-[var(--color-canvas)]">
           <div className="animate-pulse flex flex-col items-center">
             <div className="w-8 h-8 border-4 border-slate-900 border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-slate-500 text-sm font-medium tracking-widest uppercase">
