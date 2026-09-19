@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import Navbar from "./Navbar";
 // Import the filter type from your main page file
@@ -12,6 +12,13 @@ interface HeroProps {
   setSearchFilters: React.Dispatch<React.SetStateAction<SearchFilters>>;
 }
 
+// --- NEW: Define your slider images and locations ---
+const heroSlides = [
+  { id: 1, image: "/Lake1.jpg", location: "LAKESIDE" },
+  { id: 2, image: "/Aburi1.jpeg", location: "ABURI" },
+  { id: 3, image: "/Adenta1.jpg", location: "ADENTA" },
+];
+
 const Hero: React.FC<HeroProps> = ({
   currency,
   toggleCurrency,
@@ -22,6 +29,39 @@ const Hero: React.FC<HeroProps> = ({
   const [localGuests, setLocalGuests] = useState(2);
   const [maxPrice, setMaxPrice] = useState(3000);
 
+  // --- NEW: State for Slider and Typewriter ---
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [displayText, setDisplayText] = useState("");
+
+  // 1. Background Image Slider Interval
+  useEffect(() => {
+    const slideInterval = setInterval(() => {
+      setCurrentSlide((prev) =>
+        prev === heroSlides.length - 1 ? 0 : prev + 1,
+      );
+    }, 6000); // Change slide every 6 seconds
+
+    return () => clearInterval(slideInterval);
+  }, []);
+
+  // 2. Typewriter Effect Logic
+  useEffect(() => {
+    const fullText = `BE OUR GUEST IN ${heroSlides[currentSlide].location}`;
+    setDisplayText(""); // Reset text when slide changes
+    let i = 0;
+
+    const typingInterval = setInterval(() => {
+      if (i < fullText.length) {
+        setDisplayText(fullText.substring(0, i + 1));
+        i++;
+      } else {
+        clearInterval(typingInterval);
+      }
+    }, 100); // Speed of typing (100ms per character)
+
+    return () => clearInterval(typingInterval);
+  }, [currentSlide]);
+
   const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMaxPrice(Number(e.target.value));
   };
@@ -30,14 +70,12 @@ const Hero: React.FC<HeroProps> = ({
 
   // --- Handle Search Click ---
   const handleSearchClick = () => {
-    // 1. Update global state
     setSearchFilters({
       location: localLocation,
       guests: localGuests,
       maxPrice: maxPrice,
     });
 
-    // 2. Smooth scroll to villas section
     const villasSection = document.getElementById("villas");
     if (villasSection) {
       villasSection.scrollIntoView({ behavior: "smooth" });
@@ -45,21 +83,38 @@ const Hero: React.FC<HeroProps> = ({
   };
 
   return (
-    <div className="relative h-[90vh] w-full overflow-hidden">
-      {/* --- RESTORED: Static Background Image --- */}
-      <img
-        src="/hero.png"
-        alt="Hero Luxury Villa"
-        className="absolute inset-0 w-full h-full object-cover opacity-100"
-      />
+    <div className="relative h-[90vh] w-full overflow-hidden bg-slate-900">
+      {/* --- NEW: Dynamic Background Image Slider --- */}
+      {heroSlides.map((slide, index) => (
+        <div
+          key={slide.id}
+          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+            index === currentSlide ? "opacity-100 z-0" : "opacity-0 z-0"
+          }`}
+        >
+          <img
+            src={slide.image}
+            alt={`Hero Luxury Villa ${slide.location}`}
+            className="w-full h-full object-cover"
+          />
+          {/* Dark overlay to make white text readable */}
+          <div className="absolute inset-0 bg-black/40"></div>
+        </div>
+      ))}
 
       {/* Navbar with props passed down */}
-      <Navbar currency={currency} toggleCurrency={toggleCurrency} />
+      <div className="relative z-20">
+        <Navbar currency={currency} toggleCurrency={toggleCurrency} />
+      </div>
 
       <div className="relative z-10 flex flex-col items-center justify-center h-full text-white px-4">
-        <h1 className="text-5xl md:text-8xl font-serif mb-6 text-center shadow-sm drop-shadow-lg">
-          BE OUR GUEST
+        {/* --- NEW: Typewriter Header --- */}
+        <h1 className="text-4xl md:text-7xl lg:text-8xl font-serif mb-6 text-center shadow-sm drop-shadow-lg h-[80px] md:h-[120px] flex items-center justify-center">
+          <span>{displayText}</span>
+          {/* Blinking Cursor */}
+          <span className="animate-pulse ml-1 inline-block w-1 md:w-2 h-10 md:h-20 bg-white"></span>
         </h1>
+
         <p className="text-xs md:text-sm uppercase tracking-[0.2em] mb-12 bg-gray-900/30 px-6 py-3 backdrop-blur-md rounded-full border border-white/10">
           Live like a king in our best houses
         </p>

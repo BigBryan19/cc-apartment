@@ -1,7 +1,4 @@
-// components/villas/villasData.ts
-import { VillaProps } from "./types";
-
-
+import { VillaProps } from "../components/villas/types";
 
 export const villasData: VillaProps[] = [
   {
@@ -59,8 +56,8 @@ export const villasData: VillaProps[] = [
       { option: "Studio", amount: 800 },
       { option: "One bedrooms", amount: 1200 },
       { option: "Two bedrooms", amount: 2000 },
-      { option: "Whole apartment (4 bedrooms)", amount: 3500 },
-      { option: "Monthly Rate (Whole apartment)", amount: 30000 },
+      { option: "Whole apartment", amount: 3500 },
+      { option: "Monthly Rate", amount: 30000 },
     ],
   },
   {
@@ -86,11 +83,10 @@ export const villasData: VillaProps[] = [
       "PS5 Gaming Console",
     ],
     rates: [
-      { option: "Single bedroom", amount: 1500 },
-      { option: "Studio", amount: 2000 },
-      { option: "Two bedrooms", amount: 3500 },
-      { option: "Two bedrooms", amount: 42000 },
+      { option: "One bedroom", amount: 1500 },
+      { option: "Two bedrooms", amount: 2000 },
+      { option: "Whole apartment", amount: 3500 },
+      { option: "Monthly Rate", amount: 36000 },
     ],
   },
 ];
-

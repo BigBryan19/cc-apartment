@@ -38,29 +38,29 @@ const AboutUs: React.FC = () => {
         {/* Image Collage */}
         <div className="order-1 md:order-2 relative h-[600px] w-full hidden md:block">
           {/* Image 1: Top Left */}
-          <div className="absolute top-0 left-0 w-64 h-80 rounded-2xl shadow-2xl overflow-hidden z-20 border-[6px] border-stone-50 transform -rotate-3 hover:rotate-0 transition duration-500">
+          <div className=" top-0 left-0 w-64 h-80 rounded-2xl shadow-2xl overflow-hidden z-20 border-[6px] border-stone-50 transform -rotate-3 hover:rotate-0 transition duration-500">
             <img
-              src="/img1.jpg"
+              src="/Lake1.jpg"
               className="w-full h-full object-cover"
               alt="Travelers"
             />
           </div>
 
           {/* Image 2: Right */}
-          <div className="absolute top-24 right-0 w-72 h-96 rounded-2xl shadow-xl overflow-hidden z-10 opacity-90 grayscale hover:grayscale-0 transition duration-500">
+          <div className=" bottom-12 left-12 w-80 h-56 rounded-2xl shadow-2xl overflow-hidden z-30 border-[6px] border-stone-50 transform rotate-3 hover:rotate-0 transition duration-500">
             <img
-              src="/img3.jpg"
+              src="/Adenta1.jpg"
               className="w-full h-full object-cover"
-              alt="Resort View"
+              alt="Relaxing"
             />
           </div>
 
           {/* Image 3: Bottom Left */}
-          <div className="absolute bottom-12 left-12 w-80 h-56 rounded-2xl shadow-2xl overflow-hidden z-30 border-[6px] border-stone-50 transform rotate-3 hover:rotate-0 transition duration-500">
+          <div className="absolute top-24 right-0 w-72 h-96 rounded-2xl shadow-xl overflow-hidden z-10 opacity-90 grayscale hover:grayscale-0 transition duration-500">
             <img
-              src="/img2.jpg"
+              src="/Aburi1.jpeg"
               className="w-full h-full object-cover"
-              alt="Relaxing"
+              alt="Resort View"
             />
           </div>
         </div>

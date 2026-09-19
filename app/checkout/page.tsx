@@ -1,6 +1,5 @@
 // app/checkout/page.tsx
 "use client";
-
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -10,9 +9,10 @@ import {
   ShieldCheck,
   MapPin,
   Loader2,
+  Calendar,
+  Gift,
 } from "lucide-react";
-
-import { villasData } from "../components/villas/villasData";
+import { createClient } from "../utils/supabase";
 import { VillaProps } from "../components/villas/types";
 
 const CheckoutContent = () => {
@@ -25,48 +25,129 @@ const CheckoutContent = () => {
   const [paymentMethod, setPaymentMethod] = useState<"card" | "mobile_money">(
     "card",
   );
-
-  // Simulated loading state for the fake payment
   const [loading, setLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  // --- NEW: States for the new URL parameters ---
+  const [checkOutDate, setCheckOutDate] = useState<string>("");
+  const [totalNights, setTotalNights] = useState<number>(0);
+  const [computedTotal, setComputedTotal] = useState<number>(0);
+  const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
     phone: "",
+    checkInDate: "",
   });
+
+  const supabase = createClient();
 
   useEffect(() => {
     const id = searchParams.get("villaId");
     const rate = searchParams.get("rate");
     const curr = searchParams.get("currency");
 
-    if (id) {
-      const foundVilla = villasData.find((v) => v.id === parseInt(id));
-      if (foundVilla) setVilla(foundVilla);
-    }
+    // --- NEW: Extracting extra parameters ---
+    const checkInParam = searchParams.get("checkIn");
+    const checkOutParam = searchParams.get("checkOut");
+    const nightsParam = searchParams.get("nights");
+    const totalParam = searchParams.get("totalPrice");
+    const packagesParam = searchParams.get("packages");
+
+    const fetchVilla = async () => {
+      if (id) {
+        const { data, error } = await supabase
+          .from("villas")
+          .select("*")
+          .eq("id", id)
+          .single();
+
+        if (data && !error) {
+          setVilla({ ...data, hasPool: data.has_pool });
+        }
+      }
+    };
+    fetchVilla();
+
     if (rate) setSelectedRate(rate);
     if (curr) setCurrency(curr);
+    if (checkOutParam) setCheckOutDate(checkOutParam);
+    if (nightsParam) setTotalNights(parseInt(nightsParam));
+    if (totalParam) setComputedTotal(parseFloat(totalParam));
+    if (packagesParam)
+      setSelectedPackages(packagesParam.split(",").filter(Boolean));
+
+    // Pre-fill the check-in date if it exists
+    if (checkInParam) {
+      setFormData((prev) => ({ ...prev, checkInDate: checkInParam }));
+    }
   }, [searchParams]);
 
-  // --- SIMULATED PAYMENT LOGIC ---
-  const handlePaymentSubmit = (e: React.FormEvent) => {
+  // --- LIVE DATABASE SUBMISSION ---
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email) return alert("Please enter your email address.");
+    if (!formData.email || !formData.checkInDate || !villa) {
+      return alert(
+        "Please fill out all required fields, including your check-in date.",
+      );
+    }
 
     setLoading(true);
 
-    // Simulate a 2-second payment processing delay
-    setTimeout(() => {
-      setLoading(false);
-      alert(
-        "Payment Successful! We will redirect you to the success page shortly.",
-      );
+    // Use the exact computed total from the URL if available, otherwise fallback
+    const finalAmount = computedTotal > 0 ? computedTotal : villa.price;
 
-      // We will uncomment this once we build the success page!
-      // router.push(`/success?ref=CC_${Math.floor(Math.random() * 100000)}`);
-    }, 2000);
+    // Insert the booking into Supabase
+    // Note: If you want to save packages and check-out dates to the DB,
+    // you will need to add those columns to your Supabase 'bookings' table first!
+    const { error } = await supabase.from("bookings").insert([
+      {
+        villa_id: villa.id,
+        guest_name: `${formData.firstName} ${formData.lastName}`.trim(),
+        guest_email: formData.email,
+        guest_phone: formData.phone,
+        check_in_date: formData.checkInDate,
+        total_amount: finalAmount,
+        payment_method: paymentMethod,
+        status: "pending",
+      },
+    ]);
+
+    setLoading(false);
+
+    if (error) {
+      alert("Something went wrong processing your booking: " + error.message);
+    } else {
+      setIsSuccess(true);
+      setTimeout(() => {
+        router.push("/");
+      }, 3000);
+    }
   };
+
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-stone-50">
+        <div className="bg-white p-12 rounded-3xl shadow-lg text-center max-w-md animate-in zoom-in duration-500">
+          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <ShieldCheck size={40} />
+          </div>
+          <h2 className="text-3xl font-serif text-slate-900 mb-4">
+            Booking Received!
+          </h2>
+          <p className="text-slate-500 mb-8 leading-relaxed">
+            Thank you, {formData.firstName}. We have received your reservation
+            request. Our team will contact you shortly to confirm.
+          </p>
+          <div className="animate-pulse text-xs font-bold text-slate-400 uppercase tracking-widest">
+            Redirecting to home...
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!villa) {
     return (
@@ -150,7 +231,7 @@ const CheckoutContent = () => {
                     placeholder="john@example.com"
                   />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-2 sm:col-span-1">
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                     Phone Number
                   </label>
@@ -165,6 +246,20 @@ const CheckoutContent = () => {
                     placeholder="+233 50 000 0000"
                   />
                 </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                    <Calendar size={14} /> Check-in Date
+                  </label>
+                  <input
+                    required
+                    type="date"
+                    value={formData.checkInDate}
+                    onChange={(e) =>
+                      setFormData({ ...formData, checkInDate: e.target.value })
+                    }
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-slate-900 outline-none transition"
+                  />
+                </div>
               </div>
 
               <h2 className="text-xl font-serif text-slate-900 mb-4">
@@ -173,7 +268,11 @@ const CheckoutContent = () => {
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div
                   onClick={() => setPaymentMethod("card")}
-                  className={`border rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition ${paymentMethod === "card" ? "border-slate-900 bg-slate-50 text-slate-900 shadow-inner" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+                  className={`border rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition ${
+                    paymentMethod === "card"
+                      ? "border-slate-900 bg-slate-50 text-slate-900 shadow-inner"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300"
+                  }`}
                 >
                   <CreditCard size={24} />
                   <span className="text-xs font-bold uppercase tracking-widest">
@@ -182,7 +281,11 @@ const CheckoutContent = () => {
                 </div>
                 <div
                   onClick={() => setPaymentMethod("mobile_money")}
-                  className={`border rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition ${paymentMethod === "mobile_money" ? "border-slate-900 bg-slate-50 text-slate-900 shadow-inner" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+                  className={`border rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition ${
+                    paymentMethod === "mobile_money"
+                      ? "border-slate-900 bg-slate-50 text-slate-900 shadow-inner"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300"
+                  }`}
                 >
                   <Smartphone size={24} />
                   <span className="text-xs font-bold uppercase tracking-widest">
@@ -201,10 +304,9 @@ const CheckoutContent = () => {
                     <Loader2 size={16} className="animate-spin" /> Processing...
                   </>
                 ) : (
-                  `Pay ${selectedRate.split("(")[1]?.replace(")", "") || `${currency} ${villa.price}`}`
+                  `Pay ${currency} ${computedTotal > 0 ? computedTotal.toLocaleString() : villa.price.toLocaleString()}`
                 )}
               </button>
-
               <div className="flex items-center justify-center gap-2 mt-4 text-xs text-slate-400 font-medium">
                 <ShieldCheck size={14} /> Payments are secure and encrypted
               </div>
@@ -238,21 +340,68 @@ const CheckoutContent = () => {
                 <div className="flex justify-between text-slate-600">
                   <span>Selected Rate</span>
                   <span className="font-medium text-slate-900">
-                    {selectedRate.split("(")[0]}
+                    {selectedRate || "Standard"}
                   </span>
                 </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Currency</span>
-                  <span className="font-medium text-slate-900">{currency}</span>
-                </div>
+
+                {/* --- NEW: Display the extracted Dates and Nights --- */}
+                {totalNights > 0 && (
+                  <>
+                    <div className="flex justify-between text-slate-600">
+                      <span>Check-out</span>
+                      <span className="font-medium text-slate-900">
+                        {checkOutDate}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>Duration</span>
+                      <span className="font-medium text-slate-900">
+                        {totalNights} Night(s)
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div className="flex justify-between items-center mb-6">
-                <span className="font-bold text-slate-900">Total</span>
-                <span className="text-2xl font-serif text-slate-900">
-                  {selectedRate.split("(")[1]?.replace(")", "") ||
-                    `${currency} ${villa.price}`}
-                </span>
+              {/* --- NEW: Display Extra Packages if selected --- */}
+              {selectedPackages.length > 0 && (
+                <div className="mb-6 pb-6 border-b border-slate-100">
+                  <span className="block text-xs font-bold text-slate-900 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <Gift size={14} className="text-blue-500" /> Selected
+                    Add-ons
+                  </span>
+                  <ul className="space-y-2">
+                    {selectedPackages.map((pkg, idx) => (
+                      <li
+                        key={idx}
+                        className="text-sm text-slate-600 flex justify-between items-center bg-slate-50 p-2 rounded-lg"
+                      >
+                        <span>{pkg}</span>
+                        <span className="text-xs text-blue-600 font-medium">
+                          Quote pending
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex justify-between items-end mt-6">
+                <div>
+                  <span className="block font-bold text-slate-900 mb-1">
+                    Total Room Bill
+                  </span>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-widest">
+                    {currency} Currency
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-3xl font-serif text-slate-900 block leading-none">
+                    {computedTotal > 0
+                      ? `${currency} ${computedTotal.toLocaleString()}`
+                      : `${currency} ${villa.price.toLocaleString()}`}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
