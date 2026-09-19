@@ -74,12 +74,14 @@ const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center shrink-0"
             aria-label="Cosy Crest home"
           >
+            {/* The brand asset is a pure-white wordmark, so it needs a filter
+                on either background: black on light surfaces, white on dark. */}
             <img
               src="/cc-horinzontal.png"
               alt="Cosy Crest"
               className={`w-auto transition-all duration-300 ${
                 isLight ? "h-7 md:h-8" : "h-8 md:h-10"
-              } ${isLight ? "" : "brightness-0 invert"}`}
+              } ${isLight ? "brightness-0" : "brightness-0 invert"}`}
             />
           </Link>
 
@@ -156,7 +158,11 @@ const Navbar: React.FC<NavbarProps> = ({
           }`}
         >
           <div className="flex items-center justify-between h-16 px-5 border-b border-[var(--color-line-soft)]">
-            <img src="/cc-horinzontal.png" alt="Cosy Crest" className="h-7 w-auto" />
+            <img
+              src="/cc-horinzontal.png"
+              alt="Cosy Crest"
+              className="h-7 w-auto brightness-0"
+            />
             <button
               onClick={() => setIsMobileMenuOpen(false)}
               className="p-2 -mr-2 text-[var(--color-ink)] hover:bg-[var(--color-canvas)] rounded-full transition-colors"

@@ -201,7 +201,12 @@ const Footer: React.FC = () => {
         {/* ---------------- Bottom bar ---------------- */}
         <div className="mt-14 grid gap-8 border-t border-[var(--color-line)] py-10 text-xs text-[var(--color-muted)] md:grid-cols-3 md:gap-12">
           <div>
-            <img src="/cc-horinzontal.png" alt="Cosy Crest" className="mb-4 h-8 w-auto" />
+            {/* White wordmark, darkened for the light footer background. */}
+            <img
+              src="/cc-horinzontal.png"
+              alt="Cosy Crest"
+              className="mb-4 h-8 w-auto brightness-0"
+            />
             <p className="max-w-xs leading-relaxed">
               Fully serviced apartments in Accra and Aburi, delivered with
               hotel-grade housekeeping and 24/7 support.

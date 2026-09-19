@@ -46,3 +46,4 @@ next-env.d.ts
 # local UI review screenshots (not part of the app)
 /shots/
 /shots2/
+/shots3/
