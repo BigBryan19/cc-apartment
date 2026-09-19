@@ -47,6 +47,27 @@ create table if not exists public.villas (
   created_at  timestamptz not null default now()
 );
 
+-- If a `villas` table already existed (e.g. from an earlier version of this
+-- project), the CREATE above was skipped. Bring any missing columns up to date.
+-- These are added as nullable with defaults so they are safe on a table that
+-- already holds rows.
+alter table public.villas
+  add column if not exists title       text,
+  add column if not exists location    text,
+  add column if not exists price       numeric default 0,
+  add column if not exists guests      integer default 2,
+  add column if not exists bedrooms    integer default 1,
+  add column if not exists bathrooms   integer default 1,
+  add column if not exists has_pool    boolean default false,
+  add column if not exists image       text,
+  add column if not exists images      text[]  default '{}',
+  add column if not exists video       text,
+  add column if not exists description text,
+  add column if not exists amenities   text[]  default '{}',
+  add column if not exists rates       jsonb   default '[]'::jsonb,
+  add column if not exists coordinates jsonb,
+  add column if not exists created_at  timestamptz default now();
+
 -- ---------------------------------------------------------------------------
 -- 2. Bookings
 -- ---------------------------------------------------------------------------
@@ -145,36 +166,38 @@ create policy "bookings_public_update"
 -- ---------------------------------------------------------------------------
 -- 5. Optional starter data — mirrors app/lib/data.ts so the site is not empty
 --    on first load. Delete this block if you would rather start blank.
+--
+--    Only runs when `villas` is completely empty, so it can never overwrite or
+--    collide with properties you already have. It deliberately does NOT set
+--    `id`, so it works whether the key is bigserial or uuid — and a fresh
+--    bigserial table will assign 1, 2, 3, matching app/lib/data.ts.
 -- ---------------------------------------------------------------------------
-insert into public.villas
-  (id, title, location, price, guests, bedrooms, bathrooms, has_pool,
-   image, images, description, amenities, rates, coordinates)
-values
-  (1, 'Lakeside Estate', 'Greater Accra • Lakeside', 2000, 4, 3, 5, true,
-   '/Lake1.jpg', array['/Lake1.jpg','/Lake2.jpg','/Lake3.jpg','/Lake4.jpg'],
-   'Experience comfort, privacy, and elegance in this beautifully furnished apartment located in the serene and secure Lakeside Estate.',
-   array['Free Wi-Fi','Kitchen','Pool','Well-furnished hall','Television in all rooms','PS5 Gaming Console'],
-   '[{"option":"One bedrooms","amount":1500},{"option":"Two bedrooms","amount":2000},{"option":"Whole apartment","amount":3500},{"option":"Monthly Rate","amount":36000}]'::jsonb,
-   '{"lat":5.726743173934811,"lng":-0.1200319741836416}'::jsonb),
+do $$
+begin
+  if (select count(*) from public.villas) = 0 then
+    insert into public.villas
+      (title, location, price, guests, bedrooms, bathrooms, has_pool,
+       image, images, description, amenities, rates, coordinates)
+      values
+      ('Lakeside Estate', 'Greater Accra • Lakeside', 2000, 4, 3, 5, true,
+       '/Lake1.jpg', array['/Lake1.jpg','/Lake2.jpg','/Lake3.jpg','/Lake4.jpg'],
+       'Experience comfort, privacy, and elegance in this beautifully furnished apartment located in the serene and secure Lakeside Estate.',
+       array['Free Wi-Fi','Kitchen','Pool','Well-furnished hall','Television in all rooms','PS5 Gaming Console'],
+       '[{"option":"One bedrooms","amount":1500},{"option":"Two bedrooms","amount":2000},{"option":"Whole apartment","amount":3500},{"option":"Monthly Rate","amount":36000}]'::jsonb,
+       '{"lat":5.726743173934811,"lng":-0.1200319741836416}'::jsonb),
 
-  (2, 'Aburi Mountain Retreat', 'Eastern Region • Aburi', 600, 4, 4, 5, true,
-   '/Aburi1.jpeg', array['/Aburi1.jpeg','/Aburi2.jpeg','/Aburi3.jpeg','/Aburi4.jpeg'],
-   'Nestled in the serene and refreshing environment of Aburi, this beautifully furnished apartment offers complete comfort.',
-   array['Free Wi-Fi','Kitchen','Pool','Well-furnished hall','Television in all rooms'],
-   '[{"option":"Single bedroom","amount":600},{"option":"Studio","amount":800},{"option":"One bedrooms","amount":1200},{"option":"Two bedrooms","amount":2000},{"option":"Whole apartment","amount":3500},{"option":"Monthly Rate","amount":30000}]'::jsonb,
-   '{"lat":5.843870554138503,"lng":-0.17225994962774632}'::jsonb),
+      ('Aburi Mountain Retreat', 'Eastern Region • Aburi', 600, 4, 4, 5, true,
+       '/Aburi1.jpeg', array['/Aburi1.jpeg','/Aburi2.jpeg','/Aburi3.jpeg','/Aburi4.jpeg'],
+       'Nestled in the serene and refreshing environment of Aburi, this beautifully furnished apartment offers complete comfort.',
+       array['Free Wi-Fi','Kitchen','Pool','Well-furnished hall','Television in all rooms'],
+       '[{"option":"Single bedroom","amount":600},{"option":"Studio","amount":800},{"option":"One bedrooms","amount":1200},{"option":"Two bedrooms","amount":2000},{"option":"Whole apartment","amount":3500},{"option":"Monthly Rate","amount":30000}]'::jsonb,
+       '{"lat":5.843870554138503,"lng":-0.17225994962774632}'::jsonb),
 
-  (3, 'Adenta Serenity', 'Greater Accra • Adenta', 600, 4, 4, 5, true,
-   '/Adenta1.jpg', array['/Adenta1.jpg','/Adenta2.jpg','/Adenta3.jpg','/Adenta4.jpg'],
-   'Located in the heart of Adenta, this premium apartment combines luxury, comfort, and entertainment with modern furnishings and a grand piano.',
-   array['Free Wi-Fi','Kitchen','Pool','Well-furnished hall','Grand Piano','PS5 Gaming Console'],
-   '[{"option":"One bedroom","amount":1500},{"option":"Two bedrooms","amount":2000},{"option":"Whole apartment","amount":3500},{"option":"Monthly Rate","amount":36000}]'::jsonb,
-   '{"lat":5.712737022781674,"lng":-0.16226067413187414}'::jsonb)
-on conflict (id) do nothing;
-
--- Keep the sequence ahead of the explicit ids above, otherwise the next
--- villa added from /admin collides with id 1.
-select setval(
-  pg_get_serial_sequence('public.villas', 'id'),
-  greatest((select coalesce(max(id), 1) from public.villas), 1)
-);
+      ('Adenta Serenity', 'Greater Accra • Adenta', 600, 4, 4, 5, true,
+       '/Adenta1.jpg', array['/Adenta1.jpg','/Adenta2.jpg','/Adenta3.jpg','/Adenta4.jpg'],
+       'Located in the heart of Adenta, this premium apartment combines luxury, comfort, and entertainment with modern furnishings and a grand piano.',
+       array['Free Wi-Fi','Kitchen','Pool','Well-furnished hall','Grand Piano','PS5 Gaming Console'],
+       '[{"option":"One bedroom","amount":1500},{"option":"Two bedrooms","amount":2000},{"option":"Whole apartment","amount":3500},{"option":"Monthly Rate","amount":36000}]'::jsonb,
+       '{"lat":5.712737022781674,"lng":-0.16226067413187414}'::jsonb);
+  end if;
+end $$;

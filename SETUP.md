@@ -26,6 +26,12 @@ three must never be exposed — they stay server-side.
 
 ## Part A — Supabase
 
+> **Already have a Supabase project?** Skip to **A2** to copy your keys, then run
+> [`supabase/check.sql`](supabase/check.sql) before `schema.sql`. It is
+> read-only and reports which tables already exist, what columns they have,
+> and whether your `villas.id` is numeric or a uuid — which decides whether
+> `schema.sql` is a clean install or an upgrade.
+
 ### A1. Create the project
 
 1. Sign in and click **New project**.
@@ -50,16 +56,29 @@ In the dashboard go to **Settings → API Keys** (on older projects this is
 > that the **public** key goes in the `ANON_KEY` variable and the **secret** one
 > goes in the `SERVICE_ROLE_KEY` variable.
 
-### A3. Create the tables
+### A3. Create or upgrade the tables
 
 1. In the sidebar click **SQL Editor** → **New query**.
 2. Open [`supabase/schema.sql`](supabase/schema.sql) from this repo, copy the
    whole file, paste it in, and press **Run**.
-3. It should report success. This creates `villas`, `bookings` and
-   `blocked_dates`, and seeds your three properties so the site is not empty.
+3. It should report success.
 
-Confirm it worked: **Table Editor** should list `villas`, `bookings`,
-`blocked_dates`, and `villas` should have 3 rows.
+The script is written to be safe on an existing project:
+
+- it creates `villas`, `bookings` and `blocked_dates` if they are missing, and
+  adds any missing columns if they already exist;
+- the starter data only inserts when `villas` is **completely empty**, so it
+  can never overwrite or collide with properties you already have.
+
+Confirm it worked: **Table Editor** should list `villas`, `bookings` and
+`blocked_dates`.
+
+**One caveat worth checking.** The app links to properties as `/villas/<id>`
+and the detail page resolves them from the bundled catalogue by **numeric** id
+(1, 2, 3). If your existing `villas.id` is a **uuid**, the listing will render
+but clicking through will report "Villa not found". `check.sql` reports the
+column type — if it is a uuid, tell me and I'll rework the detail page to read
+from Supabase instead.
 
 ---
 
