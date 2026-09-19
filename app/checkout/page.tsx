@@ -13,7 +13,8 @@ import {
   Gift,
   AlertTriangle,
 } from "lucide-react";
-import { createClient } from "../utils/supabase";
+import { createClient, isSupabaseConfigured } from "../utils/supabase";
+import { villasData } from "../lib/data";
 import { VillaProps } from "../components/villas/types";
 import DateRangePicker from "../components/booking/DateRangePicker";
 import { useVillaAvailability } from "../lib/availability";
@@ -77,11 +78,32 @@ const CheckoutContent = () => {
     const checkOutParam = searchParams.get("checkOut");
     const packagesParam = searchParams.get("packages");
 
+    // Same catalogue the listings and detail pages fall back to.
+    const applyBundledVilla = (id: string): boolean => {
+      const match = villasData.find((v) => String(v.id) === String(id));
+      if (match) setVilla(match);
+      return Boolean(match);
+    };
+
     const fetchVilla = async () => {
       if (!villaIdParam) {
-        setLoadError("No property was specified. Please choose an apartment first.");
+        setLoadError(
+          "No property was specified. Please choose an apartment first.",
+        );
         return;
       }
+
+      // No database configured yet — resolve from the bundled catalogue so
+      // the booking flow is still walkable end to end.
+      if (!isSupabaseConfigured()) {
+        if (!applyBundledVilla(villaIdParam)) {
+          setLoadError(
+            "We could not find that property. It may have been removed.",
+          );
+        }
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from("villas")
@@ -198,6 +220,17 @@ const CheckoutContent = () => {
         response.status === 503 || /not configured/i.test(payload.error ?? "");
 
       if (gatewayMissing && ALLOW_UNPAID_FALLBACK) {
+        // With no database there is nothing to persist, so say that plainly
+        // instead of implying a reservation was recorded.
+        if (!isSupabaseConfigured()) {
+          setSuccessNote(
+            "Demo mode: neither Paystack nor the database is connected yet, so no payment was taken and nothing was saved. Add your Supabase and Paystack keys to complete a real booking.",
+          );
+          setIsSuccess(true);
+          setTimeout(() => router.push("/"), 9000);
+          return;
+        }
+
         // Record a pending request without taking payment.
         const { error } = await supabase.from("bookings").insert([
           {

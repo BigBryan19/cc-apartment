@@ -8,7 +8,8 @@ import dynamic from "next/dynamic";
 import { SearchFilters, VillaProps } from "./types";
 import { EXCHANGE_RATE } from "./utils";
 import VillaCard from "./VillaCard";
-import { createClient } from "../../utils/supabase";
+import { createClient, isSupabaseConfigured } from "../../utils/supabase";
+import { villasData as bundledVillas } from "../../lib/data";
 
 // Leaflet touches `window`, so the map is client-only.
 const VillaMapView = dynamic(() => import("./VillaMapView"), {
@@ -36,6 +37,16 @@ const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
 
   useEffect(() => {
     const fetchVillas = async () => {
+      // Not wired to a database yet — fall back to the catalogue bundled in
+      // app/lib/data.ts so the site still presents real properties. Once
+      // Supabase is configured, the database becomes authoritative and this
+      // branch is never taken (even if it returns zero rows).
+      if (!isSupabaseConfigured()) {
+        setVillasData(bundledVillas);
+        setIsLoading(false);
+        return;
+      }
+
       const supabase = createClient();
       const { data, error } = await supabase.from("villas").select("*");
 

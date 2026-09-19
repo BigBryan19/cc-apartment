@@ -9,7 +9,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { createClient } from "../../utils/supabase";
+import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 import {
   CalendarOff,
   Loader2,
@@ -178,18 +178,39 @@ export default function ManageAvailability() {
         </p>
       </header>
 
-      {/* Migration hint — shown only when blocked_dates cannot be read */}
-      {availability.error && (
+      {/* Setup / migration hint — shown when Supabase is unconfigured or the
+          blocked_dates table cannot be read. */}
+      {(!isSupabaseConfigured() || availability.error) && (
         <div className="mb-8 flex items-start gap-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-5 text-sm leading-relaxed">
           <AlertTriangle size={20} className="mt-0.5 shrink-0" />
           <div>
             <p className="font-bold mb-1">Blockouts are not persisted yet.</p>
-            <p>
-              The <code className="font-mono text-xs">blocked_dates</code> table
-              could not be read (<span className="font-mono text-xs">{availability.error}</span>).
-              Run <span className="font-mono text-xs">supabase/schema.sql</span> in
-              your Supabase SQL editor to create it.
-            </p>
+            {isSupabaseConfigured() ? (
+              <p>
+                The <code className="font-mono text-xs">blocked_dates</code>{" "}
+                table could not be read
+                {availability.error ? (
+                  <>
+                    {" "}
+                    (
+                    <span className="font-mono text-xs">
+                      {availability.error}
+                    </span>
+                    )
+                  </>
+                ) : null}
+                . Run <span className="font-mono text-xs">supabase/schema.sql</span>{" "}
+                in your Supabase SQL editor to create it.
+              </p>
+            ) : (
+              <p>
+                Supabase is not configured, so nothing can be saved yet. Add
+                your project credentials to <span className="font-mono text-xs">.env.local</span>{" "}
+                and run <span className="font-mono text-xs">supabase/schema.sql</span>{" "}
+                first. Until then the guest calendar simply shows the default
+                booking window with no blocked dates.
+              </p>
+            )}
           </div>
         </div>
       )}

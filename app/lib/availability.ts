@@ -14,7 +14,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createClient } from "../utils/supabase";
+import { createClient, isSupabaseConfigured } from "../utils/supabase";
 import type { DateRange } from "./dates";
 
 export const BLOCKED_DATES_TABLE = "blocked_dates";
@@ -76,6 +76,18 @@ export function useVillaAvailability(villaId: number | null): AvailabilityState 
     if (villaId === null || Number.isNaN(villaId)) {
       setBlocked([]);
       setBooked([]);
+      setIsLoading(false);
+      return;
+    }
+
+    // With no Supabase credentials there is nothing to read. Resolve straight
+    // away so the calendar renders the default booking window instead of
+    // sitting on "Checking…" and then warning the guest about a backend they
+    // were never meant to know about.
+    if (!isSupabaseConfigured()) {
+      setBlocked([]);
+      setBooked([]);
+      setError(null);
       setIsLoading(false);
       return;
     }
