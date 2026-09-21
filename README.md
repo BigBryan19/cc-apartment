@@ -72,6 +72,34 @@ It is idempotent and bootstraps a project from empty:
   authenticated admin. An existing `invoices` table is locked down too if
   present — the app never reads it, but it holds the same guest PII.
 
+## SEO
+
+`NEXT_PUBLIC_SITE_URL` is not cosmetic — it is the origin used for canonical
+URLs, Open Graph images, `robots.txt` and `sitemap.xml`. If it is wrong or
+unset, every canonical and every preview image points at the wrong host, and
+that actively suppresses ranking. **Set it to the real public domain.**
+
+| Concern | Where | Notes |
+| --- | --- | --- |
+| Brand identity, address, geo, amenities | `app/lib/seo.ts` | One source of truth, also used by the receipt |
+| Site-wide metadata, title template | `app/layout.tsx` | Default title + `%s \| Cosy Crest` for subpages |
+| Per-property metadata + canonical | `app/villas/[id]/page.tsx` | Each apartment gets its own title, description and images |
+| `robots.txt` | `app/robots.ts` | Blocks `/admin`, `/api`, `/receipt`, `/checkout` |
+| `sitemap.xml` | `app/sitemap.ts` | Homepage + each property, with image entries |
+| FAQ rich results | `app/lib/content.ts` | Shared by the FAQ section so copy and markup agree |
+
+Structured data emitted: `LodgingBusiness`, `WebSite`, `Apartment` (with
+`Offer` price), `BreadcrumbList`, `FAQPage`.
+
+**Deliberately omitted:** `aggregateRating`. The 4.9 shown on the cards is a
+hardcoded string, not a collected rating. Publishing invented review data
+breaches Google's guidelines and risks a manual action — worse than no stars.
+Add it once real reviews exist.
+
+**Worth doing next:** submit the sitemap in Google Search Console and Bing
+Webmaster Tools, and claim a Google Business Profile. Those two do more for
+local discovery than any tag.
+
 ### Admin access
 
 `/admin` is protected by Supabase Auth. `middleware.ts` redirects any request

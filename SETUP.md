@@ -233,7 +233,16 @@ npm run dev
 1. Push to GitHub and import the repo in Vercel.
 2. **Project → Settings → Environment Variables** — add all six from Part C,
    with `NEXT_PUBLIC_SITE_URL` set to your real domain
-   (e.g. `https://www.cosycrest.com`, no trailing slash).
+   (e.g. `https://cosycrest.com`, no trailing slash).
+
+   > **This one is load-bearing.** `NEXT_PUBLIC_SITE_URL` is the origin used for
+   > every canonical URL, every Open Graph image, `robots.txt` and
+   > `sitemap.xml`. Set it wrong and every page tells search engines it lives
+   > somewhere else — which suppresses ranking rather than helping it.
+   >
+   > Use whichever of `cosycrest.com` or `www.cosycrest.com` is your **primary**
+   > host, and make the other one 301-redirect to it in Vercel. Serving both
+   > splits the site into two competing copies of itself.
 3. **Redeploy.** Environment variables only apply to new deployments.
 
 > **This one catches everybody.** The `NEXT_PUBLIC_*` values are inlined into

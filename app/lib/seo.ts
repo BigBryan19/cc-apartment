@@ -11,8 +11,19 @@
 
 import type { VillaProps } from "../components/villas/types";
 
+/**
+ * Canonical origin for the whole site.
+ *
+ * NEXT_PUBLIC_SITE_URL wins. The literal below is only a safety net for a
+ * deployment that forgot to set it — and it must match the host the site is
+ * actually served from, because it becomes the canonical URL on every page.
+ *
+ * Pick ONE of apex or www and make the other 301 to it in Vercel. Serving both
+ * splits the site into two competing copies of itself, which is worse than
+ * either choice on its own.
+ */
 export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL || "https://www.cosycrest.com"
+  process.env.NEXT_PUBLIC_SITE_URL || "https://cosycrest.com"
 ).replace(/\/$/, "");
 
 export const SITE = {
