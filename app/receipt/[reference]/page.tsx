@@ -53,8 +53,11 @@ export default async function ReceiptPage({
     <>
       <PrintButton />
       {/* The receipt markup comes from app/lib/receipt.ts, where every
-          interpolated value is HTML-escaped. */}
-      <div dangerouslySetInnerHTML={{ __html: html }} />
+          interpolated value is HTML-escaped.
+
+          pb-28 keeps the floating action bar from covering the footer on a
+          short viewport; print:pb-0 drops it again so it is not in the PDF. */}
+      <div className="pb-28 print:pb-0" dangerouslySetInnerHTML={{ __html: html }} />
     </>
   );
 }

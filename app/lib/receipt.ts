@@ -199,7 +199,10 @@ export function renderReceiptHtml(
           <!-- Meta -->
           <tr>
             <td style="padding:0 40px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${LINE};border-bottom:1px solid ${LINE};">
+              <!-- table-layout:fixed makes the 33% widths actually bind. Without
+                   it the browser auto-sizes, and a long guest email widens its
+                   column and spills outside the card. -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${LINE};border-bottom:1px solid ${LINE};table-layout:fixed;">
                 <tr>
                   <td width="33%" valign="top" style="padding:20px 0;">
                     <div style="font-size:13px;font-weight:bold;color:#1f2937;margin-bottom:6px;">Issued</div>
@@ -210,8 +213,8 @@ export function renderReceiptHtml(
                   <td width="33%" valign="top" style="padding:20px 12px;">
                     <div style="font-size:13px;font-weight:bold;color:#1f2937;margin-bottom:6px;">Billed to</div>
                     <div style="font-size:13px;color:${MUTED};font-weight:500;">${esc(data.guestName)}</div>
-                    ${data.guestPhone ? `<div style="font-size:13px;color:${MUTED};">${esc(data.guestPhone)}</div>` : ""}
-                    ${data.guestEmail ? `<div style="font-size:13px;color:${MUTED};word-break:break-all;">${esc(data.guestEmail)}</div>` : ""}
+                    ${data.guestPhone ? `<div style="font-size:13px;color:${MUTED};overflow-wrap:anywhere;">${esc(data.guestPhone)}</div>` : ""}
+                    ${data.guestEmail ? `<div style="font-size:13px;color:${MUTED};word-break:break-all;overflow-wrap:anywhere;">${esc(data.guestEmail)}</div>` : ""}
                   </td>
                   <td width="33%" valign="top" style="padding:20px 0;">
                     <div style="font-size:13px;font-weight:bold;color:#1f2937;margin-bottom:6px;">From</div>

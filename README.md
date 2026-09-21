@@ -35,6 +35,27 @@ bundled in `app/lib/data.ts`, so the site is browsable but nothing persists.
 > states and the booking calendar falls back to the default date window. Payment
 > cannot be taken until the Paystack secret key is present.
 
+### What happens after a payment succeeds
+
+Both the Paystack webhook and `/api/payments/paystack/verify` run the same
+idempotent steps, because either can be the first to learn a charge succeeded —
+the guest always returns through `/checkout/success`, while the webhook may lag
+or, until it is registered in Paystack, never arrive.
+
+1. The booking flips to `confirmed` / `paid`.
+2. Its nights are written to `blocked_dates` as a **Reserved** hold, so they can
+   be seen and released from `/admin/availability`. Guests were already kept off
+   those nights by the booking itself; the hold exists to make it visible.
+3. A receipt is emailed once (`receipt_sent_at` guards against a second copy).
+
+Releasing a **Reserved** hold also cancels the booking — deleting the block
+alone would not free the dates, because the reservation marks them unavailable
+on its own. Refunds must be issued separately in Paystack.
+
+The guest can download the same receipt any time at
+`/receipt/<paystack-reference>`; the reference is the access token, which is why
+it carries 64 bits of randomness.
+
 ### Database
 
 Run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL editor.
