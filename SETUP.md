@@ -150,6 +150,40 @@ their user there.
 Keep both — you'll paste them in the next step. Live keys look the same but
 start with `sk_live_` / `pk_live_`; only switch to those once you're happy.
 
+> Only the secret key is actually read by the code. The current flow redirects
+> to Paystack's hosted page, so the public key is unused — it is kept for a
+> future inline-checkout switch.
+
+---
+
+## Part B2 — Receipt emails (Resend)
+
+After a successful payment the guest is emailed a receipt, and the same
+document is downloadable from the confirmation page. Sending uses
+[Resend](https://resend.com), which has a free tier.
+
+**This step is optional.** Without it the site, the payments and the
+downloadable receipt all still work — the guest just does not get the email.
+
+1. Create a Resend account.
+2. **Verify a domain** you control (Domains → Add Domain) and add the DNS
+   records it gives you. You cannot send from `@gmail.com` — Resend only
+   permits addresses on a domain you have verified.
+   - Testing before your domain is ready? Resend lets you send from
+     `onboarding@resend.dev`, but **only to the email address you signed up
+     with**. Useful for proving the wiring, not for real guests.
+3. **API Keys → Create API Key**, and copy the `re_…` value.
+4. Set these two variables:
+
+   | Variable | Example |
+   | --- | --- |
+   | `RESEND_API_KEY` | `re_xxxxxxxx` |
+   | `RECEIPT_FROM_EMAIL` | `Cosy Crest <receipts@yourdomain.com>` |
+
+Receipts are sent at most once per booking: the webhook and `/verify` both try,
+and the first to succeed stamps `receipt_sent_at` so the guest never receives
+two copies. If sending fails, nothing is stamped and the other path retries.
+
 ---
 
 ## Part C — Run it locally

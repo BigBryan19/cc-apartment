@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local UI-review screenshots and the throwaway CDP scripts used to take
+    // them. Gitignored already; eslint does not read .gitignore.
+    "shots*/**",
   ]),
 ]);
 

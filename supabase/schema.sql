@@ -95,7 +95,10 @@ alter table public.bookings
   add column if not exists payment_reference text,
   add column if not exists payment_status    text default 'unpaid',
   add column if not exists paid_at           timestamptz,
-  add column if not exists amount_paid       numeric;
+  add column if not exists amount_paid       numeric,
+  -- Set once the receipt email has actually gone out. Both the webhook and
+  -- /verify try to send, and this is what stops the guest receiving two.
+  add column if not exists receipt_sent_at   timestamptz;
 
 -- The webhook matches a booking by reference when metadata is unavailable.
 create unique index if not exists bookings_payment_reference_key
@@ -117,6 +120,23 @@ create table if not exists public.blocked_dates (
   created_at timestamptz not null default now(),
   constraint blocked_dates_range_valid check (end_date >= start_date)
 );
+
+-- Blocks created by a successful payment carry the booking they came from, so
+-- the admin can see *why* a range is closed and revoke it deliberately.
+-- Nullable, because ranges an admin blocks by hand have no booking.
+alter table public.blocked_dates
+  add column if not exists booking_id uuid;
+
+create index if not exists blocked_dates_booking_idx
+  on public.blocked_dates (booking_id);
+
+-- At most one block per booking. Partial, because the column is null for every
+-- admin-created block and NULLs would otherwise all collide. This is what makes
+-- a repeated webhook delivery safe — Paystack retries, and each retry would
+-- otherwise close the same dates twice.
+create unique index if not exists blocked_dates_booking_unique
+  on public.blocked_dates (booking_id)
+  where booking_id is not null;
 
 create index if not exists blocked_dates_villa_idx
   on public.blocked_dates (villa_id, start_date, end_date);

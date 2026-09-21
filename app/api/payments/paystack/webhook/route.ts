@@ -24,6 +24,8 @@ import {
   createServiceClient,
   isServiceRoleConfigured,
 } from "@/app/lib/supabase-server";
+import { blockDatesForBooking } from "@/app/lib/booking-holds";
+import { sendReceiptOnce } from "@/app/lib/receipt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,49 +89,70 @@ export async function POST(request: Request) {
     currency: currency ?? "GHS",
   };
 
+  let resolvedBookingId: string | null =
+    typeof bookingId === "string" && bookingId !== "" ? bookingId : null;
+
   try {
     // Preferred path: update by the booking id carried in metadata.
-    if (bookingId !== null && bookingId !== undefined && bookingId !== "") {
+    if (resolvedBookingId) {
       const { error } = await supabase
         .from("bookings")
         .update(fullUpdate)
-        .eq("id", bookingId);
+        .eq("id", resolvedBookingId);
 
-      if (!error) {
-        return NextResponse.json({ received: true, bookingId, reference });
+      if (error) {
+        console.warn(
+          "[paystack/webhook] full update by id failed, retrying minimal:",
+          error.message,
+        );
+
+        // Columns may not exist yet (migration not run) — still mark confirmed.
+        await supabase
+          .from("bookings")
+          .update({ status: "confirmed" })
+          .eq("id", resolvedBookingId);
       }
-      console.warn(
-        "[paystack/webhook] full update by id failed, retrying minimal:",
-        error.message,
-      );
-
-      // Columns may not exist yet (migration not run) — still mark confirmed.
-      await supabase
+    } else {
+      // Fallback path: no bookingId in metadata, match on the reference.
+      const { data, error } = await supabase
         .from("bookings")
-        .update({ status: "confirmed" })
-        .eq("id", bookingId);
+        .update(fullUpdate)
+        .eq("payment_reference", reference)
+        .select("id");
 
-      return NextResponse.json({ received: true, bookingId, reference });
+      if (error) {
+        console.warn(
+          "[paystack/webhook] update by reference failed:",
+          error.message,
+        );
+        return NextResponse.json(
+          { received: true, warning: "Booking not matched.", reference },
+          { status: 200 },
+        );
+      }
+
+      resolvedBookingId = data?.[0]?.id ?? null;
     }
 
-    // Fallback path: no bookingId in metadata, match on the reference.
-    const { error } = await supabase
-      .from("bookings")
-      .update(fullUpdate)
-      .eq("payment_reference", reference);
+    // Close the paid dates off for this property. Deliberately non-fatal: the
+    // charge has already succeeded, so a problem here must not turn into a 500
+    // that makes Paystack retry the whole event indefinitely.
+    const blockedDates = resolvedBookingId
+      ? await blockDatesForBooking(supabase, resolvedBookingId, reference)
+      : null;
 
-    if (error) {
-      console.warn(
-        "[paystack/webhook] update by reference failed:",
-        error.message,
-      );
-      return NextResponse.json(
-        { received: true, warning: "Booking not matched.", reference },
-        { status: 200 },
-      );
-    }
+    // Also non-fatal: the guest has paid, so a mail outage must not turn into a
+    // 500 that makes Paystack replay the whole event. Stamps receipt_sent_at,
+    // so the /verify route will not send a second copy.
+    const receiptEmail = await sendReceiptOnce(reference);
 
-    return NextResponse.json({ received: true, reference });
+    return NextResponse.json({
+      received: true,
+      bookingId: resolvedBookingId,
+      reference,
+      blockedDates,
+      receiptEmail,
+    });
   } catch (error) {
     console.error("[paystack/webhook] unexpected failure:", error);
     // 500 makes Paystack retry with backoff.

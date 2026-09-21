@@ -13,6 +13,8 @@ import {
   createServiceClient,
   isServiceRoleConfigured,
 } from "@/app/lib/supabase-server";
+import { blockDatesForBooking } from "@/app/lib/booking-holds";
+import { sendReceiptOnce } from "@/app/lib/receipt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,11 +39,15 @@ export async function GET(request: Request) {
     const transaction = await verifyTransaction(reference);
     const isSuccessful = transaction.status === "success";
 
+    // Everything below is idempotent, so the webhook and this route can both
+    // run it without double-charging, double-blocking or double-emailing.
+    let receiptEmail: string | null = null;
+
     // Confirm the booking server-side so a guest who closes the tab before the
     // webhook lands still ends up with a confirmed reservation.
     if (isSuccessful && isServiceRoleConfigured()) {
       const supabase = createServiceClient();
-      const bookingId = transaction.metadata?.bookingId;
+      const metaBookingId = transaction.metadata?.bookingId;
 
       const update = {
         status: "confirmed",
@@ -52,24 +58,44 @@ export async function GET(request: Request) {
         currency: transaction.currency,
       };
 
-      if (bookingId !== undefined && bookingId !== null && bookingId !== "") {
+      let resolvedId: string | null =
+        metaBookingId !== undefined &&
+        metaBookingId !== null &&
+        metaBookingId !== ""
+          ? String(metaBookingId)
+          : null;
+
+      if (resolvedId) {
         const { error } = await supabase
           .from("bookings")
           .update(update)
-          .eq("id", bookingId);
+          .eq("id", resolvedId);
 
         if (error) {
+          // Payment columns may not exist yet (migration not run).
           await supabase
             .from("bookings")
             .update({ status: "confirmed" })
-            .eq("id", bookingId);
+            .eq("id", resolvedId);
         }
       } else {
-        await supabase
+        const { data } = await supabase
           .from("bookings")
           .update(update)
-          .eq("payment_reference", transaction.reference);
+          .eq("payment_reference", transaction.reference)
+          .select("id");
+
+        resolvedId = data?.[0]?.id ?? null;
       }
+
+      // Hold the dates and send the receipt. Doing this here as well as in the
+      // webhook matters because the guest reaches this route on every return
+      // from Paystack, whereas the webhook may lag behind or — until it is
+      // registered in the Paystack dashboard — never arrive at all.
+      if (resolvedId) {
+        await blockDatesForBooking(supabase, resolvedId, transaction.reference);
+      }
+      receiptEmail = await sendReceiptOnce(transaction.reference);
     }
 
     return NextResponse.json({
@@ -80,6 +106,7 @@ export async function GET(request: Request) {
       currency: transaction.currency,
       paidAt: transaction.paid_at ?? null,
       email: transaction.customer?.email ?? null,
+      receiptEmail,
     });
   } catch (error) {
     const message =

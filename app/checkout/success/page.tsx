@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
+  Download,
   XCircle,
   Loader2,
   ShieldCheck,
@@ -104,12 +105,13 @@ function SuccessContent() {
             <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 size={40} />
             </div>
-            <h2 className="text-3xl font-serif text-slate-900 mb-3">
-              Payment Confirmed
+            <h2 className="mb-3 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
+              Payment confirmed
             </h2>
-            <p className="text-slate-500 mb-8 leading-relaxed">
-              Thank you! Your booking is confirmed and a receipt has been sent to
-              your email address.
+            <p className="mb-8 leading-relaxed text-[var(--color-muted)]">
+              Thank you! Your booking is confirmed and your dates are now held.
+              We have emailed your receipt — if it has not arrived, you can
+              download it below.
             </p>
 
             <dl className="text-left bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3 text-sm mb-8">
@@ -138,6 +140,17 @@ function SuccessContent() {
                 </div>
               )}
             </dl>
+
+            {details?.reference && (
+              <a
+                href={`/receipt/${encodeURIComponent(details.reference)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-ink mb-3 inline-flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm"
+              >
+                <Download size={15} /> View or download receipt
+              </a>
+            )}
           </>
         )}
 
@@ -158,9 +171,9 @@ function SuccessContent() {
 
         <Link
           href="/"
-          className="inline-flex items-center gap-2 bg-slate-900 text-white py-3.5 px-7 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-slate-800 transition shadow-lg"
+          className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-line)] px-7 py-3.5 text-sm font-semibold text-[var(--color-ink)] transition-colors hover:bg-[var(--color-canvas)]"
         >
-          <ArrowLeft size={15} /> Back to Home
+          <ArrowLeft size={15} /> Back to home
         </Link>
 
         <div className="flex items-center justify-center gap-2 mt-6 text-xs text-slate-400 font-medium">

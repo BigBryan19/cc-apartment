@@ -26,6 +26,22 @@ export const BLOCKED_DATES_TABLE = "blocked_dates";
  */
 export const AVAILABILITY_TIMEOUT_MS = 6000;
 
+/**
+ * Cancel a reservation.
+ *
+ * Needed when an admin releases a blocked range that a paid booking created:
+ * deleting the block alone is not enough, because availability treats any
+ * non-cancelled booking as unavailable and would keep the dates closed.
+ */
+export async function cancelBooking(bookingId: string): Promise<void> {
+  const { error } = await createClient()
+    .from("bookings")
+    .update({ status: "cancelled" })
+    .eq("id", bookingId);
+
+  if (error) throw new Error(error.message);
+}
+
 /** Rows are stored per-property and may be a single day or a range. */
 export interface BlockedDateRow {
   id?: string | number;
@@ -111,7 +127,7 @@ export function useVillaAvailability(villaId: number | null): AvailabilityState 
         const [blockedResult, bookedResult] = await Promise.all([
           supabase
             .from(BLOCKED_DATES_TABLE)
-            .select("id, villa_id, start_date, end_date, reason")
+            .select("id, villa_id, start_date, end_date, reason, booking_id")
             .eq("villa_id", villaId)
             .abortSignal(controller.signal),
           supabase
@@ -138,6 +154,7 @@ export function useVillaAvailability(villaId: number | null): AvailabilityState 
                   id: row.id,
                   kind: "blocked",
                   reason: row.reason ?? undefined,
+                  bookingId: row.booking_id ?? null,
                 }),
               )
               .filter((r): r is DateRange => r !== null),

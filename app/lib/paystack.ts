@@ -36,10 +36,17 @@ function getSecretKey(): string {
   return key;
 }
 
-/** Unique, human-readable transaction reference. */
+/**
+ * Unique, human-readable transaction reference.
+ *
+ * 8 random bytes (64 bits) rather than 4. This string doubles as the access
+ * token for the guest's receipt at /receipt/<reference>, which exposes their
+ * name, email and phone number — 32 bits was too little for something a
+ * stranger could try to guess. Still well inside Paystack's 50-char limit.
+ */
 export function generateReference(prefix = "CC"): string {
   const stamp = Date.now().toString(36).toUpperCase();
-  const rand = crypto.randomBytes(4).toString("hex").toUpperCase();
+  const rand = crypto.randomBytes(8).toString("hex").toUpperCase();
   return `${prefix}-${stamp}-${rand}`;
 }
 

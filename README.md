@@ -27,7 +27,9 @@ bundled in `app/lib/data.ts`, so the site is browsable but nothing persists.
 | `SUPABASE_SERVICE_ROLE_KEY` | **server only** | Webhook writes booking status, bypassing RLS |
 | `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | public | `pk_test_xxx` / `pk_live_xxx` |
 | `PAYSTACK_SECRET_KEY` | **server only** | `sk_test_xxx` / `sk_live_xxx` — signs + verifies transactions |
-| `NEXT_PUBLIC_SITE_URL` | public | Absolute origin, used for Paystack `callback_url` and OG tags |
+| `RESEND_API_KEY` | **server only** | Receipt emails. Optional — without it no email is sent |
+| `RECEIPT_FROM_EMAIL` | **server only** | `Cosy Crest <receipts@yourdomain.com>`, on a Resend-verified domain |
+| `NEXT_PUBLIC_SITE_URL` | public | Absolute origin, used for Paystack `callback_url`, receipt links and OG tags |
 
 > The app renders even when these are unset — Supabase calls degrade to empty
 > states and the booking calendar falls back to the default date window. Payment

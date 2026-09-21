@@ -27,6 +27,12 @@ export interface DateRange {
   /** "blocked" (admin) or "booked" (existing reservation). */
   kind?: "blocked" | "booked";
   reason?: string;
+  /**
+   * For an admin block created by a paid booking, the reservation behind it.
+   * Releasing the block has to cancel that booking too, otherwise the booking
+   * keeps the dates unavailable on its own.
+   */
+  bookingId?: string | null;
 }
 
 const pad = (n: number): string => (n < 10 ? `0${n}` : `${n}`);

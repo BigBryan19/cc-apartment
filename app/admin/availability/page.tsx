@@ -20,6 +20,7 @@ import {
   Building2,
 } from "lucide-react";
 import {
+  cancelBooking,
   createBlockedRange,
   deleteBlockedRange,
   useVillaAvailability,
@@ -30,6 +31,7 @@ import {
   nightsBetween,
   toDateKey,
   isValidDateKey,
+  type DateRange,
 } from "../../lib/dates";
 
 interface VillaOption {
@@ -151,18 +153,38 @@ export default function ManageAvailability() {
     }
   };
 
-  // --- Remove a blockout --------------------------------------------------
-  const handleDelete = async (id: string | number | undefined) => {
-    if (id === undefined) return;
-    if (!confirm("Remove this blocked range? The dates become bookable again.")) {
-      return;
-    }
+  // --- Release a blockout -------------------------------------------------
+  // A block created by a paid booking cannot be released on its own: the
+  // booking independently marks those nights unavailable, so the reservation
+  // has to be cancelled at the same time or the dates stay closed.
+  const handleRelease = async (range: DateRange) => {
+    // A row without an id cannot be addressed, so there is nothing to release.
+    if (range.id === undefined) return;
+
+    const fromBooking = Boolean(range.bookingId);
+
+    const prompt = fromBooking
+      ? "This range is held by a paid booking.\n\n" +
+        "Releasing it will CANCEL that booking too, so the dates become " +
+        "bookable again. Any refund must be handled separately in Paystack.\n\n" +
+        "Continue?"
+      : "Remove this blocked range? The dates become bookable again.";
+
+    if (!confirm(prompt)) return;
+
     try {
-      await deleteBlockedRange(id);
-      setNotice("Blocked range removed.");
+      if (fromBooking && range.bookingId) {
+        await cancelBooking(range.bookingId);
+      }
+      await deleteBlockedRange(range.id);
+      setNotice(
+        fromBooking
+          ? "Booking cancelled and the dates released."
+          : "Blocked range removed.",
+      );
       availability.refresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Delete failed.");
+      alert(error instanceof Error ? error.message : "Release failed.");
     }
   };
 
@@ -175,6 +197,14 @@ export default function ManageAvailability() {
         <p className="text-slate-500 text-sm leading-relaxed">
           Block specific dates or date ranges so guests cannot book them. Blocked
           dates are combined with existing bookings on the booking calendar.
+        </p>
+        <p className="mt-3 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+          <span>
+            The <strong>reason</strong> you type is shown on the public calendar,
+            so keep guest names, emails and phone numbers out of it. Ranges
+            arriving from a paid booking are marked <strong>Reserved</strong>.
+          </span>
         </p>
       </header>
 
@@ -361,16 +391,23 @@ export default function ManageAvailability() {
                     className="p-4 px-6 flex items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors"
                   >
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">
-                        {range.start}
-                        {range.end !== range.start ? ` → ${range.end}` : ""}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-900">
+                          {range.start}
+                          {range.end !== range.start ? ` → ${range.end}` : ""}
+                        </p>
+                        {range.bookingId && (
+                          <span className="shrink-0 rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-accent)]">
+                            Reserved
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500 truncate">
                         {range.reason || "No reason given"}
                       </p>
                     </div>
                     <button
-                      onClick={() => handleDelete(range.id)}
+                      onClick={() => handleRelease(range)}
                       className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
                       title="Remove blockout"
                       aria-label={`Remove blockout ${range.start}`}

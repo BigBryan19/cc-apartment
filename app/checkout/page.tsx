@@ -4,8 +4,6 @@ import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
-  CreditCard,
-  Smartphone,
   ShieldCheck,
   MapPin,
   Loader2,
@@ -35,9 +33,6 @@ const CheckoutContent = () => {
   const [villa, setVilla] = useState<VillaProps | null>(null);
   const [selectedRate, setSelectedRate] = useState<string>("");
   const [currency, setCurrency] = useState<"GHS" | "USD">("GHS");
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "mobile_money">(
-    "card",
-  );
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -240,7 +235,9 @@ const CheckoutContent = () => {
             guest_phone: formData.phone,
             check_in_date: checkInDate,
             total_amount: displayAmount,
-            payment_method: paymentMethod,
+            // "paystack" records that the charge routes through the gateway;
+            // the specific channel is chosen on Paystack's own page.
+            payment_method: "paystack",
             status: "pending",
           },
         ]);
@@ -460,48 +457,17 @@ const CheckoutContent = () => {
                 />
               </div>
 
-              {/* Payment method */}
+              {/* No channel picker here. Paystack's hosted page already
+                  presents every channel enabled on the account (card, mobile
+                  money, bank transfer), and a choice made here could not
+                  restrict it anyway — it would only add a step that does
+                  nothing. */}
               <h2 className="mb-4 text-lg font-semibold tracking-tight text-[var(--color-ink)]">
-                Payment method
+                Payment
               </h2>
-              <div className="grid grid-cols-2 gap-4 mb-2">
-                <div
-                  onClick={() => setPaymentMethod("card")}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && setPaymentMethod("card")}
-                  className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-colors ${
-                    paymentMethod === "card"
-                      ? "border-[var(--color-ink)] bg-[var(--color-canvas)] text-[var(--color-ink)]"
-                      : "border-[var(--color-line)] text-[var(--color-muted)] hover:border-[var(--color-ink)]"
-                  }`}
-                >
-                  <CreditCard size={22} />
-                  <span className="text-center text-[13px] font-semibold">
-                    Card
-                  </span>
-                </div>
-                <div
-                  onClick={() => setPaymentMethod("mobile_money")}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && setPaymentMethod("mobile_money")
-                  }
-                  className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-colors ${
-                    paymentMethod === "mobile_money"
-                      ? "border-[var(--color-ink)] bg-[var(--color-canvas)] text-[var(--color-ink)]"
-                      : "border-[var(--color-line)] text-[var(--color-muted)] hover:border-[var(--color-ink)]"
-                  }`}
-                >
-                  <Smartphone size={22} />
-                  <span className="text-center text-[13px] font-semibold">
-                    Mobile money
-                  </span>
-                </div>
-              </div>
               <p className="mb-6 text-xs text-[var(--color-muted)]">
-                You will be redirected to Paystack to complete payment securely.
+                You will be redirected to Paystack, where you can pay by card or
+                mobile money.
               </p>
 
               {(errorMessage || stayError) && (
