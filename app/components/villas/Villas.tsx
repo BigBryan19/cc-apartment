@@ -142,7 +142,7 @@ const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
         {/* ---- Content ---- */}
         <div className="mt-10">
           {isLoading ? (
-            <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-x-6 gap-y-10">
               {[0, 1, 2, 3].map((i) => (
                 <div key={i} className="animate-pulse">
                   <div className="aspect-[4/3] rounded-xl bg-[var(--color-canvas)]" />
@@ -162,7 +162,7 @@ const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
               </p>
             </div>
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-x-6 gap-y-10">
               {filteredVillas.map((villa) => (
                 <VillaCard
                   key={villa.id}
