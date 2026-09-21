@@ -195,12 +195,18 @@ drop policy if exists "bookings_public_read"   on public.bookings;
 drop policy if exists "bookings_public_update" on public.bookings;
 drop policy if exists "bookings_admin_all"     on public.bookings;
 
--- INSERT stays open so the checkout fallback (Supabase configured, Paystack
--- not yet) can still record a request. The primary path creates the booking
--- server-side in /api/payments/paystack/initialize with the service-role key,
--- which bypasses RLS entirely.
-create policy "bookings_public_insert"
-  on public.bookings for insert with check (true);
+-- Deliberately NO anonymous write policy on bookings.
+--
+-- Every booking is created server-side with the service-role key, which
+-- bypasses RLS entirely: /api/payments/paystack/initialize when Paystack is
+-- configured, and /api/bookings/request when it is not.
+--
+-- An earlier version of this file opened INSERT to the anonymous role "so the
+-- checkout fallback can record a request". That was a mistake twice over: it
+-- let anyone holding the publishable key fill the table with junk rows, and
+-- because RLS denies by default when no policy matches, the moment that policy
+-- was not in place the checkout silently threw the reservation away — the guest
+-- saw an error and no booking ever reached the admin.
 
 -- SELECT / UPDATE / DELETE are admin-only. This is the policy that stops the
 -- publishable key from reading guest contact details.

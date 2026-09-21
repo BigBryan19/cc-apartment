@@ -227,24 +227,38 @@ const CheckoutContent = () => {
         }
 
         // Record a pending request without taking payment.
-        const { error } = await supabase.from("bookings").insert([
-          {
-            villa_id: villa.id,
-            guest_name: guestName,
-            guest_email: formData.email,
-            guest_phone: formData.phone,
-            check_in_date: checkInDate,
-            total_amount: displayAmount,
-            // "paystack" records that the charge routes through the gateway;
-            // the specific channel is chosen on Paystack's own page.
-            payment_method: "paystack",
-            status: "pending",
-          },
-        ]);
+        //
+        // This goes through a server route, NOT a direct insert. `bookings`
+        // holds guest contact details, so its policies are closed to the
+        // anonymous role — a browser-side insert is rejected by row-level
+        // security and the reservation vanishes with no visible error.
+        const requestResponse = await fetch("/api/bookings/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            villaId: villa.id,
+            villaTitle: villa.title,
+            guestName,
+            guestEmail: formData.email,
+            guestPhone: formData.phone,
+            checkIn: checkInDate,
+            checkOut: checkOutDate,
+            nights: totalNights,
+            rate: selectedRate,
+            totalAmount: displayAmount,
+            currency,
+            packages: selectedPackages,
+          }),
+        });
 
-        if (error) {
+        const requestPayload = (await requestResponse.json().catch(() => null)) as
+          | { successful?: boolean; error?: string }
+          | null;
+
+        if (!requestResponse.ok || !requestPayload?.successful) {
           setErrorMessage(
-            `Could not save your reservation: ${error.message}`,
+            requestPayload?.error ||
+              "Could not save your request. Please try again or contact us.",
           );
         } else {
           setSuccessNote(
