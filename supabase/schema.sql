@@ -189,6 +189,25 @@ create policy "bookings_admin_all"
   to authenticated
   using (true) with check (true);
 
+-- --- Invoices: not read by the app at all, but it holds the same guest PII
+--     (name, email, phone) and is equally readable with the publishable key,
+--     so it gets the same treatment. Guarded so this still runs on a project
+--     that never had the table. ---------------------------------------------
+do $$
+begin
+  if exists (
+    select 1 from information_schema.tables
+     where table_schema = 'public' and table_name = 'invoices'
+  ) then
+    execute 'alter table public.invoices enable row level security';
+    execute 'drop policy if exists "invoices_public_read" on public.invoices';
+    execute 'drop policy if exists "invoices_public_write" on public.invoices';
+    execute 'drop policy if exists "invoices_admin_all" on public.invoices';
+    execute 'create policy "invoices_admin_all" on public.invoices
+               for all to authenticated using (true) with check (true)';
+  end if;
+end $$;
+
 
 -- ---------------------------------------------------------------------------
 -- 5. Optional starter data — mirrors app/lib/data.ts so the site is not empty
@@ -226,5 +245,26 @@ begin
        array['Free Wi-Fi','Kitchen','Pool','Well-furnished hall','Grand Piano','PS5 Gaming Console'],
        '[{"option":"One bedroom","amount":1500},{"option":"Two bedrooms","amount":2000},{"option":"Whole apartment","amount":3500},{"option":"Monthly Rate","amount":36000}]'::jsonb,
        '{"lat":5.712737022781674,"lng":-0.16226067413187414}'::jsonb);
-  end if;
+   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- 6. Data repair — asset paths that 404 on case-sensitive hosts
+--
+--    Rows seeded before this file was corrected store lower-case paths
+--    ("/lake1.jpg") while the files in /public are capitalised ("/Lake1.jpg").
+--    macOS treats those as the same file, so this went unnoticed locally — but
+--    on Vercel the filesystem is case-sensitive and every one of those images
+--    returns 404. Scoped to exactly the "/lake…" prefix so it cannot touch
+--    anything else.
+-- ---------------------------------------------------------------------------
+update public.villas
+   set image = regexp_replace(image, '^/lake', '/Lake')
+ where image like '/lake%';
+
+update public.villas
+   set images = array(
+     select regexp_replace(entry, '^/lake', '/Lake') from unnest(images) as entry
+   )
+ where images is not null
+   and array_to_string(images, ',') like '%/lake%';

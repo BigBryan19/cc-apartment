@@ -43,9 +43,11 @@ It is idempotent and bootstraps a project from empty:
   `nights`, `currency`, `packages`, `payment_reference`, `payment_status`,
   `paid_at`, `amount_paid`)
 - `blocked_dates` — admin-defined unavailable ranges per property
-- RLS policies for all three. Reads of `villas` and `blocked_dates` are public;
-  everything else, including reads of `bookings`, requires an authenticated
-  admin.
+- an asset-path repair for rows seeded before the `/Lake1.jpg` casing fix
+- RLS policies for all of them. Reads of `villas` and `blocked_dates` are
+  public; everything else, including reads of `bookings`, requires an
+  authenticated admin. An existing `invoices` table is locked down too if
+  present — the app never reads it, but it holds the same guest PII.
 
 ### Admin access
 
