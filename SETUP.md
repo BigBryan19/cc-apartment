@@ -107,6 +107,25 @@ from Supabase instead.
 
 ---
 
+### A4. Create your admin login
+
+With RLS tightened, `/admin` is unreachable until at least one user exists —
+the login page will reject everything while the users list is empty.
+
+1. Dashboard → **Authentication → Users** → **Add user** → **Create new user**.
+2. Enter your email and a strong password, and tick **Auto Confirm User**.
+   (Without that tick Supabase sends a confirmation email, and you cannot sign
+   in until it is confirmed.)
+3. Visit `/admin` — you should be redirected to `/admin/login`. Sign in.
+
+To create additional admins, repeat this. To remove someone's access, delete
+their user there.
+
+> Using one shared login for the whole team makes it impossible to tell who did
+> what. If more than one person needs access, create one user each.
+
+---
+
 ## Part B — Paystack
 
 1. Sign in at [paystack.com](https://paystack.com) and complete their onboarding.
@@ -171,6 +190,16 @@ npm run dev
    (e.g. `https://www.cosycrest.com`, no trailing slash).
 3. **Redeploy.** Environment variables only apply to new deployments.
 
+> **This one catches everybody.** The `NEXT_PUBLIC_*` values are inlined into
+> the JavaScript bundle **when the build runs**, not read at request time. So
+> adding them to Vercel and hitting *Redeploy* is what makes them take effect —
+> and changing them later always needs another rebuild. The same applies
+> locally: if you add keys to `.env.local` while `npm run dev` is running,
+> restart it; if you are serving a production build, run `npm run build` again.
+> Symptom of getting this wrong: the site still behaves as if nothing is
+> configured, and the admin login page shows the amber "not configured in this
+> build" banner.
+
 ---
 
 ## Part E — The webhook (do this after deploying)
@@ -225,14 +254,34 @@ log and confirm the `charge.success` delivery shows a 200.
 
 ---
 
-## ⚠️ Before you take real money
+## Security model
 
-The `/admin` panel currently has **no real authentication** — it's a client-side
-password gate, and it talks to Supabase with the public anon key. That means
-anyone who reads the anon key out of the page source can currently read guest
-names, emails and phone numbers from `bookings`, and can edit `villas`.
+The admin panel is protected by **Supabase Auth**. `middleware.ts` intercepts
+every request under `/admin` and redirects to `/admin/login` unless there is a
+valid session, and the row-level security policies in
+[`supabase/schema.sql`](supabase/schema.sql) restrict writes — plus reads of
+`bookings`, which hold guest contact details — to the `authenticated` role.
 
-Put the admin panel behind Supabase Auth (or move its reads/writes to a server
-route using `SUPABASE_SERVICE_ROLE_KEY`) and change the permissive policies in
-[`supabase/schema.sql`](supabase/schema.sql) to `to authenticated` before
-launch.
+| Table | Read | Write |
+| --- | --- | --- |
+| `villas` | public (guests browse listings) | admin only |
+| `blocked_dates` | public (calendar greys them out before login) | admin only |
+| `bookings` | **admin only** | insert is public; read/update/delete admin only |
+
+Two things worth understanding about this design:
+
+- **`bookings` insert is public by design.** A guest has no account, so the
+  checkout fallback has to be able to write one. The primary path creates the
+  booking server-side in `/api/payments/paystack/initialize` using the
+  service-role key, which bypasses RLS entirely. The open insert means someone
+  could spam junk rows; if that becomes a problem, move the fallback
+  server-side too and change the policy to `to authenticated`.
+- **The policies grant access to *any* signed-in user, not to a specific
+  person.** With a single admin account that is equivalent. If you ever add a
+  second user who should not see everything, scope the policies with something
+  like `using (auth.uid() = owner_id)`.
+
+Finally: keep `SUPABASE_SERVICE_ROLE_KEY` off the client. It is read only in
+`app/lib/supabase-server.ts`, which imports `server-only` so it can never be
+bundled into browser code. A secret key is additionally rejected with HTTP 401
+if it is ever sent from a browser.

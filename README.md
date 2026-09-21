@@ -43,7 +43,20 @@ It is idempotent and bootstraps a project from empty:
   `nights`, `currency`, `packages`, `payment_reference`, `payment_status`,
   `paid_at`, `amount_paid`)
 - `blocked_dates` — admin-defined unavailable ranges per property
-- RLS policies for all three (see the security note at the top of the file)
+- RLS policies for all three. Reads of `villas` and `blocked_dates` are public;
+  everything else, including reads of `bookings`, requires an authenticated
+  admin.
+
+### Admin access
+
+`/admin` is protected by Supabase Auth. `middleware.ts` redirects any request
+under `/admin` to `/admin/login` unless there is a valid session.
+
+**You must create a user first** — while the users list is empty the login page
+rejects everything. See [SETUP.md](SETUP.md) → *A4. Create your admin login*.
+
+Note: with credentials absent the app runs in a bundled-catalogue demo mode and
+the gate deliberately steps aside, since there is no database to protect.
 
 ### Paystack webhook
 

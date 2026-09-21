@@ -9,17 +9,18 @@
 --   bookings       — reservations + Paystack payment fields
 --   blocked_dates  — admin-defined unavailable ranges
 --
--- ⚠️  SECURITY NOTE — READ BEFORE GOING LIVE
--- The admin panel (/admin) has no Supabase Auth. It talks to the database with
--- the *public anon key*, which is embedded in the browser bundle, so the
--- policies below are deliberately permissive enough to keep it working. That
--- means anyone who reads the anon key out of the page source can also read
--- guest names, emails and phone numbers in `bookings`, and can write to
--- `villas`. This is acceptable while staffing a demo, but it is NOT acceptable
--- once real bookings and payments are flowing. Before launch, put the admin
--- panel behind Supabase Auth (or move admin reads/writes to a server route
--- using SUPABASE_SERVICE_ROLE_KEY) and tighten these policies to
--- `to authenticated`.
+-- ACCESS MODEL
+-- The admin panel is protected by Supabase Auth: middleware.ts redirects any
+-- request under /admin to /admin/login unless there is a valid session, and
+-- the policies in section 4 restrict every write — plus reads of `bookings`,
+-- which contain guest contact details — to the `authenticated` role.
+--
+-- You must create an admin user before /admin is usable. See SETUP.md,
+-- "Part A4: create your admin login". Without one, the login page will reject
+-- every attempt because no user exists.
+--
+-- Nothing here depends on the service-role key except the Paystack routes,
+-- which run server-side only.
 -- ===========================================================================
 
 
@@ -122,45 +123,71 @@ create index if not exists blocked_dates_villa_idx
 
 -- ---------------------------------------------------------------------------
 -- 4. Row Level Security
---    Guests must read villas and blocked dates without signing in.
---    See the security note at the top of this file about the write policies.
+--
+--    READ MODEL
+--      villas        — public. Guests browse listings without signing in.
+--      blocked_dates — public. The calendar greys these out before login.
+--      bookings      — AUTHENTICATED ONLY. These rows hold guest names, emails
+--                      and phone numbers. The publishable key ships in the
+--                      browser bundle, so `using (true)` here would publish
+--                      every guest's contact details to the internet.
+--
+--    WRITE MODEL
+--      Everything except a guest creating their own booking requires a
+--      signed-in admin (see middleware.ts and /admin/login).
+--
+--    Policies are dropped first so this file can be re-run on a project that
+--    still has the older permissive versions.
 -- ---------------------------------------------------------------------------
 alter table public.villas        enable row level security;
 alter table public.bookings      enable row level security;
 alter table public.blocked_dates enable row level security;
 
--- Properties: public read, public write (admin panel is unauthenticated).
+-- --- Properties: anyone may browse, only an admin may edit ------------------
 drop policy if exists "villas_public_read"  on public.villas;
+drop policy if exists "villas_public_write" on public.villas;
+drop policy if exists "villas_admin_write"  on public.villas;
+
 create policy "villas_public_read"
   on public.villas for select using (true);
 
-drop policy if exists "villas_public_write" on public.villas;
-create policy "villas_public_write"
-  on public.villas for all using (true) with check (true);
+create policy "villas_admin_write"
+  on public.villas for all
+  to authenticated
+  using (true) with check (true);
 
--- Blocked dates: public read (so the calendar can grey them out), public write.
+-- --- Blocked dates: anyone may read, only an admin may edit -----------------
 drop policy if exists "blocked_dates_public_read"  on public.blocked_dates;
+drop policy if exists "blocked_dates_public_write" on public.blocked_dates;
+drop policy if exists "blocked_dates_admin_write"  on public.blocked_dates;
+
 create policy "blocked_dates_public_read"
   on public.blocked_dates for select using (true);
 
-drop policy if exists "blocked_dates_public_write" on public.blocked_dates;
-create policy "blocked_dates_public_write"
-  on public.blocked_dates for all using (true) with check (true);
+create policy "blocked_dates_admin_write"
+  on public.blocked_dates for all
+  to authenticated
+  using (true) with check (true);
 
--- Bookings: guests create their own at checkout, so anon needs INSERT.
+-- --- Bookings: guests may create one; only an admin may read or change ------
 drop policy if exists "bookings_public_insert" on public.bookings;
+drop policy if exists "bookings_public_read"   on public.bookings;
+drop policy if exists "bookings_public_update" on public.bookings;
+drop policy if exists "bookings_admin_all"     on public.bookings;
+
+-- INSERT stays open so the checkout fallback (Supabase configured, Paystack
+-- not yet) can still record a request. The primary path creates the booking
+-- server-side in /api/payments/paystack/initialize with the service-role key,
+-- which bypasses RLS entirely.
 create policy "bookings_public_insert"
   on public.bookings for insert with check (true);
 
--- The admin bookings/availability screens read reservations with the anon key.
--- Replace these with `to authenticated` once the admin panel has a real login.
-drop policy if exists "bookings_public_read"   on public.bookings;
-create policy "bookings_public_read"
-  on public.bookings for select using (true);
-
-drop policy if exists "bookings_public_update" on public.bookings;
-create policy "bookings_public_update"
-  on public.bookings for update using (true) with check (true);
+-- SELECT / UPDATE / DELETE are admin-only. This is the policy that stops the
+-- publishable key from reading guest contact details.
+create policy "bookings_admin_all"
+  on public.bookings for all
+  to authenticated
+  using (true) with check (true);
 
 
 -- ---------------------------------------------------------------------------
