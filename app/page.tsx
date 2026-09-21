@@ -13,7 +13,10 @@ import FAQ from "./components/FAQ";
 import FloatingWhatsApp from "./components/FloatingWhatsApp";
 import AboutUs from "./components/AboutUs";
 import Footer from "./components/Footer";
+import JsonLd from "./components/JsonLd";
 import { SearchFilters } from "./components/villas/types";
+import { FAQS } from "./lib/content";
+import { faqJsonLd } from "./lib/seo";
 
 const App: React.FC = () => {
   const [currency, setCurrency] = useState<"GHS" | "USD">("GHS");
@@ -28,6 +31,11 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-white font-sans text-[var(--color-ink)]">
+      {/* FAQPage markup. The questions come from the same array the FAQ
+          section renders, so the visible copy and the structured data always
+          match — a mismatch is what gets FAQ rich results withdrawn. */}
+      <JsonLd data={faqJsonLd(FAQS)} />
+
       <Hero
         currency={currency}
         toggleCurrency={toggleCurrency}

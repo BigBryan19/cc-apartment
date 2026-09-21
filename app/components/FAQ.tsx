@@ -3,34 +3,9 @@
 
 import React, { useState } from "react";
 import { Plus, Minus } from "lucide-react";
-
-const FAQS = [
-  {
-    question: "What are the check-in and check-out times?",
-    answer:
-      "Standard check-in is at 2:00 PM, and check-out is at 11:00 AM. Early check-in or late check-out can be arranged upon request, subject to availability.",
-  },
-  {
-    question: "Are pets allowed in the apartments?",
-    answer:
-      "Yes, select properties like our Aburi Mountain Retreat are pet-friendly. Please let us know during booking so we can prepare accordingly.",
-  },
-  {
-    question: "Is security guaranteed at the properties?",
-    answer:
-      "Absolutely. All properties are equipped with 24/7 security personnel, CCTV surveillance and secure parking to ensure maximum safety.",
-  },
-  {
-    question: "How do the special packages (birthday / honeymoon) work?",
-    answer:
-      "Once you select a package during checkout or via WhatsApp, our concierge team will reach out to discuss your exact preferences and themes, and arrange everything before your arrival.",
-  },
-  {
-    question: "Can I cancel or modify my reservation?",
-    answer:
-      "Yes, reservations can be modified or cancelled up to 48 hours before check-in for a full refund. Please review our full terms and conditions for extended stays.",
-  },
-];
+// Shared with app/lib/seo.ts, which turns the same array into FAQPage
+// structured data. One copy, so the page and the markup cannot disagree.
+import { FAQS } from "../lib/content";
 
 const FAQ: React.FC = () => {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
