@@ -3,7 +3,7 @@
 /* ===========================================================================
    DESIGN SYSTEM
    A restrained, editorial booking-platform language: white canvas, near-black
-   ink, one warm accent, hairline borders, tight radii, generous whitespace.
+   ink, one accent, hairline borders, tight radii, generous whitespace.
    =========================================================================== */
 
 @theme {
@@ -18,10 +18,13 @@
   --color-canvas: #f7f7f7; /* alternating section background */
   --color-canvas-warm: #faf8f6;
 
-  /* Accent — used almost exclusively for the primary booking CTA. */
-  --color-accent: #ff385c;
-  --color-accent-deep: #d70466;
-  --color-accent-soft: #fff1f3;
+  /* Accent — the brand colour, used for the primary booking CTA, selected
+     states and the favourite heart. Single source of truth: change it here. */
+  --color-accent: #455360;
+  /* Shade used for hover/pressed states. */
+  --color-accent-deep: #37424d;
+  /* Light tint used for ::selection and subtle accent surfaces. */
+  --color-accent-soft: #eef1f4;
 
   /* --- Radii: tightened from the previous 24px+ defaults ---------------- */
   --radius-xs: 4px;
@@ -113,23 +116,19 @@ body {
   }
 }
 
-/* The signature booking CTA. */
+/* The signature booking CTA. Solid rather than a gradient now that the brand
+   colour is a single flat value. */
 @utility btn-accent {
-  background-image: linear-gradient(
-    to right,
-    #e61e4d 0%,
-    #e31c5f 50%,
-    #d70466 100%
-  );
+  background-color: var(--color-accent);
   color: #ffffff;
   font-weight: 600;
   transition:
     transform 0.2s var(--ease-out-soft),
     box-shadow 0.2s var(--ease-out-soft),
-    filter 0.2s var(--ease-out-soft);
+    background-color 0.2s var(--ease-out-soft);
 
   &:hover:not(:disabled) {
-    filter: brightness(1.06);
+    background-color: var(--color-accent-deep);
     box-shadow: var(--shadow-card);
   }
   &:active:not(:disabled) {
