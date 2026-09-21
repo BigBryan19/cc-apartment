@@ -30,9 +30,12 @@ export const SITE = {
   name: "Cosy Crest Apartments",
   shortName: "Cosy Crest",
   legalName: "Cosy Crest Apartments",
-  tagline: "Luxury furnished apartments in Accra and Aburi, Ghana",
+  // "Short let" is the term Ghanaian guests actually search; "holiday rental"
+  // and "vacation home" are not used in this market, so they are deliberately
+  // absent from every tagline and description.
+  tagline: "Short let apartments in Accra and Aburi, Ghana",
   description:
-    "Fully furnished, privately managed apartments in Greater Accra and the Eastern Region of Ghana. Private pools, fast Wi-Fi, secure parking and hotel-grade housekeeping — ideal for holidays, honeymoons and work trips.",
+    "Short let apartments in Accra and Aburi — fully furnished, privately managed, with private pools, fast Wi-Fi and hotel-grade housekeeping. Ideal for holidays, honeymoons, family visits and work trips in Greater Accra and the Eastern Region.",
   phone: "+233 54 053 4870",
   phoneE164: "+233540534870",
   email: "officialcosycrestaparts@gmail.com",

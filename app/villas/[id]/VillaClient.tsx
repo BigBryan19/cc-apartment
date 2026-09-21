@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ChevronLeft,
   MapPin,
@@ -17,6 +18,7 @@ import {
   Users,
   BedDouble,
   Bath,
+  ArrowUpRight,
 } from "lucide-react";
 import { villasData } from "../../lib/data";
 import Navbar from "../../components/Navbar";
@@ -25,6 +27,53 @@ import { formatPrice, getAmenityIcon } from "../../components/villas/utils";
 import DateRangePicker from "../../components/booking/DateRangePicker";
 import { useVillaAvailability } from "../../lib/availability";
 import { validateStay } from "../../lib/dates";
+
+/**
+ * Guides worth reading for each property, linked from its detail page.
+ *
+ * These are internal links from the highest-intent pages on the site into the
+ * guides, which is how a crawler reaches them and how authority transfers.
+ * `default` covers an id that is not in the static catalogue.
+ */
+const LOCATION_GUIDES: Record<
+  number | "default",
+  { label: string; href: string }[]
+> = {
+  1: [
+    { label: "Where to stay in Accra", href: "/guides/where-to-stay-in-accra" },
+    {
+      label: "Lakeside Estate: a local's guide",
+      href: "/guides/lakeside-estate-accra",
+    },
+  ],
+  2: [
+    {
+      label: "Staying in Aburi: the complete guide",
+      href: "/guides/staying-in-aburi",
+    },
+    {
+      label: "The best time to visit Ghana",
+      href: "/guides/best-time-to-visit-ghana",
+    },
+  ],
+  3: [
+    {
+      label: "Short let apartments in Adenta",
+      href: "/guides/short-let-adenta",
+    },
+    {
+      label: "What a short let includes",
+      href: "/guides/what-a-short-let-includes",
+    },
+  ],
+  default: [
+    { label: "Where to stay in Accra", href: "/guides/where-to-stay-in-accra" },
+    {
+      label: "What a short let includes",
+      href: "/guides/what-a-short-let-includes",
+    },
+  ],
+};
 
 const AVAILABLE_PACKAGES = [
   { id: "Honeymoon Setup", icon: Heart, label: "Honeymoon" },
@@ -94,6 +143,9 @@ export default function VillaClient({
     checkInDate && checkOutDate
       ? validateStay(checkInDate, checkOutDate, availability.all)
       : null;
+
+  const locationGuides =
+    LOCATION_GUIDES[villa?.id ?? 0] ?? LOCATION_GUIDES.default;
 
   const togglePackage = (pkgId: string) =>
     setSelectedPackages((prev) =>
@@ -218,6 +270,31 @@ export default function VillaClient({
               <p className="mt-7 text-[15px] leading-relaxed text-[var(--color-muted)]">
                 {villa.description}
               </p>
+
+              {/* Internal links to the guides for this area. Useful to the
+                  guest, and how authority flows from the property pages — the
+                  strongest commercial pages — into the guides. */}
+              {locationGuides.length > 0 && (
+                <div className="mt-8 rounded-2xl border border-[var(--color-line)] bg-[var(--color-canvas)] p-5">
+                  <p className="eyebrow mb-3">Planning your stay</p>
+                  <ul className="space-y-2.5">
+                    {locationGuides.map((guide) => (
+                      <li key={guide.href}>
+                        <Link
+                          href={guide.href}
+                          className="group inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-ink)] transition-opacity hover:opacity-70"
+                        >
+                          {guide.label}
+                          <ArrowUpRight
+                            size={13}
+                            className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                          />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <div className="mt-10 border-t border-[var(--color-line-soft)] pt-8">
                 <h2 className="text-xl font-semibold tracking-tight">

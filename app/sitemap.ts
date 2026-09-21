@@ -14,6 +14,7 @@
 
 import type { MetadataRoute } from "next";
 import { villasData } from "./lib/data";
+import { GUIDES } from "./lib/guides";
 import { SITE_URL, absoluteUrl } from "./lib/seo";
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -29,6 +30,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ),
   }));
 
+  const guidePages: MetadataRoute.Sitemap = GUIDES.map((guide) => ({
+    url: `${SITE_URL}/guides/${guide.slug}`,
+    // Each guide carries its own revision date; using it is a truthful signal
+    // about how fresh the page actually is.
+    lastModified: new Date(guide.updated),
+    changeFrequency: "monthly",
+    priority: 0.7,
+  }));
+
   return [
     {
       url: SITE_URL,
@@ -38,5 +48,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       images: [absoluteUrl("/hero-bg.png")],
     },
     ...propertyPages,
+    {
+      url: `${SITE_URL}/guides`,
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    ...guidePages,
   ];
 }

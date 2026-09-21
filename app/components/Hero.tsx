@@ -117,8 +117,8 @@ const Hero: React.FC<HeroProps> = ({
         </h1>
 
         <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/85 sm:text-base">
-          Fully furnished, privately managed apartments with pools, fast Wi-Fi
-          and hotel-grade housekeeping.
+          Short let apartments in Accra and Aburi — fully furnished, privately
+          managed, with private pools, fast Wi-Fi and hotel-grade housekeeping.
         </p>
 
         {/* ---------------- Search ---------------- */}

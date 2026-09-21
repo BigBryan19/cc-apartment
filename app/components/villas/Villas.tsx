@@ -103,7 +103,7 @@ const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
           <div>
             <span className="eyebrow">Our homes</span>
             <h2 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-4xl">
-              Top pick apartments
+              Short let apartments in Accra and Aburi
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-[var(--color-muted)]">
               {isLoading
