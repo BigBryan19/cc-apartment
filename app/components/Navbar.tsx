@@ -59,7 +59,11 @@ const Navbar: React.FC<NavbarProps> = ({
       <header
         className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
           isLight
-            ? "bg-white/95 backdrop-blur-md border-b border-[var(--color-line-soft)]"
+            ? // Fully opaque rather than /95: at 95% the collage ghosted faintly
+              // through as it scrolled under the bar, which reads as the same
+              // "image on top of the navbar" problem even once the stacking
+              // order is correct.
+              "bg-white border-b border-[var(--color-line-soft)]"
             : "bg-gradient-to-b from-black/45 to-transparent"
         }`}
       >

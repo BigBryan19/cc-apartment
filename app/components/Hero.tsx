@@ -98,9 +98,13 @@ const Hero: React.FC<HeroProps> = ({
           sub-heading stays readable over bright areas of the photo. */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/45 to-black/70" />
 
-      <div className="relative z-20">
-        <Navbar currency={currency} toggleCurrency={toggleCurrency} />
-      </div>
+      {/* Deliberately NOT wrapped in a `relative z-20` div. Such a wrapper
+          creates a stacking context that traps the navbar's own z-50 inside
+          it, leaving the navbar competing at level 20 against the page
+          sections — so AboutUs's collage images (z-30) painted straight over
+          it while scrolling. The navbar is `fixed` and layers above the scrim
+          here on its own, so it needs no help from a parent. */}
+      <Navbar currency={currency} toggleCurrency={toggleCurrency} />
 
       <div className="relative z-10 shell flex min-h-[92svh] flex-col items-center justify-center pt-28 pb-16 text-center">
         <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-md">
