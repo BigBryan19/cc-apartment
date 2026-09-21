@@ -31,6 +31,18 @@ three must never be exposed — they stay server-side.
 > read-only and reports which tables already exist, what columns they have,
 > and whether your `villas.id` is numeric or a uuid — which decides whether
 > `schema.sql` is a clean install or an upgrade.
+>
+> ⚠️ **Running A3 is not optional on an existing project.** A project created
+> before these policies existed ships with row-level security wide open.
+> Because the publishable key is embedded in the browser bundle, anyone who
+> views your page source can then read every row of `bookings` and `invoices`
+> — guest names, emails and phone numbers — with a plain HTTPS request. That
+> exposure ends the moment `schema.sql` runs.
+>
+> Check it yourself both ways. Before: send a request to
+> `/rest/v1/bookings?select=guest_email` with your publishable key as the
+> `apikey` header and see whether guest rows come back. After: the same
+> request should return `[]` or a permission error.
 
 ### A1. Create the project
 
