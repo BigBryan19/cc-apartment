@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X, Globe, Check } from "lucide-react";
 
 interface NavbarProps {
@@ -16,10 +17,19 @@ interface NavbarProps {
   variant?: "overlay" | "solid";
 }
 
+/**
+ * Nav items.
+ *
+ * The section links are absolute ("/#villas", not "#villas"). As bare hashes
+ * they only resolved on the homepage — from /guides or a property page the
+ * browser looked for that anchor on the current page, found nothing, and the
+ * click appeared to do nothing at all.
+ */
 const LINKS = [
-  { label: "Villas", href: "#villas" },
-  { label: "About Us", href: "#aboutus" },
-  { label: "Contact", href: "#contact" },
+  { label: "Villas", href: "/#villas" },
+  { label: "About Us", href: "/#aboutus" },
+  { label: "Guides", href: "/guides" },
+  { label: "Contact", href: "/#contact" },
 ];
 
 const Navbar: React.FC<NavbarProps> = ({
@@ -28,6 +38,8 @@ const Navbar: React.FC<NavbarProps> = ({
   variant = "overlay",
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
+  // Only real pages can be "current"; the `/#section` links never are.
+  const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -92,17 +104,22 @@ const Navbar: React.FC<NavbarProps> = ({
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-1">
             {LINKS.map((link) => (
-              <a
+              <Link
                 key={link.href}
                 href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
                 className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
                   isLight
-                    ? "text-[var(--color-ink-soft)] hover:bg-[var(--color-canvas)] hover:text-[var(--color-ink)]"
-                    : "text-white/90 hover:bg-white/10 hover:text-white"
+                    ? pathname === link.href
+                      ? "bg-[var(--color-canvas)] text-[var(--color-ink)]"
+                      : "text-[var(--color-ink-soft)] hover:bg-[var(--color-canvas)] hover:text-[var(--color-ink)]"
+                    : pathname === link.href
+                      ? "bg-white/15 text-white"
+                      : "text-white/90 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
           </div>
 
@@ -178,14 +195,15 @@ const Navbar: React.FC<NavbarProps> = ({
 
           <nav className="flex-1 overflow-y-auto py-4">
             {LINKS.map((link) => (
-              <a
+              <Link
                 key={link.href}
                 href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="block px-5 py-3.5 text-lg font-medium text-[var(--color-ink)] hover:bg-[var(--color-canvas)] transition-colors"
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
           </nav>
 

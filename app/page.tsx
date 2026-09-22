@@ -8,7 +8,6 @@ import Regions from "./components/Regions";
 import Specialties from "./components/Specialties";
 import Packages from "./components/Packages";
 import Testimonials from "./components/Testimonials";
-import GuidesTeaser from "./components/GuidesTeaser";
 import HostCTA from "./components/HostCTA";
 import FAQ from "./components/FAQ";
 import FloatingWhatsApp from "./components/FloatingWhatsApp";
@@ -57,9 +56,6 @@ const App: React.FC = () => {
         <Testimonials />
 
         <HostCTA />
-
-        {/* Internal links out to the guides. */}
-        <GuidesTeaser />
 
         <FAQ />
       </main>
