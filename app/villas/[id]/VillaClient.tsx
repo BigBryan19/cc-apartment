@@ -23,6 +23,7 @@ import {
 import { villasData } from "../../lib/data";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
+import ContactSection from "../../components/ContactSection";
 import { formatPrice, getAmenityIcon } from "../../components/villas/utils";
 import DateRangePicker from "../../components/booking/DateRangePicker";
 import { useVillaAvailability } from "../../lib/availability";
@@ -500,7 +501,21 @@ export default function VillaClient({
         </div>
       )}
 
-      <Footer />
+      {/* An enquiry form at the end of the property page — the moment a guest
+          is most likely to have a question about dates or the apartment. This
+          instance owns the `#contact` anchor; the footer below skips its own
+          copy so the page does not show the form twice. */}
+      <section className="bg-[var(--color-canvas-warm)] pt-16">
+        <div className="shell pb-20">
+          <ContactSection
+            id="contact"
+            heading="Questions about this apartment?"
+            defaultMessage={`I'm interested in ${villa.title}. My dates are: `}
+          />
+        </div>
+      </section>
+
+      <Footer showContact={false} />
     </div>
   );
 }

@@ -14,6 +14,7 @@
 import React, { useState, useEffect } from "react";
 import Navbar from "../Navbar";
 import Footer from "../Footer";
+import ContactSection from "../ContactSection";
 
 export default function GuideShell({
   children,
@@ -44,7 +45,16 @@ export default function GuideShell({
         variant="solid"
       />
       {children}
-      <Footer />
+
+      {/* Someone who has just read a guide is exactly the person with a
+          question, so the enquiry form sits at the end of it. This instance
+          owns the `#contact` anchor, and the footer below skips its own copy so
+          the page never shows two forms. */}
+      <div className="shell pb-20">
+        <ContactSection id="contact" />
+      </div>
+
+      <Footer showContact={false} />
     </div>
   );
 }
