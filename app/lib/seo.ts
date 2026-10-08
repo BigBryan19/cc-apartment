@@ -18,12 +18,19 @@ import type { VillaProps } from "../components/villas/types";
  * deployment that forgot to set it — and it must match the host the site is
  * actually served from, because it becomes the canonical URL on every page.
  *
+ * The fallback is the **www** host on purpose. Vercel is configured to
+ * 308-redirect `cosycrest.com` → `www.cosycrest.com`, so the apex is not a
+ * servable origin: every canonical tag and sitemap entry built from it would
+ * point at a URL that immediately redirects, which Google reports as
+ * "Page with redirect" and drops from the index.
+ *
  * Pick ONE of apex or www and make the other 301 to it in Vercel. Serving both
  * splits the site into two competing copies of itself, which is worse than
- * either choice on its own.
+ * either choice on its own. If you switch to serving the apex, change *both*
+ * the Vercel redirect and this fallback.
  */
 export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL || "https://cosycrest.com"
+  process.env.NEXT_PUBLIC_SITE_URL || "https://www.cosycrest.com"
 ).replace(/\/$/, "");
 
 export const SITE = {
@@ -83,7 +90,7 @@ export function organizationJsonLd() {
     priceRange: "GH₵600 - GH₵3,500 per night",
     currenciesAccepted: SITE.currency,
     paymentAccepted: "Card, Mobile Money",
-    image: absoluteUrl("/hero-bg.png"),
+    image: absoluteUrl("/og-cover.jpg"),
     logo: absoluteUrl("/cc-real.png"),
     address: {
       "@type": "PostalAddress",

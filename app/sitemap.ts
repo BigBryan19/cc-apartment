@@ -45,7 +45,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified,
       changeFrequency: "daily",
       priority: 1,
-      images: [absoluteUrl("/hero-bg.png")],
+      images: [absoluteUrl("/og-cover.jpg")],
     },
     ...propertyPages,
     {

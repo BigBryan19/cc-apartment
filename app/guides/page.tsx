@@ -25,13 +25,13 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
     url: "/guides",
     locale: "en_GH",
-    images: [{ url: "/hero-bg.png", alt: SITE.name }],
+    images: [{ url: "/og-cover.jpg", alt: SITE.name }],
   },
   twitter: {
     card: "summary_large_image",
     title: `Guides to staying in Ghana — ${SITE.shortName}`,
     description: DESCRIPTION,
-    images: ["/hero-bg.png"],
+    images: ["/og-cover.jpg"],
   },
 };
 
