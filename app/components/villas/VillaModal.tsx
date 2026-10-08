@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   X,
   Share2,
@@ -15,11 +15,11 @@ import {
   Plus,
 } from "lucide-react";
 import { VillaProps } from "./types";
-import { formatPrice, getAmenityIcon } from "./utils";
+import { formatPrice } from "./utils";
 import { useRouter } from "next/navigation";
 import DateRangePicker from "../booking/DateRangePicker";
 import { useVillaAvailability } from "../../lib/availability";
-import { validateStay } from "../../lib/dates";
+import { nightsBetween, validateStay } from "../../lib/dates";
 
 interface VillaModalProps {
   villa: VillaProps;
@@ -49,7 +49,16 @@ const VillaModal: React.FC<VillaModalProps> = ({
   // Custom Day Selection States
   const [checkInDate, setCheckInDate] = useState<string>("");
   const [checkOutDate, setCheckOutDate] = useState<string>("");
-  const [totalNights, setTotalNights] = useState<number>(0);
+
+  // Derived, not stored. The night count is a pure function of the two date
+  // keys, so holding it in state cost an extra effect and an extra render every
+  // time either date changed. `nightsBetween` is the same helper the paid path
+  // prices with, so this widget and the invoice cannot disagree about how many
+  // nights a stay is.
+  const totalNights = useMemo(
+    () => nightsBetween(checkInDate, checkOutDate),
+    [checkInDate, checkOutDate],
+  );
 
   // --- NEW: State for selected packages ---
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
@@ -66,6 +75,18 @@ const VillaModal: React.FC<VillaModalProps> = ({
       ]
     : villa.images.map((img) => ({ type: "image", src: img }));
 
+  /*
+   * Locks background scroll while the modal is open, and seeds the rate from the
+   * `villa` prop (the guest's later pick overrides it, in the rate list below).
+   *
+   * React would prefer the rate to be derived rather than mirrored into state.
+   * It is suppressed rather than changed here because the override has to
+   * survive a `villa` identity change, and deriving it would alter *when* the
+   * guest's choice resets — a behaviour change that should not ride along
+   * inside an audit fix. The scroll lock is a genuine imperative side effect in
+   * any case.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect -- prop→state mirror with a user override; see comment above */
   useEffect(() => {
     document.body.style.overflow = "hidden";
     if (villa.rates && villa.rates.length > 0) {
@@ -79,19 +100,7 @@ const VillaModal: React.FC<VillaModalProps> = ({
       document.body.style.overflow = "unset";
     };
   }, [villa, currency]);
-
-  useEffect(() => {
-    if (checkInDate && checkOutDate) {
-      const start = new Date(checkInDate);
-      const end = new Date(checkOutDate);
-      const timeDiff = end.getTime() - start.getTime();
-      const calculatedNights = Math.ceil(timeDiff / (1000 * 3600 * 24));
-
-      setTotalNights(calculatedNights > 0 ? calculatedNights : 0);
-    } else {
-      setTotalNights(0);
-    }
-  }, [checkInDate, checkOutDate]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleNext = () =>
     setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1));

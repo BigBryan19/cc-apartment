@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useSyncExternalStore } from "react";
 import { VillaProps } from "./types";
 import { formatPrice } from "./utils";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
@@ -12,6 +12,14 @@ interface VillaMapViewProps {
   onMarkerClick: (v: VillaProps) => void;
   currency?: "GHS" | "USD";
 }
+
+/**
+ * Snapshots for the hydration flag below. The value never changes after
+ * hydration, so `subscribe` has nothing to listen to.
+ */
+const subscribeToNothing = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 // --- NEW: Helper Component to Auto-Zoom and Center the Map ---
 const MapBoundsFit = ({ villas }: { villas: VillaProps[] }) => {
@@ -37,11 +45,20 @@ const VillaMapView: React.FC<VillaMapViewProps> = ({
   onMarkerClick,
   currency = "GHS",
 }) => {
-  const [isMounted, setIsMounted] = useState(false);
+  // Hydration-safe "are we on the client yet?" flag.
+  //
+  // `useState(false)` plus `setIsMounted(true)` inside an effect works, but it
+  // trips react-hooks/set-state-in-effect and costs an extra render pass.
+  // useSyncExternalStore is React's supported way to read a value that differs
+  // between environments: the server snapshot is false, so the placeholder is
+  // what hydrates, and the client snapshot is true.
+  const isMounted = useSyncExternalStore(
+    subscribeToNothing,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
 
   useEffect(() => {
-    setIsMounted(true);
-
     delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })
       ._getIconUrl;
     L.Icon.Default.mergeOptions({

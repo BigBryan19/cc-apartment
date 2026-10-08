@@ -22,10 +22,18 @@ export default function GuideShell({
 }) {
   const [currency, setCurrency] = useState<"GHS" | "USD">("GHS");
 
+  /*
+   * Read in an effect rather than in useState's lazy initialiser. This shell is
+   * prerendered on the server, where `window` does not exist — so the initial
+   * render must produce "GHS" on both sides, and only then adopt the stored
+   * preference. Doing it in the initialiser would mismatch during hydration.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect -- browser-only storage read; see comment above */
   useEffect(() => {
     const saved = window.localStorage.getItem("cc-currency");
     if (saved === "GHS" || saved === "USD") setCurrency(saved);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const toggleCurrency = () => {
     setCurrency((current) => {

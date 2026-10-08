@@ -65,10 +65,18 @@ const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
     fetchVillas();
   }, []);
 
+  /*
+   * Read in an effect rather than in useState's lazy initialiser. This component
+   * is prerendered, so reading localStorage during the initial render would make
+   * the client's first render disagree with the server's HTML — a hydration
+   * mismatch. The cost is one extra render, which is the correct trade here.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect -- browser-only storage read; see comment above */
   useEffect(() => {
     const saved = localStorage.getItem("cosy-favorites");
     if (saved) setFavorites(JSON.parse(saved));
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const toggleFavorite = (id: number) => {
     const next = favorites.includes(id)

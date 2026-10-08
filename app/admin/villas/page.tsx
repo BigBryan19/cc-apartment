@@ -1,17 +1,15 @@
 // app/admin/villas/page.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { createClient } from "../../utils/supabase";
 import {
   Plus,
   Trash2,
-  Edit,
   Loader2,
   X,
   DollarSign,
   MapPin,
-  Users,
 } from "lucide-react";
 
 interface Villa {
@@ -46,7 +44,7 @@ export default function ManageVillas() {
   const supabase = createClient();
 
   // Fetch villas from Supabase
-  const fetchVillas = async () => {
+  const fetchVillas = useCallback(async () => {
     setIsLoading(true);
     const { data, error } = await supabase
       .from("villas")
@@ -57,11 +55,21 @@ export default function ManageVillas() {
       setVillas(data as unknown as Villa[]);
     }
     setIsLoading(false);
-  };
+  }, [supabase]);
 
+  /*
+   * Client-side fetch on mount. The leading `setIsLoading(true)` is a
+   * synchronous setState from inside an effect, which
+   * react-hooks/set-state-in-effect flags. The rule's preferred fix is a
+   * data-fetching layer (React Query / SWR, or moving this to a server
+   * component) — a larger change than belongs in this branch, so it is
+   * suppressed with the reason recorded rather than half-applied.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect -- client-side fetch-on-mount; see comment above */
   useEffect(() => {
     fetchVillas();
-  }, []);
+  }, [fetchVillas]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Handle Form Submission (Add Villa)
   const handleSubmit = async (e: React.FormEvent) => {

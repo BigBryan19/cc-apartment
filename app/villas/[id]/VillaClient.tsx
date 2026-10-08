@@ -103,6 +103,15 @@ export default function VillaClient({
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
+  /*
+   * Seeds the rate picker from the `villa` prop; the guest's later choice
+   * overrides it. React would prefer this be derived rather than mirrored into
+   * state, but `selectedRate` starts as "" and several guards depend on that
+   * (including the "is a rate chosen?" check on the submit button), so deriving
+   * it would change validation behaviour — not a change to make blind inside an
+   * audit fix. Same treatment as the equivalent effect in VillaModal.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect -- prop→state mirror feeding validation; see comment above */
   useEffect(() => {
     if (!villa) return;
     if (villa.rates && villa.rates.length > 0) {
@@ -113,6 +122,7 @@ export default function VillaClient({
       setSelectedRateAmount(villa.price);
     }
   }, [villa]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!villa) {
     return (
