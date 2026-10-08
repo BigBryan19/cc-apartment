@@ -9,7 +9,7 @@ import { SearchFilters, VillaProps } from "./types";
 import { EXCHANGE_RATE } from "./utils";
 import VillaCard from "./VillaCard";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
-import { bundledVillas } from "../../lib/catalog";
+import { bundledVillas, toVillaProps, type VillaRow } from "../../lib/catalog";
 import { fromNightlyPrice } from "../../lib/rates";
 import { maxPropertyOccupancy } from "../../lib/quote";
 
@@ -39,10 +39,10 @@ const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
 
   useEffect(() => {
     const fetchVillas = async () => {
-      // Not wired to a database yet — fall back to the catalogue bundled in
-      // app/lib/data.ts so the site still presents real properties. Once
-      // Supabase is configured, the database becomes authoritative and this
-      // branch is never taken (even if it returns zero rows).
+      // Fall back to the catalogue bundled in app/lib/catalog.ts so the site
+      // still presents real properties when Supabase is unreachable. Once it is
+      // configured the database is authoritative, and this branch is not taken
+      // even if it returns zero rows.
       if (!isSupabaseConfigured()) {
         setVillasData(bundledVillas);
         setIsLoading(false);
@@ -55,11 +55,17 @@ const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
       if (error) {
         console.error("Error fetching villas:", error);
       } else if (data) {
-        type VillaRow = Omit<VillaProps, "hasPool"> & { has_pool?: boolean };
-        const formatted: VillaProps[] = (data as VillaRow[]).map((v) => ({
-          ...v,
-          hasPool: Boolean(v.has_pool),
-        }));
+        // Through toVillaProps, never a spread.
+        //
+        // This used to be `(data as VillaRow[]).map(v => ({...v, hasPool: ...}))`,
+        // which built a VillaProps-shaped object without ever populating `units`.
+        // The assertion made the compiler accept it, so the page compiled and
+        // then threw "Cannot read properties of undefined (reading 'filter')" on
+        // the deployed site the moment anything asked a villa for its units.
+        //
+        // toVillaProps is the only supported way to build a VillaProps from a row:
+        // it normalises `rates` into `units`, so there is nothing to forget.
+        const formatted = (data as VillaRow[]).map(toVillaProps);
         setVillasData(formatted);
       }
       setIsLoading(false);

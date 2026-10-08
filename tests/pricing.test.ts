@@ -16,7 +16,14 @@
 // passing here.
 // ---------------------------------------------------------------------------
 
-import { buildQuote, priceUnit, findUnitsForGuests, type ExtraInput } from "../app/lib/quote";
+import {
+  buildQuote,
+  priceUnit,
+  findUnitsForGuests,
+  maxPropertyOccupancy,
+  type ExtraInput,
+} from "../app/lib/quote";
+import { toVillaProps } from "../app/lib/catalog";
 import {
   normalizeUnits,
   fromNightlyPrice,
@@ -477,6 +484,79 @@ console.log("\n=== Status model ===\n");
   const pending = migrateLegacyStatus("pending", ["Birthday Decoration"]);
   check("3", "a legacy pending row is not treated as confirmed",
     pending.accommodation === "pending_payment" && pending.occasion === "requested");
+}
+
+// ---------------------------------------------------------------------------
+// Regression: the production white-screen
+//
+// The deployed site threw "Cannot read properties of undefined (reading
+// 'filter')" because two components built a VillaProps from database rows with
+// an object spread and an `as VillaProps` cast. The cast silenced the compiler,
+// `units` was never populated, and the first call to fromNightlyPrice(villa.units)
+// killed the page. Every producer must go through toVillaProps.
+// ---------------------------------------------------------------------------
+
+console.log("\n=== Regression: DB row -> VillaProps ===\n");
+{
+  // Shaped exactly like a row from the production `villas` table.
+  const productionRow = {
+    id: 1,
+    title: "Lakeside Estate",
+    location: "Greater Accra • Lakeside",
+    price: 2000,
+    guests: 4,
+    bedrooms: 3,
+    bathrooms: 5,
+    has_pool: true,
+    image: "/Lake1.jpg",
+    images: ["/Lake1.jpg", "/Lake2.jpg"],
+    amenities: ["Free Wi-Fi"],
+    coordinates: { lat: 5.7, lng: -0.12 },
+    rates: [
+      { option: "One bedrooms", amount: 1500 },
+      { option: "Monthly Rate (Whole apartment)", amount: 30000 },
+    ],
+  };
+
+  const villa = toVillaProps(productionRow);
+
+  check(
+    "R1",
+    "toVillaProps populates units from the rates column",
+    Array.isArray(villa.units) && villa.units.length === 2,
+    `got ${JSON.stringify(villa.units?.length)}`,
+  );
+  check(
+    "R1",
+    "…and the mapped result is directly usable by the listing card",
+    fromNightlyPrice(villa.units)?.amount === 1500,
+  );
+  check("R1", "…and hasPool is mapped from has_pool", villa.hasPool === true);
+
+  // The exact failure mode. Before the fix these threw a TypeError and took the
+  // whole page down; now a caller that forgets toVillaProps degrades instead.
+  // A villa built the way the broken code built it: no units at all.
+  const missingUnits = undefined as unknown as AccommodationUnit[];
+  check(
+    "R2",
+    "fromNightlyPrice tolerates a missing units array instead of throwing",
+    fromNightlyPrice(missingUnits) === null,
+  );
+  check(
+    "R2",
+    "maxPropertyOccupancy tolerates it too",
+    maxPropertyOccupancy(missingUnits) === null,
+  );
+  check(
+    "R2",
+    "and a filter falls back to the property's own occupancy rather than crashing",
+    (maxPropertyOccupancy(missingUnits) ?? 4) === 4,
+  );
+  check(
+    "R2",
+    "rateWarnings tolerates it as well",
+    rateWarnings(missingUnits).length === 0,
+  );
 }
 
 // --- Summary -----------------------------------------------------------------

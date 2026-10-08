@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:pricing": "tsc tests/pricing.test.ts --outDir .test-build --module commonjs --target es2020 --moduleResolution node --skipLibCheck --esModuleInterop && node .test-build/tests/pricing.test.js"
+    "test:pricing": "tsc -p tsconfig.test.json && node .test-build/tests/pricing.test.js",
+    "check:live-mapping": "tsc -p tsconfig.test.json && node .test-build/tests/live-mapping.check.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

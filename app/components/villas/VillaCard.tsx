@@ -21,7 +21,9 @@ const VillaCard: React.FC<VillaCardProps> = ({
   onToggleFavorite,
   ...villa
 }) => {
-  const data = villa as VillaProps;
+  // `villa` is already a VillaProps; the cast that used to be here is how the
+  // missing `units` went unnoticed.
+  const data = villa;
   // Derived from the units, so the card and the detail page cannot disagree.
   const nightly = fromNightlyPrice(data.units);
 

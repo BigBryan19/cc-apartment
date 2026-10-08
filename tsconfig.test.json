@@ -1,0 +1,30 @@
+// tsconfig.test.json
+// ---------------------------------------------------------------------------
+// Compile target for the acceptance tests.
+//
+// WHY THIS EXISTS SEPARATELY
+//   `npm run test:pricing` originally invoked tsc with a hand-written set of
+//   flags. Without the project's `strict` settings, TypeScript cannot narrow
+//   discriminated unions on a boolean discriminant, so `result.ok ? … :
+//   result.reason` reported "Property 'reason' does not exist" — two errors that
+//   were artefacts of the compiler flags rather than problems in the tests.
+//
+//   Extending the real tsconfig means the tests are checked under the same rules
+//   as the application. `include` lists only the tests; TypeScript follows their
+//   imports, so the modules under test are compiled but nothing else is.
+// ---------------------------------------------------------------------------
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".test-build",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2020",
+    "jsx": "react-jsx",
+    "incremental": false,
+    "isolatedModules": false,
+    "plugins": []
+  },
+  "include": ["tests/**/*.ts"]
+}
