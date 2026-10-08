@@ -20,20 +20,35 @@ bundled in `app/lib/data.ts`, so the site is browsable but nothing persists.
 
 ### Required environment variables
 
-| Variable | Scope | Purpose |
-| --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | public | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public | Supabase anon key (browser reads) |
-| `SUPABASE_SERVICE_ROLE_KEY` | **server only** | Webhook writes booking status, bypassing RLS |
-| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | public | `pk_test_xxx` / `pk_live_xxx` |
-| `PAYSTACK_SECRET_KEY` | **server only** | `sk_test_xxx` / `sk_live_xxx` — signs + verifies transactions |
-| `RESEND_API_KEY` | **server only** | Receipt emails. Optional — without it no email is sent |
-| `RECEIPT_FROM_EMAIL` | **server only** | `Cosy Crest <receipts@yourdomain.com>`, on a Resend-verified domain |
-| `NEXT_PUBLIC_SITE_URL` | public | Absolute origin, used for Paystack `callback_url`, receipt links and OG tags |
+| Variable | Scope | Required for | Purpose |
+| --- | --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | public | everything | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public | everything | Supabase publishable/anon key (browser reads) |
+| `SUPABASE_SERVICE_ROLE_KEY` | **server only** | **taking payments** | Records bookings, blocks paid dates, sends receipts. Bypasses RLS |
+| `ADMIN_EMAILS` | **server only** | **the admin panel** | Comma-separated allowlist for `/admin`. Fails closed when empty |
+| `PAYSTACK_SECRET_KEY` | **server only** | **taking payments** | `sk_test_xxx` / `sk_live_xxx` — signs + verifies transactions |
+| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | public | — | Kept for a future inline-checkout switch; not read today |
+| `RESEND_API_KEY` | **server only** | receipt emails | Optional — without it the guest gets no email, but the booking is valid |
+| `RECEIPT_FROM_EMAIL` | **server only** | receipt emails | `Cosy Crest <receipts@yourdomain.com>`, on a Resend-verified domain |
+| `NEXT_PUBLIC_SITE_URL` | public | correct SEO | Absolute origin for Paystack `callback_url`, receipt links, canonical tags and OG images |
 
-> The app renders even when these are unset — Supabase calls degrade to empty
-> states and the booking calendar falls back to the default date window. Payment
-> cannot be taken until the Paystack secret key is present.
+#### Three of these are hard requirements, and two of them fail quietly
+
+- **`SUPABASE_SERVICE_ROLE_KEY` missing** ⇒ `/api/payments/paystack/initialize`
+  now *refuses to charge* rather than taking money it cannot record. Before this
+  was enforced, a missing key produced the worst possible outcome: the guest paid,
+  the success page said the dates were held, and no booking existed.
+  Check it live with `GET /api/payments/paystack/webhook` → `"storage":true`.
+- **`ADMIN_EMAILS` missing** ⇒ nobody can reach `/admin`. That is intentional —
+  the panel exposes guest contact details and edits prices, so it fails closed.
+  Set it, then confirm `/admin` still redirects to the login page.
+- **`NEXT_PUBLIC_SITE_URL`** must name the host that actually serves the site
+  **without redirecting**. The site redirects apex → `www`, so this must be the
+  `www` host; otherwise every canonical and sitemap URL points at a redirect.
+
+> Beyond those, the app renders even when variables are unset — Supabase calls
+> degrade to empty states and the booking calendar falls back to the default date
+> window.
 
 ### What happens after a payment succeeds
 
@@ -71,6 +86,20 @@ It is idempotent and bootstraps a project from empty:
   public; everything else, including reads of `bookings`, requires an
   authenticated admin. An existing `invoices` table is locked down too if
   present — the app never reads it, but it holds the same guest PII.
+
+Then run [`supabase/admin-role.sql`](supabase/admin-role.sql). It is optional but
+recommended: it replaces the `TO authenticated` grants with a real
+`public.is_admin()` predicate, so the *database* refuses non-admins rather than
+relying on the middleware alone.
+
+> **Do not skip this if signup is enabled on your Supabase project.**
+> Authentication → Sign In / Providers → Email → turn **off** "Allow new users to
+> sign up". With signup open and the original `using (true)` policies,
+> "authenticated" meant "anyone who registered" — and `middleware.ts` only
+> checked that a session existed, not whose it was. A stranger could sign up,
+> confirm their own email, and read every guest's name, email and phone number
+> through the public key. Two independent layers now prevent that: the
+> `ADMIN_EMAILS` gate at the edge, and `is_admin()` in the policies. Enable both.
 
 ## SEO
 

@@ -124,14 +124,29 @@ from Supabase instead.
 With RLS tightened, `/admin` is unreachable until at least one user exists —
 the login page will reject everything while the users list is empty.
 
-1. Dashboard → **Authentication → Users** → **Add user** → **Create new user**.
-2. Enter your email and a strong password, and tick **Auto Confirm User**.
+1. **Turn off public signup.** Dashboard → **Authentication → Sign In /
+   Providers** → **Email** → turn **off** "Allow new users to sign up".
+
+   Do this first. While signup is open, anyone can register an account — and an
+   account was all that was needed to reach the admin panel before the
+   `ADMIN_EMAILS` gate existed, because every policy granted `authenticated`
+   unconditional access and the middleware only checked that *a* session existed.
+
+2. Dashboard → **Authentication → Users** → **Add user** → **Create new user**.
+3. Enter your email and a strong password, and tick **Auto Confirm User**.
    (Without that tick Supabase sends a confirmation email, and you cannot sign
    in until it is confirmed.)
-3. Visit `/admin` — you should be redirected to `/admin/login`. Sign in.
+4. **Add that address to `ADMIN_EMAILS`** — comma-separated, in `.env.local` and
+   in Vercel. Without it, `/admin` is closed to *everyone*. That is deliberate:
+   the panel can read guest contact details and change prices, so the gate fails
+   closed rather than open.
+5. Recommended — run [`supabase/admin-role.sql`](supabase/admin-role.sql). It
+   adds the second layer, where the database itself refuses non-admins. Edit the
+   email address in step 1 of that file before running it.
+6. Visit `/admin` — you should be redirected to `/admin/login`. Sign in.
 
-To create additional admins, repeat this. To remove someone's access, delete
-their user there.
+To remove someone's access, delete their user in Supabase **and** drop their
+address from `ADMIN_EMAILS`.
 
 > Using one shared login for the whole team makes it impossible to tell who did
 > what. If more than one person needs access, create one user each.
@@ -199,7 +214,11 @@ Open `.env.local` and fill it in:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+# Required to record a paid booking. Without it the checkout refuses to charge.
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# Comma-separated. Without it, nobody can reach /admin (fails closed by design).
+ADMIN_EMAILS=you@example.com
 
 NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_test_xxxxxxxx
 PAYSTACK_SECRET_KEY=sk_test_xxxxxxxx
@@ -311,30 +330,46 @@ log and confirm the `charge.success` delivery shows a 200.
 
 ## Security model
 
-The admin panel is protected by **Supabase Auth**. `middleware.ts` intercepts
-every request under `/admin` and redirects to `/admin/login` unless there is a
-valid session, and the row-level security policies in
-[`supabase/schema.sql`](supabase/schema.sql) restrict writes — plus reads of
-`bookings`, which hold guest contact details — to the `authenticated` role.
+Reaching `/admin` requires **two independent things**, and both are checked:
+
+1. **A session that belongs to an administrator.** `middleware.ts` intercepts
+   every request under `/admin` and redirects to `/admin/login` unless the
+   session's user is listed in `ADMIN_EMAILS` or carries
+   `app_metadata.role = "admin"`. Being merely *signed in* is not sufficient.
+2. **A database that agrees.** The policies in `schema.sql` — as upgraded by
+   [`supabase/admin-role.sql`](supabase/admin-role.sql) — call
+   `public.is_admin()`, so PostgREST refuses a non-admin even if the middleware
+   gate were bypassed or misconfigured.
 
 | Table | Read | Write |
 | --- | --- | --- |
 | `villas` | public (guests browse listings) | admin only |
 | `blocked_dates` | public (calendar greys them out before login) | admin only |
-| `bookings` | **admin only** | insert is public; read/update/delete admin only |
+| `bookings` | **admin only** | server-side only (service-role key); read/update/delete admin only |
+| `invoices` | **admin only** | admin only |
 
-Two things worth understanding about this design:
+Three things worth understanding about this design:
 
-- **`bookings` insert is public by design.** A guest has no account, so the
-  checkout fallback has to be able to write one. The primary path creates the
-  booking server-side in `/api/payments/paystack/initialize` using the
-  service-role key, which bypasses RLS entirely. The open insert means someone
-  could spam junk rows; if that becomes a problem, move the fallback
-  server-side too and change the policy to `to authenticated`.
-- **The policies grant access to *any* signed-in user, not to a specific
-  person.** With a single admin account that is equivalent. If you ever add a
-  second user who should not see everything, scope the policies with something
-  like `using (auth.uid() = owner_id)`.
+- **`bookings` has no public write policy.** A guest has no account, so both the
+  paid path (`/api/payments/paystack/initialize`) and the unpaid fallback
+  (`/api/bookings/request`) create the row server-side with the service-role key,
+  which bypasses RLS by design. An earlier version opened INSERT to the anonymous
+  role "so the checkout fallback can record a request". That was wrong twice
+  over: it let anyone holding the publishable key fill the table with junk, and
+  whenever the policy was absent the checkout silently threw the reservation
+  away. Do not reopen it.
+
+- **"Authenticated" is not "admin".** This is the mistake the original policies
+  made: every grant was `to authenticated using (true)`, which on a project with
+  public signup enabled means *anyone who registered*. `admin-role.sql` replaces
+  those grants with `is_admin()`. If you ever need per-person scoping, extend
+  `is_admin()` — do not loosen the policies.
+
+- **Both money-taking routes are rate limited, and the amount is not the
+  client's to choose.** `/api/payments/paystack/initialize` ignores any `amount`
+  in the request body and re-derives the price from `villas.rates` plus the two
+  dates (`app/lib/pricing.ts`); `/verify` and the webhook reconcile the settled
+  amount against the stored one before confirming anything.
 
 Finally: keep `SUPABASE_SERVICE_ROLE_KEY` off the client. It is read only in
 `app/lib/supabase-server.ts`, which imports `server-only` so it can never be
