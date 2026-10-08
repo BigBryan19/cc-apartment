@@ -271,7 +271,13 @@ export async function POST(request: Request) {
         payment_method: "paystack",
         payment_reference: reference,
         payment_status: "pending",
-        extras: extraIds,
+        // `bookings.packages` is the pre-existing text[] column and is where
+        // add-on labels have always been stored. There is no `extras` column —
+        // writing one silently failed the insert, which would have refused every
+        // booking even after the key and the migration were in place. The
+        // structured equivalent lives in `booking_extras`; this keeps the legacy
+        // column populated so anything already reading it keeps working.
+        packages: extraIds,
         status: "pending",
       },
     ])

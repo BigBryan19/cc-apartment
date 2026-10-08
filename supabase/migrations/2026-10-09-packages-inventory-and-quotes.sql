@@ -568,6 +568,17 @@ end $$;
 -- accommodation confirmed + occasion REQUESTED. Those add-ons were never priced
 -- or approved — that is precisely the defect being fixed — so claiming them
 -- confirmed would preserve the wrong claim rather than correct it.
+--
+-- READ THE COLUMN TYPES, DO NOT ASSUME THEM
+--   `bookings.packages` is `text[]`, not `jsonb`. An earlier draft of this file
+--   called jsonb_array_length(packages) and the whole migration aborted with
+--   "function jsonb_array_length(text[]) does not exist" — which in the Supabase
+--   SQL editor means nothing at all was applied, since it runs as one
+--   transaction. `array_length(x, 1)` is the correct call, and its NULL for an
+--   empty array is handled by the coalesce.
+--
+--   The same applies to any column this file touches that it does not itself
+--   create. supabase/schema.sql is stale and cannot be used to infer types.
 
 update public.bookings
    set accommodation_status = case status
@@ -577,8 +588,8 @@ update public.bookings
                               end,
        occasion_status = case
                            when status = 'cancelled' then
-                             case when coalesce(jsonb_array_length(packages), 0) > 0 then 'cancelled' else 'none' end
-                           when coalesce(jsonb_array_length(packages), 0) > 0 then 'requested'
+                             case when coalesce(array_length(packages, 1), 0) > 0 then 'cancelled' else 'none' end
+                           when coalesce(array_length(packages, 1), 0) > 0 then 'requested'
                            else 'none'
                          end
  where accommodation_status = 'pending_payment'
