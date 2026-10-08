@@ -66,6 +66,14 @@ const CheckoutContent = () => {
 
   const supabase = useMemo(() => createClient(), []);
 
+  /*
+   * Seeds the form from the query string the villa page linked with. Written as
+   * an effect, not useState initialisers, because this page is statically
+   * prerendered and `useSearchParams` is only authoritative on the client —
+   * seeding state from it during the initial render would mismatch hydration.
+   * Suppressed rather than restructured: this is the payment form.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect -- URL-derived form seed; see comment above */
   useEffect(() => {
     const rate = searchParams.get("rate");
     const curr = searchParams.get("currency");
@@ -128,6 +136,7 @@ const CheckoutContent = () => {
     if (packagesParam)
       setSelectedPackages(packagesParam.split(",").filter(Boolean));
   }, [searchParams, supabase, villaIdParam]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // --- Pricing: always recomputed from the chosen dates -------------------
   const rateAmount = useMemo(() => {
@@ -181,19 +190,22 @@ const CheckoutContent = () => {
 
     try {
       // 1) Ask the server to create the Paystack transaction.
+      //
+      // NOTE: `amount` and `nights` are deliberately NOT sent. The server prices
+      // the stay from the property row and the two dates (app/lib/pricing.ts),
+      // and ignores anything the browser says about money. `displayAmount` above
+      // is for showing the guest a total before they commit — it is never the
+      // figure that gets charged.
       const response = await fetch("/api/payments/paystack/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: formData.email,
-          amount: displayAmount,
           currency,
           villaId: villa.id,
-          villaTitle: villa.title,
           rate: selectedRate,
           checkIn: checkInDate,
           checkOut: checkOutDate,
-          nights: totalNights,
           packages: selectedPackages,
           guestName,
           guestPhone: formData.phone,
@@ -203,7 +215,25 @@ const CheckoutContent = () => {
       const payload = (await response.json()) as {
         authorizationUrl?: string;
         error?: string;
+        amount?: number;
+        nights?: number;
       };
+
+      // The server's figure is authoritative. If it disagrees with what we
+      // showed the guest, stop and say so rather than sending them to pay a
+      // different number than the one on the button.
+      if (
+        response.ok &&
+        typeof payload.amount === "number" &&
+        Math.abs(payload.amount - displayAmount) > 0.01
+      ) {
+        setErrorMessage(
+          `The price for these dates is ${formatPrice(payload.amount, currency)}, ` +
+            `not ${formatPrice(displayAmount, currency)}. Please review and try again.`,
+        );
+        setLoading(false);
+        return;
+      }
 
       if (response.ok && payload.authorizationUrl) {
         // Hand off to Paystack's hosted checkout.
@@ -211,8 +241,12 @@ const CheckoutContent = () => {
         return;
       }
 
+      // Only the *gateway* being unconfigured should fall through to the
+      // no-payment path. The initialize route also returns 503 when it cannot
+      // persist a booking — treating that as "demo mode" would tell the guest
+      // their request was recorded when nothing was saved.
       const gatewayMissing =
-        response.status === 503 || /not configured/i.test(payload.error ?? "");
+        response.status === 503 && /payment gateway is not configured/i.test(payload.error ?? "");
 
       if (gatewayMissing && ALLOW_UNPAID_FALLBACK) {
         // With no database there is nothing to persist, so say that plainly

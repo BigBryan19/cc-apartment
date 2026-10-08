@@ -19,12 +19,16 @@ import {
   Loader2,
   ShieldCheck,
   ArrowLeft,
+  AlertTriangle,
 } from "lucide-react";
 
-type VerifyState = "verifying" | "success" | "failed";
+type VerifyState = "verifying" | "success" | "attention" | "failed";
 
 interface VerifyResponse {
   successful?: boolean;
+  /** True when a payment succeeded but no reservation could be matched to it. */
+  needsAttention?: boolean;
+  reconciled?: boolean;
   status?: string;
   reference?: string;
   amount?: number;
@@ -64,6 +68,13 @@ function SuccessContent() {
         if (response.ok && payload.successful) {
           setDetails(payload);
           setVerifyState("success");
+        } else if (payload.needsAttention) {
+          // Money moved but the reservation could not be matched or its amount
+          // did not reconcile. Neither is the guest's fault and neither is a
+          // plain failure, so it gets its own screen with the reference to quote.
+          setDetails(payload);
+          setError(payload.error || "We need to check this payment manually.");
+          setVerifyState("attention");
         } else {
           setError(payload.error || "The payment could not be verified.");
           setVerifyState("failed");
@@ -151,6 +162,45 @@ function SuccessContent() {
                 <Download size={15} /> View or download receipt
               </a>
             )}
+          </>
+        )}
+
+        {state === "attention" && (
+          <>
+            <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle size={40} />
+            </div>
+            <h2 className="mb-3 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
+              We&apos;re checking this payment
+            </h2>
+            <p className="mb-8 leading-relaxed text-[var(--color-muted)]">
+              {error ||
+                "We have received your payment and are matching it to your reservation."}
+            </p>
+
+            <dl className="text-left bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3 text-sm mb-8">
+              {details?.reference && (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-500">Reference</dt>
+                  <dd className="font-mono text-xs font-semibold text-slate-900 break-all text-right">
+                    {details.reference}
+                  </dd>
+                </div>
+              )}
+              {typeof details?.amount === "number" && (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-500">Amount paid</dt>
+                  <dd className="font-semibold text-slate-900">
+                    {details.currency} {details.amount.toLocaleString()}
+                  </dd>
+                </div>
+              )}
+            </dl>
+
+            <p className="mb-8 text-xs text-[var(--color-muted)]">
+              Please quote the reference above when you contact us. Do not pay
+              again — your payment has been received.
+            </p>
           </>
         )}
 

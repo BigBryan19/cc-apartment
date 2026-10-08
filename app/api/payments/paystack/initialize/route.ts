@@ -6,8 +6,19 @@
 // checkout URL the browser should be redirected to.
 //
 // Body:
-//   { email, amount, currency, villaId, villaTitle, checkIn, checkOut,
-//     nights, packages?, guestName?, guestPhone?, rate? }
+//   { email, villaId, checkIn, checkOut, rate?, packages?,
+//     guestName?, guestPhone?, currency? }
+//
+// NOTE: there is deliberately no `amount` and no `nights` field. Both are
+// computed here from the property row and the two date keys — see
+// app/lib/pricing.ts. Anything the client sends for those two names is
+// ignored, so a crafted request cannot influence the charge.
+//
+// ORDER OF OPERATIONS MATTERS
+//   The booking row is written BEFORE the Paystack transaction is created, and
+//   the transaction is only created if that write succeeded. The previous
+//   version did the opposite and swallowed the failure, which is how a guest
+//   could be charged for a reservation that was never recorded.
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
@@ -22,25 +33,36 @@ import {
   isServiceRoleConfigured,
 } from "@/app/lib/supabase-server";
 import { isValidDateKey, validateStay } from "@/app/lib/dates";
-import { BLOCKED_DATES_TABLE } from "@/app/lib/availability";
+// From tables.ts, NOT from lib/availability — that module is "use client" and
+// would hand this route handler a client reference instead of the table name,
+// making the guard below throw on every call. See app/lib/tables.ts.
+import { BLOCKED_DATES_TABLE, BOOKINGS_TABLE, VILLAS_TABLE } from "@/app/lib/tables";
+import { quoteStay, type PriceableVilla } from "@/app/lib/pricing";
+import { clientKey, rateLimit } from "@/app/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SUPPORTED_CURRENCIES: PaystackCurrency[] = ["GHS", "NGN", "USD", "ZAR", "KES"];
-const MAX_AMOUNT = 10_000_000;
+
+/** Keep unvalidated free-text fields from being used as a storage amplifier. */
+const MAX_NAME_LENGTH = 120;
+const MAX_PHONE_LENGTH = 40;
+const MAX_PACKAGES = 20;
+const MAX_PACKAGE_LENGTH = 80;
+
+/** 5 attempts per IP per minute. Checkout is a considered action, not a loop. */
+const RATE_LIMIT = { limit: 5, windowMs: 60_000 };
 
 interface InitializeBody {
   email?: string;
-  amount?: number | string;
   currency?: string;
   villaId?: number | string;
   villaTitle?: string;
   rate?: string;
   checkIn?: string;
   checkOut?: string;
-  nights?: number | string;
-  packages?: string[];
+  packages?: unknown;
   guestName?: string;
   guestPhone?: string;
 }
@@ -49,10 +71,35 @@ function badRequest(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+function cleanText(value: unknown, maxLength: number): string {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
 export async function POST(request: Request) {
+  // --- Throttle ------------------------------------------------------------
+  const limit = rateLimit(clientKey(request, "initialize"), RATE_LIMIT.limit, RATE_LIMIT.windowMs);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many payment attempts. Please wait a moment and try again." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
+    );
+  }
+
   if (!isPaystackConfigured()) {
     return badRequest(
       "Payment gateway is not configured. Set PAYSTACK_SECRET_KEY on the server.",
+      503,
+    );
+  }
+
+  // Fail closed. Without the service-role key we cannot record the reservation,
+  // and taking money for a booking we cannot store is worse than not selling.
+  if (!isServiceRoleConfigured()) {
+    console.error(
+      "[paystack/initialize] SUPABASE_SERVICE_ROLE_KEY missing — refusing to charge.",
+    );
+    return badRequest(
+      "We cannot take your reservation right now. No payment has been taken — please try again shortly or contact us.",
       503,
     );
   }
@@ -65,147 +112,149 @@ export async function POST(request: Request) {
   }
 
   // --- Validation ---------------------------------------------------------
-  const email = (body.email || "").trim();
+  const email = cleanText(body.email, 254);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return badRequest("A valid guest email address is required.");
   }
 
-  const rawAmount = Number(body.amount);
-  if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
-    return badRequest("A positive payment amount is required.");
-  }
-  if (rawAmount > MAX_AMOUNT) {
-    return badRequest("Payment amount exceeds the permitted maximum.");
-  }
-
-  const currency = (body.currency || "GHS").toUpperCase() as PaystackCurrency;
+  const currency = ((body.currency || "GHS") as string).toUpperCase() as PaystackCurrency;
   if (!SUPPORTED_CURRENCIES.includes(currency)) {
     return badRequest(`Unsupported currency: ${currency}`);
   }
 
-  const villaId =
-    body.villaId === undefined || body.villaId === null
-      ? null
-      : Number(body.villaId);
+  const villaId = Number(body.villaId);
+  if (!Number.isInteger(villaId) || villaId <= 0) {
+    return badRequest("A valid property is required.");
+  }
 
-  const checkIn = (body.checkIn || "").trim();
-  const checkOut = (body.checkOut || "").trim();
+  const checkIn = cleanText(body.checkIn, 10);
+  const checkOut = cleanText(body.checkOut, 10);
   if (!isValidDateKey(checkIn) || !isValidDateKey(checkOut)) {
     return badRequest("checkIn and checkOut must be YYYY-MM-DD dates.");
   }
 
-  const nights = Number(body.nights) || 0;
+  const guestName = cleanText(body.guestName, MAX_NAME_LENGTH);
+  const guestPhone = cleanText(body.guestPhone, MAX_PHONE_LENGTH);
+  const requestedRate = cleanText(body.rate, 80) || null;
+
+  const packages = Array.isArray(body.packages)
+    ? body.packages
+        .filter((entry): entry is string => typeof entry === "string")
+        .map((entry) => entry.trim().slice(0, MAX_PACKAGE_LENGTH))
+        .filter(Boolean)
+        .slice(0, MAX_PACKAGES)
+    : [];
+
+  const supabase = createServiceClient();
+
+  // --- Load the property and price the stay server-side -------------------
+  const { data: villaRow, error: villaError } = await supabase
+    .from(VILLAS_TABLE)
+    .select("id, title, price, rates")
+    .eq("id", villaId)
+    .maybeSingle();
+
+  if (villaError) {
+    console.error("[paystack/initialize] could not read villa:", villaError.message);
+    return badRequest("We could not load this property. Please try again.", 503);
+  }
+
+  if (!villaRow) {
+    return badRequest("That property could not be found.", 404);
+  }
+
+  const pricing = quoteStay(
+    villaRow as unknown as PriceableVilla,
+    checkIn,
+    checkOut,
+    requestedRate,
+  );
+
+  if (!pricing.ok) {
+    return badRequest(pricing.message, pricing.status);
+  }
+
+  const quote = pricing.quote;
 
   // --- Availability guard (server-side double-booking protection) ---------
-  // Only possible with the service-role key; the client-side calendar already
-  // hides these dates, this is defence in depth.
-  if (isServiceRoleConfigured() && villaId !== null && !Number.isNaN(villaId)) {
-    try {
-      const supabase = createServiceClient();
-      const [blockedResult, bookedResult] = await Promise.all([
-        supabase
-          .from(BLOCKED_DATES_TABLE)
-          .select("start_date, end_date, reason")
-          .eq("villa_id", villaId),
-        supabase
-          .from("bookings")
-          .select("check_in_date, check_out_date, status")
-          .eq("villa_id", villaId)
-          .neq("status", "cancelled"),
-      ]);
+  try {
+    const [blockedResult, bookedResult] = await Promise.all([
+      supabase
+        .from(BLOCKED_DATES_TABLE)
+        .select("start_date, end_date")
+        .eq("villa_id", villaId),
+      supabase
+        .from(BOOKINGS_TABLE)
+        .select("check_in_date, check_out_date")
+        .eq("villa_id", villaId)
+        .neq("status", "cancelled"),
+    ]);
 
-      const ranges = [
-        ...(blockedResult.data ?? []).map((row) => ({
-          start: row.start_date as string,
-          end: row.end_date as string,
-          kind: "blocked" as const,
+    const ranges = [
+      ...(blockedResult.data ?? []).map((row) => ({
+        start: row.start_date as string,
+        end: row.end_date as string,
+        kind: "blocked" as const,
+      })),
+      ...(bookedResult.data ?? [])
+        .filter((row) => row.check_in_date)
+        .map((row) => ({
+          start: row.check_in_date as string,
+          end: (row.check_out_date as string) || (row.check_in_date as string),
+          kind: "booked" as const,
         })),
-        ...(bookedResult.data ?? [])
-          .filter((row) => row.check_in_date)
-          .map((row) => ({
-            start: row.check_in_date as string,
-            end: (row.check_out_date as string) || (row.check_in_date as string),
-            kind: "booked" as const,
-          })),
-      ];
+    ];
 
-      const problem = validateStay(checkIn, checkOut, ranges);
-      if (problem) return badRequest(problem, 409);
-    } catch (error) {
-      // A missing table or transient DB error must not block a sale.
-      console.warn("[paystack/initialize] availability check skipped:", error);
-    }
+    const problem = validateStay(checkIn, checkOut, ranges);
+    if (problem) return badRequest(problem, 409);
+  } catch (error) {
+    console.warn("[paystack/initialize] availability check skipped:", error);
   }
 
   // --- Persist the pending booking (server-authoritative) -----------------
+  // No "retry with a minimal column set" fallback here on purpose. That
+  // fallback dropped `payment_reference`, which is the key the webhook, the
+  // verify route and the receipt email all look the booking up by — so a
+  // booking created through it could be paid for and still never produce a
+  // receipt. Failing loudly is the correct behaviour.
   const reference = generateReference();
-  let bookingId: string | number | null = null;
 
-  if (isServiceRoleConfigured()) {
-    try {
-      const supabase = createServiceClient();
-      const { data, error } = await supabase
-        .from("bookings")
-        .insert([
-          {
-            villa_id: villaId,
-            guest_name: body.guestName ?? "",
-            guest_email: email,
-            guest_phone: body.guestPhone ?? "",
-            check_in_date: checkIn,
-            check_out_date: checkOut,
-            nights: nights || null,
-            total_amount: rawAmount,
-            currency,
-            payment_method: "paystack",
-            payment_reference: reference,
-            payment_status: "pending",
-            packages: body.packages ?? [],
-            status: "pending",
-          },
-        ])
-        .select("id")
-        .single();
+  const { data: inserted, error: insertError } = await supabase
+    .from(BOOKINGS_TABLE)
+    .insert([
+      {
+        villa_id: villaId,
+        guest_name: guestName,
+        guest_email: email,
+        guest_phone: guestPhone,
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        nights: quote.nights,
+        total_amount: quote.total,
+        currency,
+        payment_method: "paystack",
+        payment_reference: reference,
+        payment_status: "pending",
+        packages,
+        status: "pending",
+      },
+    ])
+    .select("id")
+    .single();
 
-      if (error) {
-        // Likely the migration has not added the new columns yet — retry with
-        // the minimal column set so checkout still works end to end.
-        console.warn(
-          "[paystack/initialize] full booking insert failed, retrying minimal:",
-          error.message,
-        );
-        const fallback = await supabase
-          .from("bookings")
-          .insert([
-            {
-              villa_id: villaId,
-              guest_name: body.guestName ?? "",
-              guest_email: email,
-              guest_phone: body.guestPhone ?? "",
-              check_in_date: checkIn,
-              total_amount: rawAmount,
-              payment_method: "paystack",
-              status: "pending",
-            },
-          ])
-          .select("id")
-          .single();
-
-        if (fallback.error) {
-          console.error(
-            "[paystack/initialize] could not persist booking:",
-            fallback.error.message,
-          );
-        } else {
-          bookingId = fallback.data?.id ?? null;
-        }
-      } else {
-        bookingId = data?.id ?? null;
-      }
-    } catch (error) {
-      console.error("[paystack/initialize] booking insert threw:", error);
-    }
+  if (insertError || !inserted?.id) {
+    console.error(
+      "[paystack/initialize] could not persist booking — aborting before charge:",
+      insertError?.message,
+    );
+    // The guest has not been charged: no Paystack transaction exists yet.
+    return badRequest(
+      "We could not reserve your dates, so no payment has been taken. Please try again or contact us.",
+      503,
+    );
   }
+
+  const bookingId = inserted.id as string | number;
 
   // --- Create the Paystack transaction ------------------------------------
   const origin =
@@ -215,7 +264,8 @@ export async function POST(request: Request) {
   try {
     const result = await initializeTransaction({
       email,
-      amount: rawAmount,
+      // The only amount that may ever reach the gateway.
+      amount: quote.total,
       currency,
       reference,
       callbackUrl: `${origin}/checkout/success?reference=${encodeURIComponent(reference)}`,
@@ -223,12 +273,13 @@ export async function POST(request: Request) {
         bookingId,
         reference,
         villaId,
-        villaTitle: body.villaTitle ?? null,
-        rate: body.rate ?? null,
+        villaTitle: quote.villaTitle,
+        rate: quote.rateLabel,
+        nightlyRate: quote.nightlyRate,
         checkIn,
         checkOut,
-        nights,
-        packages: body.packages ?? [],
+        nights: quote.nights,
+        packages,
       },
       channels: ["card", "mobile_money", "bank", "bank_transfer", "ussd"],
     });
@@ -239,18 +290,21 @@ export async function POST(request: Request) {
       accessCode: result.access_code,
       authorizationUrl: result.authorization_url,
       bookingId,
+      // Echoed so the UI can show the authoritative figure rather than the one
+      // it calculated locally.
+      amount: quote.total,
+      nights: quote.nights,
+      currency,
     });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not initialize payment.";
 
     // Roll back the orphaned pending booking so the dates stay bookable.
-    if (bookingId !== null && isServiceRoleConfigured()) {
-      try {
-        await createServiceClient().from("bookings").delete().eq("id", bookingId);
-      } catch (cleanupError) {
-        console.warn("[paystack/initialize] rollback failed:", cleanupError);
-      }
+    try {
+      await supabase.from(BOOKINGS_TABLE).delete().eq("id", bookingId);
+    } catch (cleanupError) {
+      console.warn("[paystack/initialize] rollback failed:", cleanupError);
     }
 
     console.error("[paystack/initialize] Paystack error:", message);
