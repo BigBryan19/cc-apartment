@@ -1,12 +1,19 @@
 import React from "react";
+import Image from "next/image";
 
 const HostCTA: React.FC = () => {
   return (
     <section className="relative isolate min-h-[520px] overflow-hidden">
-      <img
-        src="/pool.png"
+      {/*
+        `fill` replaces the manual `absolute inset-0 h-full w-full` — the wrapper
+        is already `relative`. Below the fold, so it stays lazy.
+      */}
+      <Image
+        src="/pool.jpg"
         alt="Poolside at a Cosy Crest residence"
-        className="absolute inset-0 -z-10 h-full w-full object-cover"
+        fill
+        sizes="100vw"
+        className="-z-10 object-cover"
       />
       <div className="absolute inset-0 -z-10 bg-black/45" />
 
