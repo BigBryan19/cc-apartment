@@ -20,6 +20,18 @@
 --   8. Backfill of existing rows
 --   9. Verification queries
 --
+-- A NOTE ON supabase/schema.sql
+--   That file is STALE relative to production and should not be used to reason
+--   about the live table. It describes `bookings.id` as `bigserial` with ten
+--   columns; production actually has `id uuid` and already carries `nights`,
+--   `check_out_date`, `currency`, `packages`, `paid_at`, `amount_paid`,
+--   `payment_reference`, `payment_status` and `receipt_sent_at`. Something
+--   altered the table after schema.sql was written and was never recorded.
+--
+--   This migration therefore uses `add column if not exists` for everything and
+--   asserts nothing about the existing shape. Regenerating schema.sql from the
+--   live database is worth doing as its own task.
+--
 -- WHY INVENTORY IS A TABLE AND NOT A CHECK
 --   "Concurrent customers cannot confirm the same exclusive inventory" cannot be
 --   enforced by reading rows and then writing, because two requests can both read
@@ -31,7 +43,13 @@
 -- 1. Shared helpers
 -- ---------------------------------------------------------------------------
 
--- Required for the exclusion constraint's equality terms below.
+-- btree_gist supplies the equality operator classes the exclusion constraint in
+-- section 2 needs. On Supabase, extensions live in the `extensions` schema, and
+-- if that schema is not on the search_path the constraint silently cannot be
+-- created — leaving the inventory guarantee absent while everything else
+-- succeeds. Set it explicitly rather than relying on the project default.
+set search_path = public, extensions;
+
 create extension if not exists btree_gist;
 
 -- Defined in supabase/admin-role.sql. Re-declared here so this migration is
