@@ -343,6 +343,9 @@ export interface RateWarning {
  */
 export function rateWarnings(units: AccommodationUnit[]): RateWarning[] {
   const warnings: RateWarning[] = [];
+  // Defence in depth: a caller that hands over a row which never passed through
+  // toVillaProps gets an empty list rather than a page-killing TypeError.
+  if (!Array.isArray(units)) return warnings;
 
   const nightly = units.filter(
     (unit) => unit.active && unit.priceBasis === "per_night" && unit.amount > 0,
@@ -450,6 +453,7 @@ export interface FromPrice {
  * caller shows "Request a quote" instead.
  */
 export function fromNightlyPrice(units: AccommodationUnit[]): FromPrice | null {
+  if (!Array.isArray(units)) return null;
   const eligible = units.filter(
     (unit) => unit.active && unit.priceBasis === "per_night" && unit.amount > 0,
   );
@@ -530,6 +534,7 @@ export function unitFacilityLabels(unit: AccommodationUnit): string[] {
 
 /** Units a guest may actually book online, as opposed to enquire about. */
 export function bookableUnits(units: AccommodationUnit[]): AccommodationUnit[] {
+  if (!Array.isArray(units)) return [];
   return units.filter(
     (unit) =>
       unit.active &&

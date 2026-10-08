@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Compiled output of the acceptance tests (npm run test:pricing). Gitignored
+    // already, but eslint does not read .gitignore, and linting generated
+    // CommonJS reported three false no-require-imports errors.
+    ".test-build/**",
     // Local UI-review screenshots and the throwaway CDP scripts used to take
     // them. Gitignored already; eslint does not read .gitignore.
     "shots*/**",

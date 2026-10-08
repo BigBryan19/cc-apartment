@@ -12,7 +12,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "../utils/supabase";
-import { bundledVillas as villasData } from "../lib/catalog";
+import { bundledVillas as villasData, toVillaProps } from "../lib/catalog";
 import { buildQuote, type ExtraInput } from "../lib/quote";
 import {
   isEnquiryOnly,
@@ -131,7 +131,10 @@ const CheckoutContent = () => {
           );
           return;
         }
-        setVilla({ ...data, hasPool: data.has_pool } as VillaProps);
+        // Through toVillaProps, not a spread with an `as` cast. The cast hid the
+        // fact that `units` was never populated, which crashed the deployed page
+        // and, here, would have crashed the checkout for every guest.
+        setVilla(toVillaProps(data as never));
       } catch {
         setLoadError(
           "We could not reach the booking system. Please check your connection and try again.",

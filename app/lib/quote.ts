@@ -481,6 +481,7 @@ export function findUnitsForGuests<T extends AccommodationUnit>(
   units: T[],
   guests: number,
 ): { suited: T[]; tooSmall: T[] } {
+  if (!Array.isArray(units)) return { suited: [], tooSmall: [] };
   const suited: T[] = [];
   const tooSmall: T[] = [];
 
@@ -494,6 +495,7 @@ export function findUnitsForGuests<T extends AccommodationUnit>(
 
 /** The largest occupancy any unit on a property will actually accept. */
 export function maxPropertyOccupancy(units: AccommodationUnit[]): number | null {
+  if (!Array.isArray(units)) return null;
   const capacities = units
     .filter((unit) => unit.active && unit.maxGuests !== null)
     .map((unit) => unit.maxGuests as number);
