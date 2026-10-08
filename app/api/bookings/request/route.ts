@@ -215,7 +215,13 @@ export async function POST(request: Request) {
         balance_due: quote.total,
         unpriced_items: quote.unpricedItems,
         currency: ((body.currency || "GHS") as string).toUpperCase().slice(0, 3),
-        extras: extraIds,
+        // `bookings.packages` is the pre-existing text[] column and is where
+        // add-on labels have always been stored. There is no `extras` column —
+        // writing one silently failed the insert, which would have refused every
+        // booking even after the key and the migration were in place. The
+        // structured equivalent lives in `booking_extras`; this keeps the legacy
+        // column populated so anything already reading it keeps working.
+        packages: extraIds,
         payment_method: "unpaid-request",
         payment_status: "unpaid",
         status: "pending",
