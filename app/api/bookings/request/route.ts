@@ -33,7 +33,7 @@ import { validateStay, isValidDateKey, type DateRange } from "@/app/lib/dates";
 // would hand this route handler a client reference instead of the table name,
 // making the guard below throw on every call. See app/lib/tables.ts.
 import { BLOCKED_DATES_TABLE, BOOKINGS_TABLE, VILLAS_TABLE } from "@/app/lib/tables";
-import { quoteStay, type PriceableVilla } from "@/app/lib/pricing";
+import { priceRequest, type PriceableVilla } from "@/app/lib/pricing";
 import { clientKey, rateLimit } from "@/app/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -41,22 +41,23 @@ export const dynamic = "force-dynamic";
 
 const MAX_NAME_LENGTH = 120;
 const MAX_PHONE_LENGTH = 40;
-const MAX_PACKAGES = 20;
-const MAX_PACKAGE_LENGTH = 80;
 
 /** 5 requests per IP per minute. */
 const RATE_LIMIT = { limit: 5, windowMs: 60_000 };
 
 interface RequestBody {
   villaId?: number | string;
+  /** Identifiers only. Never prices. */
+  unitId?: string;
+  packageId?: string;
+  extraIds?: unknown;
   guestName?: string;
   guestEmail?: string;
   guestPhone?: string;
+  guests?: number | string;
   checkIn?: string;
   checkOut?: string;
-  rate?: string;
   currency?: string;
-  packages?: unknown;
 }
 
 function badRequest(message: string, status = 400) {
@@ -92,7 +93,12 @@ export async function POST(request: Request) {
   const checkOut = cleanText(body.checkOut, 10);
   const guestName = cleanText(body.guestName, MAX_NAME_LENGTH);
   const guestPhone = cleanText(body.guestPhone, MAX_PHONE_LENGTH);
-  const requestedRate = cleanText(body.rate, 80) || null;
+  const unitId = cleanText(body.unitId, 80) || null;
+  const packageId = cleanText(body.packageId, 80) || null;
+  const guests = Math.max(1, Math.min(60, Math.floor(Number(body.guests) || 1)));
+  const extraIds = Array.isArray(body.extraIds)
+    ? body.extraIds.filter((entry): entry is string => typeof entry === "string").slice(0, 20)
+    : [];
   const villaId = Number(body.villaId);
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -103,14 +109,6 @@ export async function POST(request: Request) {
   if (!Number.isInteger(villaId) || villaId <= 0) {
     return badRequest("A valid property is required.");
   }
-
-  const packages = Array.isArray(body.packages)
-    ? body.packages
-        .filter((entry): entry is string => typeof entry === "string")
-        .map((entry) => entry.trim().slice(0, MAX_PACKAGE_LENGTH))
-        .filter(Boolean)
-        .slice(0, MAX_PACKAGES)
-    : [];
 
   const supabase = createServiceClient();
 
@@ -127,15 +125,27 @@ export async function POST(request: Request) {
   }
   if (!villaRow) return badRequest("That property could not be found.", 404);
 
-  const pricing = quoteStay(
-    villaRow as unknown as PriceableVilla,
+  const pricing = priceRequest({
+    villa: villaRow as unknown as PriceableVilla,
+    unitId,
     checkIn,
     checkOut,
-    requestedRate,
-  );
+    guests,
+    packageId,
+    extraIds,
+    currency: ((body.currency || "GHS") as string).toUpperCase().slice(0, 3),
+  });
   if (!pricing.ok) return badRequest(pricing.message, pricing.status);
 
-  const quote = pricing.quote;
+  const {
+    quote,
+    unit,
+    nights,
+    occasionStatus,
+    packageSnapshot,
+    packageId: resolvedPackageId,
+    packageName,
+  } = pricing.priced;
 
   // Re-check availability server-side. The client already does this, but a
   // request that bypasses the UI must not be able to double-book a night.
@@ -186,10 +196,26 @@ export async function POST(request: Request) {
         guest_phone: guestPhone,
         check_in_date: checkIn,
         check_out_date: checkOut,
-        nights: quote.nights,
+        guests,
+        nights,
+        accommodation_status: "pending_payment",
+        // An unpaid request never confirms anything, and an occasion on it stays
+        // `requested` until a human has reviewed and quoted it.
+        occasion_status: occasionStatus,
+        accommodation_unit_id: unit.id,
+        accommodation_unit_name: unit.name,
+        package_id: resolvedPackageId,
+        package_name: packageName,
+        package_snapshot: packageSnapshot,
+        accommodation_subtotal: quote.accommodationSubtotal,
+        package_subtotal: quote.packageSubtotal,
+        extras_subtotal: quote.extrasSubtotal,
         total_amount: quote.total,
+        due_now: 0,
+        balance_due: quote.total,
+        unpriced_items: quote.unpricedItems,
         currency: ((body.currency || "GHS") as string).toUpperCase().slice(0, 3),
-        packages,
+        extras: extraIds,
         payment_method: "unpaid-request",
         payment_status: "unpaid",
         status: "pending",
@@ -208,6 +234,10 @@ export async function POST(request: Request) {
     successful: true,
     bookingId: data?.[0]?.id ?? null,
     amount: quote.total,
-    nights: quote.nights,
+    nights,
+    unitName: unit.name,
+    occasionStatus,
+    hasUnpricedItems: quote.unpricedItems.length > 0,
+    unpricedItems: quote.unpricedItems,
   });
 }

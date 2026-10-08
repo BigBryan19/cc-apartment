@@ -60,3 +60,6 @@ next-env.d.ts
 /shots13/
 /shots14/
 /shots15/
+
+# Compiled acceptance tests
+.test-build/

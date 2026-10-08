@@ -20,7 +20,14 @@ import {
   Bath,
   ArrowUpRight,
 } from "lucide-react";
-import { villasData } from "../../lib/data";
+import { bundledVillas as villasData } from "../../lib/catalog";
+import {
+  isEnquiryOnly,
+  priceBasisSuffix,
+  unitCapacityLabel,
+  unitFacilityLabels,
+} from "../../lib/rates";
+import { priceUnit } from "../../lib/quote";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 import { formatPrice, getAmenityIcon } from "../../components/villas/utils";
@@ -96,31 +103,26 @@ export default function VillaClient({
   );
 
   const [currency, setCurrency] = useState<"GHS" | "USD">("GHS");
-  const [selectedRate, setSelectedRate] = useState<string>("");
-  const [selectedRateAmount, setSelectedRateAmount] = useState<number>(0);
+  const [selectedUnitId, setSelectedUnitId] = useState<string>("");
   const [checkInDate, setCheckInDate] = useState<string>("");
   const [checkOutDate, setCheckOutDate] = useState<string>("");
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   /*
-   * Seeds the rate picker from the `villa` prop; the guest's later choice
-   * overrides it. React would prefer this be derived rather than mirrored into
-   * state, but `selectedRate` starts as "" and several guards depend on that
-   * (including the "is a rate chosen?" check on the submit button), so deriving
-   * it would change validation behaviour — not a change to make blind inside an
-   * audit fix. Same treatment as the equivalent effect in VillaModal.
+   * Preselects the cheapest sellable unit. Only the *identifier* is held in
+   * state; the price is derived from the unit record below, so the figure on
+   * screen can never drift from the unit actually selected.
+   *
+   * Units that cannot be sold online (monthly before its terms are configured,
+   * or a quotation-only rate) are skipped rather than preselected, so the guest
+   * does not land on something the checkout will refuse.
    */
-  /* eslint-disable react-hooks/set-state-in-effect -- prop→state mirror feeding validation; see comment above */
+  /* eslint-disable react-hooks/set-state-in-effect -- initial selection from a loaded prop; see comment above */
   useEffect(() => {
-    if (!villa) return;
-    if (villa.rates && villa.rates.length > 0) {
-      setSelectedRate(villa.rates[0].option);
-      setSelectedRateAmount(villa.rates[0].amount);
-    } else {
-      setSelectedRate("Standard Rate");
-      setSelectedRateAmount(villa.price);
-    }
+    if (!villa || !villa.units.length) return;
+    const sellable = villa.units.find((entry) => !isEnquiryOnly(entry));
+    setSelectedUnitId((sellable ?? villa.units[0]).id);
   }, [villa]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -147,7 +149,18 @@ export default function VillaClient({
         ),
       )
     : 0;
-  const computedTotalPrice = totalNights * selectedRateAmount;
+  // The unit the guest actually chose, and what it costs for these dates.
+  const selectedUnit =
+    villa.units.find((entry) => entry.id === selectedUnitId) ?? villa.units[0] ?? null;
+
+  // Priced with the same function the server uses, so the property page and the
+  // charge agree. A refusal here means the unit is not sellable online.
+  const unitPrice = selectedUnit
+    ? priceUnit(selectedUnit, totalNights, villa.guests)
+    : ({ ok: false } as const);
+
+  const selectedUnitAmount = unitPrice.ok ? unitPrice.amount : 0;
+  const computedTotalPrice = selectedUnitAmount;
 
   const stayError =
     checkInDate && checkOutDate
@@ -165,7 +178,7 @@ export default function VillaClient({
   const handleCheckoutBooking = () => {
     const query = new URLSearchParams({
       villaId: villa.id.toString(),
-      rate: selectedRate,
+      unitId: selectedUnitId,
       currency,
       checkIn: checkInDate,
       checkOut: checkOutDate,
@@ -328,38 +341,78 @@ export default function VillaClient({
                   Room options
                 </h2>
                 <div className="mt-5 divide-y divide-[var(--color-line-soft)] border-y border-[var(--color-line-soft)]">
-                  {villa.rates?.map((rate) => {
-                    const isSelected = selectedRate === rate.option;
+                  {villa.units.map((unit) => {
+                    const isSelected = selectedUnitId === unit.id;
+                    const enquiryOnly = isEnquiryOnly(unit);
+                    const capacity = unitCapacityLabel(unit);
+                    const facilities = unitFacilityLabels(unit);
+
                     return (
-                      <button
-                        key={rate.option}
-                        onClick={() => {
-                          setSelectedRate(rate.option);
-                          setSelectedRateAmount(rate.amount);
-                        }}
-                        className="flex w-full items-center justify-between gap-4 py-4 text-left"
-                      >
-                        <span className="flex items-center gap-3">
-                          <span
-                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                              isSelected
-                                ? "border-[var(--color-ink)] bg-[var(--color-ink)]"
-                                : "border-[var(--color-line)]"
-                            }`}
-                          >
-                            {isSelected && <Check size={10} className="text-white" />}
+                      <div key={unit.id} className="py-4">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedUnitId(unit.id)}
+                          aria-pressed={isSelected}
+                          className="flex w-full items-start justify-between gap-4 text-left"
+                        >
+                          <span className="flex items-start gap-3">
+                            <span
+                              aria-hidden="true"
+                              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                                isSelected
+                                  ? "border-[var(--color-ink)] bg-[var(--color-ink)]"
+                                  : "border-[var(--color-line)]"
+                              }`}
+                            >
+                              {isSelected && <Check size={10} className="text-white" />}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-sm font-medium">{unit.name}</span>
+                              {/*
+                                The unit's OWN capacity, never the property total.
+                                Showing "4 Beds - 4 Guests" against a single room was
+                                the reported checkout defect.
+                              */}
+                              {capacity && (
+                                <span className="mt-1 block text-xs text-[var(--color-muted)]">
+                                  {capacity}
+                                </span>
+                              )}
+                              {facilities.length > 0 && (
+                                <span className="mt-1 block text-xs text-[var(--color-faint)]">
+                                  {facilities.join(" · ")}
+                                </span>
+                              )}
+                            </span>
                           </span>
-                          <span className="text-sm font-medium">
-                            {rate.option}
+                          <span className="shrink-0 text-right text-sm">
+                            {enquiryOnly ? (
+                              <span className="text-[var(--color-muted)]">Enquire</span>
+                            ) : (
+                              <>
+                                <span className="font-semibold">
+                                  {formatPrice(unit.amount, currency)}
+                                </span>
+                                <span className="text-[var(--color-muted)]">
+                                  {" "}
+                                  {priceBasisSuffix(unit.priceBasis)}
+                                </span>
+                              </>
+                            )}
                           </span>
-                        </span>
-                        <span className="shrink-0 text-sm">
-                          <span className="font-semibold">
-                            {formatPrice(rate.amount, currency)}
-                          </span>
-                          <span className="text-[var(--color-muted)]"> / night</span>
-                        </span>
-                      </button>
+                        </button>
+
+                        {/*
+                          Says why a unit cannot be booked online, instead of
+                          showing a price that the checkout would then refuse.
+                        */}
+                        {enquiryOnly && (
+                          <p className="mt-2 pl-7 text-xs leading-relaxed text-[var(--color-faint)]">
+                            {unit.reviewNote ??
+                              "This option is arranged by enquiry. Ask us and we will confirm availability and price."}
+                          </p>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -372,7 +425,7 @@ export default function VillaClient({
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="text-xl">
                     <span className="font-semibold">
-                      {formatPrice(selectedRateAmount || villa.price, currency)}
+                      {selectedUnitAmount > 0 ? formatPrice(selectedUnitAmount, currency) : "Enquire"}
                     </span>
                     <span className="text-sm text-[var(--color-muted)]">
                       {" "}
@@ -444,7 +497,7 @@ export default function VillaClient({
                   <dl className="mt-6 space-y-2.5 border-t border-[var(--color-line-soft)] pt-5 text-sm">
                     <div className="flex justify-between text-[var(--color-muted)]">
                       <dt>
-                        {formatPrice(selectedRateAmount, currency)} × {totalNights}{" "}
+                        {formatPrice(selectedUnit.amount, currency)} × {totalNights}{" "}
                         night{totalNights === 1 ? "" : "s"}
                       </dt>
                       <dd className="text-[var(--color-ink)]">

@@ -9,7 +9,9 @@ import { SearchFilters, VillaProps } from "./types";
 import { EXCHANGE_RATE } from "./utils";
 import VillaCard from "./VillaCard";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
-import { villasData as bundledVillas } from "../../lib/data";
+import { bundledVillas } from "../../lib/catalog";
+import { fromNightlyPrice } from "../../lib/rates";
+import { maxPropertyOccupancy } from "../../lib/quote";
 
 // Leaflet touches `window`, so the map is client-only.
 const VillaMapView = dynamic(() => import("./VillaMapView"), {
@@ -91,12 +93,20 @@ const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
       const locationMatch = searchFilters.location
         ? villa.location.toLowerCase().includes(searchFilters.location.toLowerCase())
         : true;
-      const guestsMatch = villa.guests >= searchFilters.guests;
+      // Occupancy is the largest approved unit on the property, not the
+      // property's own headline figure — a 6-guest search must not match a
+      // property whose only bookable unit takes 2.
+      const capacity = maxPropertyOccupancy(villa.units) ?? villa.guests;
+      const guestsMatch = capacity >= searchFilters.guests;
 
-      let price = villa.price;
-      if (currency === "USD") price = Math.round(villa.price / EXCHANGE_RATE);
+      // Budget is compared against the same figure the card advertises, so a
+      // card can never appear in a price band it does not belong to.
+      const advertised = fromNightlyPrice(villa.units)?.amount ?? null;
+      let price = advertised ?? 0;
+      if (currency === "USD") price = Math.round(price / EXCHANGE_RATE);
+      const priceMatch = advertised === null ? false : price <= searchFilters.maxPrice;
 
-      return locationMatch && guestsMatch && price <= searchFilters.maxPrice;
+      return locationMatch && guestsMatch && priceMatch;
     });
   }, [searchFilters, currency, villasData]);
 

@@ -2,17 +2,19 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  X,
-  Share2,
+  BedDouble,
+  Calendar,
+  CarFront,
+  Check,
   ChevronLeft,
   ChevronRight,
-  Check,
-  Tag,
-  Calendar,
-  Heart,
   Gift,
-  CarFront,
+  Heart,
   Plus,
+  Share2,
+  Sparkles,
+  Tag,
+  X,
 } from "lucide-react";
 import { VillaProps } from "./types";
 import { formatPrice } from "./utils";
@@ -20,6 +22,13 @@ import { useRouter } from "next/navigation";
 import DateRangePicker from "../booking/DateRangePicker";
 import { useVillaAvailability } from "../../lib/availability";
 import { nightsBetween, validateStay } from "../../lib/dates";
+import { activeExtras } from "../../lib/extras";
+import {
+  isEnquiryOnly,
+  priceBasisSuffix,
+  unitCapacityLabel,
+} from "../../lib/rates";
+import { priceUnit } from "../../lib/quote";
 
 interface VillaModalProps {
   villa: VillaProps;
@@ -27,22 +36,30 @@ interface VillaModalProps {
   currency: "GHS" | "USD";
 }
 
-// Define the available packages
-const AVAILABLE_PACKAGES = [
-  { id: "Honeymoon Setup", icon: Heart, label: "Honeymoon" },
-  { id: "Birthday Decoration", icon: Gift, label: "Birthday" },
-  { id: "Luxury Car Rental", icon: CarFront, label: "Car Rental" },
-];
+/*
+ * Add-ons come from the shared extras catalogue rather than a local list, so the
+ * modal, the checkout and the server all offer the same things.
+ *
+ * Every extra is `requiresQuote: true` with no amount, because no approved price
+ * exists for any of them. They are therefore requested, never charged — the
+ * defect being fixed was that they appeared in the order summary, contributed
+ * nothing to the total, and the booking was still marked fully confirmed.
+ */
+const EXTRA_ICONS: Record<string, typeof Heart> = {
+  "honeymoon-setup": Heart,
+  "birthday-decoration": Gift,
+  "car-rental": CarFront,
+  "airport-pickup": CarFront,
+  "extra-bed": BedDouble,
+};
 
 const VillaModal: React.FC<VillaModalProps> = ({
   villa,
   onClose,
   currency,
 }) => {
-  const [selectedRate, setSelectedRate] = useState<string | null>(null);
-  const [selectedRateAmount, setSelectedRateAmount] = useState<number>(
-    villa.price,
-  );
+  /** Only the unit's identifier is held; its price is derived below. */
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showBookingOptions, setShowBookingOptions] = useState(false);
 
@@ -89,13 +106,8 @@ const VillaModal: React.FC<VillaModalProps> = ({
   /* eslint-disable react-hooks/set-state-in-effect -- prop→state mirror with a user override; see comment above */
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    if (villa.rates && villa.rates.length > 0) {
-      setSelectedRate(villa.rates[0].option);
-      setSelectedRateAmount(villa.rates[0].amount);
-    } else {
-      setSelectedRate("Standard Rate");
-      setSelectedRateAmount(villa.price);
-    }
+    const sellable = villa.units.find((entry) => !isEnquiryOnly(entry));
+    setSelectedUnitId((sellable ?? villa.units[0])?.id ?? null);
     return () => {
       document.body.style.overflow = "unset";
     };
@@ -123,8 +135,17 @@ const VillaModal: React.FC<VillaModalProps> = ({
     }
   };
 
-  const pricePerNight = selectedRateAmount;
-  const computedTotalPrice = totalNights * pricePerNight;
+  const selectedUnit =
+    villa.units.find((entry) => entry.id === selectedUnitId) ?? villa.units[0] ?? null;
+
+  // Priced with the server's own function, so the estimate shown here cannot
+  // disagree with what the checkout charges.
+  const unitPrice = selectedUnit
+    ? priceUnit(selectedUnit, totalNights, villa.guests)
+    : ({ ok: false } as const);
+
+  const pricePerNight = unitPrice.ok && totalNights > 0 ? unitPrice.amount / totalNights : 0;
+  const computedTotalPrice = unitPrice.ok ? unitPrice.amount : 0;
 
   // Blocks the booking CTA when the chosen stay crosses an unavailable night.
   const stayError =
@@ -158,7 +179,7 @@ const VillaModal: React.FC<VillaModalProps> = ({
         ? `\n\n*Requested Add-ons:*\n- ${selectedPackages.join("\n- ")}`
         : "";
 
-    const message = `*Booking Request*\n\nI am interested in: *${villa.title}*\n*Location:* ${villa.location}\n*Currency:* ${currency}\n*Selected Option:* ${selectedRate || "Default"}${datesDetails}${packagesDetails}\n\nView Property: ${imageUrl}`;
+    const message = `*Booking Request*\n\nI am interested in: *${villa.title}*\n*Location:* ${villa.location}\n*Currency:* ${currency}\n*Selected Option:* ${selectedUnit?.name || "Default"}${datesDetails}${packagesDetails}\n\nView Property: ${imageUrl}`;
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank");
   };
@@ -166,13 +187,15 @@ const VillaModal: React.FC<VillaModalProps> = ({
   const handleCheckoutBooking = () => {
     const queryParams = new URLSearchParams({
       villaId: villa.id.toString(),
-      rate: selectedRate || "Default",
+      unitId: selectedUnitId ?? "",
       currency: currency,
       checkIn: checkInDate,
       checkOut: checkOutDate,
-      nights: totalNights.toString(),
-      totalPrice: computedTotalPrice.toString(),
-      packages: selectedPackages.join(","), // Pass packages in URL
+      // `nights` and `totalPrice` are deliberately NOT passed in the URL.
+      // Anything in a query string is user-editable, and a total that travels
+      // in a URL invites someone to edit what they pay. The server prices from
+      // the unit and the dates; the URL carries identifiers only.
+      packages: selectedPackages.join(","),
     });
 
     router.push(`/checkout?${queryParams.toString()}`);
@@ -247,40 +270,55 @@ const VillaModal: React.FC<VillaModalProps> = ({
               {villa.title}
             </h2>
 
-            {villa.rates ? (
+            {villa.units.length > 0 ? (
               <div className="mt-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
                 <div className="flex items-center gap-2 mb-3">
-                  <Tag size={14} className="text-slate-500" />
+                  <Tag size={14} className="text-slate-500" aria-hidden="true" />
                   <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Select a Rate
+                    Choose your accommodation
                   </span>
                 </div>
                 <div className="space-y-2">
-                  {villa.rates.map((rate, idx) => {
-                    const isSelected = selectedRate === rate.option;
+                  {villa.units.map((unit) => {
+                    const isSelected = selectedUnitId === unit.id;
+                    const enquiryOnly = isEnquiryOnly(unit);
+                    const capacity = unitCapacityLabel(unit);
+
                     return (
-                      <div
-                        key={idx}
-                        onClick={() => {
-                          setSelectedRate(rate.option);
-                          setSelectedRateAmount(rate.amount);
-                        }}
-                        className={`flex justify-between items-center text-sm p-3 rounded-lg cursor-pointer border transition-all ${isSelected ? "bg-white border-blue-500 shadow-sm" : "border-transparent hover:bg-slate-200"}`}
+                      <button
+                        type="button"
+                        key={unit.id}
+                        onClick={() => setSelectedUnitId(unit.id)}
+                        aria-pressed={isSelected}
+                        className={`flex w-full justify-between items-start gap-3 text-sm p-3 rounded-lg text-left border transition-all ${isSelected ? "bg-white border-blue-500 shadow-sm" : "border-transparent hover:bg-slate-200"}`}
                       >
-                        <span
-                          className={`font-medium ${isSelected ? "text-blue-600" : "text-slate-600"}`}
-                        >
-                          {rate.option}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-serif text-slate-900 font-bold">
-                            {formatPrice(rate.amount, currency)}
+                        <span className="min-w-0">
+                          <span
+                            className={`block font-medium ${isSelected ? "text-blue-600" : "text-slate-600"}`}
+                          >
+                            {unit.name}
                           </span>
-                          {isSelected && (
-                            <Check size={14} className="text-blue-600" />
+                          {/* The unit's own capacity, not the property total. */}
+                          {capacity && (
+                            <span className="mt-0.5 block text-xs text-slate-500">
+                              {capacity}
+                            </span>
                           )}
-                        </div>
-                      </div>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          {enquiryOnly ? (
+                            <span className="text-xs text-slate-500">Enquire</span>
+                          ) : (
+                            <span className="font-serif text-slate-900 font-bold">
+                              {formatPrice(unit.amount, currency)}
+                              <span className="ml-1 font-sans text-xs font-normal text-slate-500">
+                                {priceBasisSuffix(unit.priceBasis)}
+                              </span>
+                            </span>
+                          )}
+                          {isSelected && <Check size={14} className="text-blue-600" />}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
@@ -335,7 +373,9 @@ const VillaModal: React.FC<VillaModalProps> = ({
               Enhance Your Stay
             </span>
             <div className="flex flex-wrap gap-2">
-              {AVAILABLE_PACKAGES.map((pkg) => {
+              {activeExtras().map((extra) => {
+                const Icon = EXTRA_ICONS[extra.id] ?? Sparkles;
+                const pkg = { id: extra.id, icon: Icon, label: extra.name };
                 const isSelected = selectedPackages.includes(pkg.id);
                 return (
                   <button
@@ -379,8 +419,14 @@ const VillaModal: React.FC<VillaModalProps> = ({
                   {formatPrice(computedTotalPrice, currency)}
                 </span>
                 {selectedPackages.length > 0 && (
-                  <span className="text-[10px] text-blue-600 font-medium">
-                    + Add-ons quote pending
+                  /*
+                   * Says the add-ons are excluded from the estimate, rather than
+                   * "quote pending", which read as though the total included them.
+                   */
+                  <span className="text-[10px] text-amber-700 font-medium">
+                    + {selectedPackages.length} add-on
+                    {selectedPackages.length === 1 ? "" : "s"} to be quoted
+                    separately
                   </span>
                 )}
               </div>

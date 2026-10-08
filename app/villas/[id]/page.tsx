@@ -1,6 +1,6 @@
 // app/villas/[id]/page.tsx
 import type { Metadata } from "next";
-import { villasData } from "../../lib/data";
+import { bundledVillas as villasData } from "../../lib/catalog";
 import VillaClient from "./VillaClient";
 import JsonLd from "../../components/JsonLd";
 import { SITE, breadcrumbJsonLd, villaJsonLd } from "../../lib/seo";

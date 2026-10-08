@@ -26,10 +26,15 @@ interface NavbarProps {
  * click appeared to do nothing at all.
  */
 const LINKS = [
-  { label: "Villas", href: "/#villas" },
-  { label: "About Us", href: "/#aboutus" },
+  { label: "Stays", href: "/#villas" },
+  // Packages previously appeared nowhere in the navigation, which is why they
+  // were effectively undiscoverable even once they existed.
+  { label: "Experiences & Packages", href: "/packages" },
+  { label: "About", href: "/#aboutus" },
   { label: "Guides", href: "/guides" },
-  { label: "Contact", href: "/#contact" },
+  // Was "/#contact" — the homepage anchor rather than the page, so it shared a
+  // destination with the footer form instead of a route of its own.
+  { label: "Contact", href: "/contact" },
 ];
 
 const Navbar: React.FC<NavbarProps> = ({

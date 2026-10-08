@@ -37,7 +37,7 @@ import { isValidDateKey, validateStay } from "@/app/lib/dates";
 // would hand this route handler a client reference instead of the table name,
 // making the guard below throw on every call. See app/lib/tables.ts.
 import { BLOCKED_DATES_TABLE, BOOKINGS_TABLE, VILLAS_TABLE } from "@/app/lib/tables";
-import { quoteStay, type PriceableVilla } from "@/app/lib/pricing";
+import { priceRequest, type PriceableVilla } from "@/app/lib/pricing";
 import { clientKey, rateLimit } from "@/app/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -48,8 +48,6 @@ const SUPPORTED_CURRENCIES: PaystackCurrency[] = ["GHS", "NGN", "USD", "ZAR", "K
 /** Keep unvalidated free-text fields from being used as a storage amplifier. */
 const MAX_NAME_LENGTH = 120;
 const MAX_PHONE_LENGTH = 40;
-const MAX_PACKAGES = 20;
-const MAX_PACKAGE_LENGTH = 80;
 
 /** 5 attempts per IP per minute. Checkout is a considered action, not a loop. */
 const RATE_LIMIT = { limit: 5, windowMs: 60_000 };
@@ -58,11 +56,16 @@ interface InitializeBody {
   email?: string;
   currency?: string;
   villaId?: number | string;
-  villaTitle?: string;
-  rate?: string;
+  /** Identifies the accommodation unit. Never a price. */
+  unitId?: string;
+  /** Identifies an occasion package. Never a price. */
+  packageId?: string;
+  /** Identifies extras. Never prices. */
+  extraIds?: unknown;
+  /** Overnight occupancy. */
+  guests?: number | string;
   checkIn?: string;
   checkOut?: string;
-  packages?: unknown;
   guestName?: string;
   guestPhone?: string;
 }
@@ -135,14 +138,11 @@ export async function POST(request: Request) {
 
   const guestName = cleanText(body.guestName, MAX_NAME_LENGTH);
   const guestPhone = cleanText(body.guestPhone, MAX_PHONE_LENGTH);
-  const requestedRate = cleanText(body.rate, 80) || null;
-
-  const packages = Array.isArray(body.packages)
-    ? body.packages
-        .filter((entry): entry is string => typeof entry === "string")
-        .map((entry) => entry.trim().slice(0, MAX_PACKAGE_LENGTH))
-        .filter(Boolean)
-        .slice(0, MAX_PACKAGES)
+  const unitId = cleanText(body.unitId, 80) || null;
+  const packageId = cleanText(body.packageId, 80) || null;
+  const guests = Math.max(1, Math.min(60, Math.floor(Number(body.guests) || 1)));
+  const extraIds = Array.isArray(body.extraIds)
+    ? body.extraIds.filter((entry): entry is string => typeof entry === "string").slice(0, 20)
     : [];
 
   const supabase = createServiceClient();
@@ -163,18 +163,32 @@ export async function POST(request: Request) {
     return badRequest("That property could not be found.", 404);
   }
 
-  const pricing = quoteStay(
-    villaRow as unknown as PriceableVilla,
+  // The server resolves the unit, the package and the extras from records it
+  // trusts, then prices them. Nothing money-shaped is read from the request.
+  const pricing = priceRequest({
+    villa: villaRow as unknown as PriceableVilla,
+    unitId,
     checkIn,
     checkOut,
-    requestedRate,
-  );
+    guests,
+    packageId,
+    extraIds,
+    currency,
+  });
 
   if (!pricing.ok) {
     return badRequest(pricing.message, pricing.status);
   }
 
-  const quote = pricing.quote;
+  const {
+    quote,
+    unit,
+    nights,
+    occasionStatus,
+    packageSnapshot,
+    packageId: resolvedPackageId,
+    packageName,
+  } = pricing.priced;
 
   // --- Availability guard (server-side double-booking protection) ---------
   try {
@@ -229,13 +243,35 @@ export async function POST(request: Request) {
         guest_phone: guestPhone,
         check_in_date: checkIn,
         check_out_date: checkOut,
-        nights: quote.nights,
+        guests,
+        nights,
+        // The two independent tracks. A paid room must not set the occasion to
+        // confirmed — see app/lib/status.ts.
+        accommodation_status: "pending_payment",
+        occasion_status: occasionStatus,
+        accommodation_unit_id: unit.id,
+        accommodation_unit_name: unit.name,
+        package_id: resolvedPackageId,
+        package_name: packageName,
+        package_snapshot: packageSnapshot,
+        // Itemised, so the receipt and the admin view can show the composition
+        // rather than one opaque total.
+        accommodation_subtotal: quote.accommodationSubtotal,
+        package_subtotal: quote.packageSubtotal,
+        extras_subtotal: quote.extrasSubtotal,
+        fees_subtotal: quote.feesSubtotal,
+        discount_total: quote.discountTotal,
+        refundable_deposit: quote.refundableDeposit,
         total_amount: quote.total,
+        due_now: quote.dueNow,
+        balance_due: quote.balanceDue,
+        balance_due_date: quote.balanceDueDate,
+        unpriced_items: quote.unpricedItems,
         currency,
         payment_method: "paystack",
         payment_reference: reference,
         payment_status: "pending",
-        packages,
+        extras: extraIds,
         status: "pending",
       },
     ])
@@ -264,8 +300,9 @@ export async function POST(request: Request) {
   try {
     const result = await initializeTransaction({
       email,
-      // The only amount that may ever reach the gateway.
-      amount: quote.total,
+      // The only amount that may ever reach the gateway. `dueNow` equals `total`
+      // while no part-payment schedule is configured.
+      amount: quote.dueNow,
       currency,
       reference,
       callbackUrl: `${origin}/checkout/success?reference=${encodeURIComponent(reference)}`,
@@ -273,13 +310,16 @@ export async function POST(request: Request) {
         bookingId,
         reference,
         villaId,
-        villaTitle: quote.villaTitle,
-        rate: quote.rateLabel,
-        nightlyRate: quote.nightlyRate,
+        villaTitle: unit.kind === "whole_property" ? (villaRow.title ?? null) : (villaRow.title ?? null),
+        unitId: unit.id,
+        unitName: unit.name,
+        packageId: resolvedPackageId,
+        occasionStatus,
         checkIn,
         checkOut,
-        nights: quote.nights,
-        packages,
+        nights,
+        guests,
+        extraIds,
       },
       channels: ["card", "mobile_money", "bank", "bank_transfer", "ussd"],
     });
@@ -292,8 +332,15 @@ export async function POST(request: Request) {
       bookingId,
       // Echoed so the UI can show the authoritative figure rather than the one
       // it calculated locally.
-      amount: quote.total,
-      nights: quote.nights,
+      amount: quote.dueNow,
+      total: quote.total,
+      nights,
+      unitName: unit.name,
+      // True when something on this booking still needs a quote. The UI must say
+      // so before payment rather than implying the total covers everything.
+      hasUnpricedItems: quote.unpricedItems.length > 0,
+      unpricedItems: quote.unpricedItems,
+      occasionStatus,
       currency,
     });
   } catch (error) {
