@@ -88,9 +88,17 @@ export default function ManageBookings() {
   }, [filters.search]);
 
   // Any change to the criteria invalidates the current page number.
-  useEffect(() => {
+  //
+  // Adjusted during render rather than in an effect: this is React's documented
+  // pattern for "reset state when a value changes". An effect would first commit
+  // a render showing the new result set at the stale page number.
+  const criteriaKey = `${searchTerm}|${filters.status}|${filters.villaId}|${filters.from}|${filters.to}`;
+  const [pageCriteriaKey, setPageCriteriaKey] = useState(criteriaKey);
+
+  if (pageCriteriaKey !== criteriaKey) {
+    setPageCriteriaKey(criteriaKey);
     setPage(0);
-  }, [searchTerm, filters.status, filters.villaId, filters.from, filters.to]);
+  }
 
   const fetchBookings = useCallback(async () => {
     if (!isSupabaseConfigured()) {
@@ -148,9 +156,17 @@ export default function ManageBookings() {
     filters.to,
   ]);
 
+  /*
+   * Client-side fetch on mount/refresh. `fetchBookings` sets its loading flag
+   * synchronously before the first await, which react-hooks/set-state-in-effect
+   * flags. Suppressed with the reason recorded: the rule's real fix is a
+   * data-fetching layer, which is out of scope for this branch.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect -- client-side fetch-on-mount; see comment above */
   useEffect(() => {
     fetchBookings();
   }, [fetchBookings]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const updateStatus = async (id: string, newStatus: string) => {
     if (newStatus === "cancelled") {

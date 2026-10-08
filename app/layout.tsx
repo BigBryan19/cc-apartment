@@ -81,7 +81,12 @@ export const metadata: Metadata = {
     locale: "en_GH",
     images: [
       {
-        url: "/hero-bg.png",
+        // A purpose-built 1200x630 card. The declared dimensions must match the
+        // file — unfurlers crop to what is advertised, and the old
+        // declaration (1200x630) did not match the asset (1920x924), so
+        // previews cropped unpredictably. 0.1 MB, well inside the limits
+        // LinkedIn, Slack and WhatsApp enforce.
+        url: "/og-cover.jpg",
         width: 1200,
         height: 630,
         alt: "Cosy Crest furnished apartment in Ghana",
@@ -93,7 +98,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${SITE.name} — ${SITE.tagline}`,
     description: SITE.description,
-    images: ["/hero-bg.png"],
+    images: ["/og-cover.jpg"],
   },
 
   // Real values only once the codes exist — an invented verification token

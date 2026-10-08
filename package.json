@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:pricing": "tsc tests/pricing.test.ts --outDir .test-build --module commonjs --target es2020 --moduleResolution node --skipLibCheck --esModuleInterop && node .test-build/tests/pricing.test.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
@@ -14,7 +15,7 @@
     "framer-motion": "^12.40.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.564.0",
-    "next": "16.1.6",
+    "next": "^16.4.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-leaflet": "^5.0.0",
@@ -27,7 +28,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "^16.4.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

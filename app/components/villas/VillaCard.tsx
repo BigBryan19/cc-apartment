@@ -5,6 +5,7 @@ import React from "react";
 import { Heart, Play, MapPin, Star, Users, BedDouble, Bath } from "lucide-react";
 import { VillaProps } from "./types";
 import { formatPrice } from "./utils";
+import { fromNightlyPrice } from "../../lib/rates";
 
 interface VillaCardProps extends VillaProps {
   onClick: (villa: VillaProps) => void;
@@ -21,6 +22,8 @@ const VillaCard: React.FC<VillaCardProps> = ({
   ...villa
 }) => {
   const data = villa as VillaProps;
+  // Derived from the units, so the card and the detail page cannot disagree.
+  const nightly = fromNightlyPrice(data.units);
 
   return (
     <article
@@ -112,9 +115,24 @@ const VillaCard: React.FC<VillaCardProps> = ({
 
         <p className="mt-2 text-[15px] text-[var(--color-ink)]">
           <span className="font-semibold">
-            {formatPrice(data.price, currency)}
+            {/*
+              "From" the cheapest published NIGHTLY rate, not the property's
+              headline figure. Advertising `price` is what made this card read
+              GHS 2,000 while the detail page offered GHS 1,500 for the same
+              property. Renders "Enquire" when nothing sellable is priced.
+            */}
+            {nightly ? (
+              <>
+                <span className="text-xs font-normal text-[var(--color-muted)]">From </span>
+                {formatPrice(nightly.amount, currency)}
+              </>
+            ) : (
+              <span className="text-sm">Enquire</span>
+            )}
           </span>
-          <span className="text-[var(--color-muted)]"> / night</span>
+          {nightly && (
+            <span className="text-[var(--color-muted)]"> / night</span>
+          )}
         </p>
       </div>
     </article>

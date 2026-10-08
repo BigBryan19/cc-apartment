@@ -51,13 +51,13 @@ export async function generateMetadata({
       locale: "en_GH",
       publishedTime: guide.updated,
       modifiedTime: guide.updated,
-      images: [{ url: "/hero-bg.png", alt: SITE.name }],
+      images: [{ url: "/og-cover.jpg", alt: SITE.name }],
     },
     twitter: {
       card: "summary_large_image",
       title: guide.metaTitle ?? guide.title,
       description: guide.description,
-      images: ["/hero-bg.png"],
+      images: ["/og-cover.jpg"],
     },
   };
 }
@@ -103,7 +103,7 @@ export default async function GuidePage({
             mainEntityOfPage: { "@type": "WebPage", "@id": url },
             author: { "@id": `${SITE_URL}/#organization` },
             publisher: { "@id": `${SITE_URL}/#organization` },
-            image: `${SITE_URL}/hero-bg.png`,
+            image: `${SITE_URL}/og-cover.jpg`,
           },
           breadcrumbJsonLd([
             { name: "Home", path: "/" },

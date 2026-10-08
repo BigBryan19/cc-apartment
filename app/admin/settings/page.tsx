@@ -1,7 +1,7 @@
 // app/admin/settings/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createClient } from "../../utils/supabase";
 import { KeyRound, Loader2, ShieldCheck } from "lucide-react";
 

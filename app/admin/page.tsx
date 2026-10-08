@@ -13,20 +13,23 @@ import {
 } from "lucide-react";
 
 export default function AdminDashboard() {
+  const configured = isSupabaseConfigured();
+
   const [stats, setStats] = useState({ villas: 0, bookings: 0 });
-  const [isLoading, setIsLoading] = useState(true);
+  // Start settled when there is nothing to load. `configured` derives from
+  // NEXT_PUBLIC_* values, which Next inlines at build time — so it is identical
+  // on the server and the client, and seeding state from it cannot cause a
+  // hydration mismatch. The previous version flipped this from inside the
+  // effect instead, which cost an extra render on every mount.
+  const [isLoading, setIsLoading] = useState(configured);
   const [error, setError] = useState("");
 
-  const configured = isSupabaseConfigured();
   // Both states mean "we do not know the real numbers" — never render a 0 that
   // the admin would read as fact.
   const unavailable = !configured || Boolean(error);
 
   useEffect(() => {
-    if (!configured) {
-      setIsLoading(false);
-      return;
-    }
+    if (!configured) return;
 
     let cancelled = false;
 

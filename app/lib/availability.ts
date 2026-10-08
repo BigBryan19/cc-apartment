@@ -16,8 +16,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient, isSupabaseConfigured } from "../utils/supabase";
 import type { DateRange } from "./dates";
+import { BLOCKED_DATES_TABLE } from "./tables";
 
-export const BLOCKED_DATES_TABLE = "blocked_dates";
+// Re-exported so existing client-side imports keep working.
+//
+// Server code (the route handlers) must import from "./tables" directly: this
+// module is "use client", so a value imported from it into a route handler
+// arrives as a client reference rather than the string. See app/lib/tables.ts.
+export { BLOCKED_DATES_TABLE };
 
 /**
  * Hard cap on how long the calendar will wait for availability. Without this a
@@ -88,6 +94,15 @@ export function useVillaAvailability(villaId: number | null): AvailabilityState 
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 
+  /*
+   * Clearing the slices on the "nothing to load" paths is a synchronous setState
+   * from inside an effect, which react-hooks/set-state-in-effect flags. It is
+   * deliberate: the alternative is to derive every field at the return site, and
+   * this hook feeds the checkout widget, the villa page and the modal, where a
+   * subtle change in when `isLoading` flips would be visible to guests. The
+   * suppression is recorded rather than the behaviour changed.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect -- state resets on the no-op paths; see comment above */
   useEffect(() => {
     if (villaId === null || Number.isNaN(villaId)) {
       setBlocked([]);
@@ -196,6 +211,7 @@ export function useVillaAvailability(villaId: number | null): AvailabilityState 
       cancelled = true;
     };
   }, [villaId, nonce]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   return { blocked, booked, all: [...blocked, ...booked], isLoading, error, refresh };
 }

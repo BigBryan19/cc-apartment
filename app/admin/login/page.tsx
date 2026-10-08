@@ -6,6 +6,26 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, AlertTriangle, Lock } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 
+/**
+ * Supabase returns its own wording for auth failures. Those strings are not a
+ * contract we control, so map the ones a guest can actually hit and fall back to
+ * something calm rather than rendering a raw API message.
+ */
+function friendlyAuthError(message: string): string {
+  switch (message) {
+    case "Invalid login credentials":
+      // Deliberately not distinguishing "no such user" from "wrong password".
+      return "Those credentials were not recognised.";
+    case "Email not confirmed":
+      return "This account has not been confirmed yet. Check your inbox for the confirmation link.";
+    case "Too many requests":
+    case "Email rate limit exceeded":
+      return "Too many attempts. Please wait a few minutes and try again.";
+    default:
+      return "We could not sign you in. Please try again or contact us.";
+  }
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -17,6 +37,11 @@ function LoginForm() {
   const [error, setError] = useState("");
 
   const configured = isSupabaseConfigured();
+
+  // Set by middleware.ts when a session exists but does not belong to an
+  // administrator. Without this the redirect would be indistinguishable from a
+  // failed login and the user would retype a correct password forever.
+  const rejectedNotAdmin = searchParams.get("error") === "not_admin";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,12 +57,7 @@ function LoginForm() {
     });
 
     if (signInError) {
-      // Deliberately not distinguishing "no such user" from "wrong password".
-      setError(
-        signInError.message === "Invalid login credentials"
-          ? "Those credentials were not recognised."
-          : signInError.message,
-      );
+      setError(friendlyAuthError(signInError.message));
       setIsLoading(false);
       return;
     }
@@ -45,6 +65,20 @@ function LoginForm() {
     // refresh() re-runs middleware and server components so the new session
     // cookie is picked up before we navigate.
     router.replace(next.startsWith("/admin") ? next : "/admin");
+    router.refresh();
+  };
+
+  /**
+   * A non-admin session is already established when this page is reached with
+   * `error=not_admin`, which would otherwise make the form unusable — signing in
+   * again as the admin would just replace the session, but the stale one has to
+   * go first or `getUser()` keeps returning it.
+   */
+  const handleSignOutOtherAccount = async () => {
+    if (isSupabaseConfigured()) {
+      await createClient().auth.signOut();
+    }
+    router.replace("/admin/login");
     router.refresh();
   };
 
@@ -62,6 +96,27 @@ function LoginForm() {
             Cosy Crest management
           </p>
         </div>
+
+        {rejectedNotAdmin && (
+          <div className="mb-5 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <div className="flex gap-3">
+              <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+              <p>
+                That account is signed in but is not an administrator, so it
+                cannot open the admin panel. Sign in with an administrator
+                account, or ask for this account to be added to{" "}
+                <code className="font-mono text-xs">ADMIN_EMAILS</code>.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSignOutOtherAccount}
+              className="self-start rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-800 transition-colors hover:bg-red-100"
+            >
+              Sign out of this account
+            </button>
+          </div>
+        )}
 
         {!configured && (
           <div className="mb-5 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">

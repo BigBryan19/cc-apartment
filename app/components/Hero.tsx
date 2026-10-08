@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { Search, MapPin, Users, Wallet, ChevronDown } from "lucide-react";
 import Navbar from "./Navbar";
 import { SearchFilters } from "./villas/types";
@@ -30,7 +31,27 @@ const Hero: React.FC<HeroProps> = ({
   const [maxPrice, setMaxPrice] = useState(ANY_PRICE);
 
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [displayText, setDisplayText] = useState("");
+
+  /**
+   * Typewriter state.
+   *
+   * `slide` is stored alongside `length` so the animation can be reset during
+   * render when the slide changes, rather than in an effect. Resetting in an
+   * effect body (`setDisplayText("")`) caused a cascading second render on every
+   * slide change and trips react-hooks/set-state-in-effect.
+   */
+  const [typed, setTyped] = useState({ slide: 0, length: 0 });
+
+  const headline = `Be our guest in ${heroSlides[currentSlide].location}`;
+
+  // Adjusting state during render when a prop (here, the slide) changes is the
+  // pattern React documents for exactly this case: React re-runs the component
+  // immediately without committing the stale output.
+  if (typed.slide !== currentSlide) {
+    setTyped({ slide: currentSlide, length: 0 });
+  }
+
+  const displayText = headline.slice(0, typed.slide === currentSlide ? typed.length : 0);
 
   // Background rotation
   useEffect(() => {
@@ -40,21 +61,22 @@ const Hero: React.FC<HeroProps> = ({
     return () => clearInterval(id);
   }, []);
 
-  // Typewriter headline
+  // Typewriter headline. Advances one character at a time; the reset on slide
+  // change happens above during render, so there is no setState in this effect
+  // body — only inside the interval callback.
   useEffect(() => {
-    const fullText = `Be our guest in ${heroSlides[currentSlide].location}`;
-    setDisplayText("");
-    let i = 0;
     const id = setInterval(() => {
-      if (i < fullText.length) {
-        setDisplayText(fullText.substring(0, i + 1));
-        i += 1;
-      } else {
-        clearInterval(id);
-      }
+      setTyped((prev) =>
+        prev.slide !== currentSlide
+          ? { slide: currentSlide, length: 1 }
+          : prev.length >= headline.length
+            ? prev
+            : { slide: currentSlide, length: prev.length + 1 },
+      );
     }, 55);
+
     return () => clearInterval(id);
-  }, [currentSlide]);
+  }, [currentSlide, headline.length]);
 
   const symbol = currency === "GHS" ? "₵" : "$";
   // Price brackets track the active currency so the filter always matches.
@@ -84,10 +106,19 @@ const Hero: React.FC<HeroProps> = ({
           }`}
           aria-hidden={index !== currentSlide}
         >
-          <img
+          {/*
+            `fill` suits the absolutely-positioned slide wrapper. Only the first
+            slide is eager: all three are stacked and cross-faded, so marking
+            them all `priority` would fetch three full-bleed images up front and
+            compete with the page's own LCP.
+          */}
+          <Image
             src={slide.image}
             alt={`Luxury apartment in ${slide.location}`}
-            className={`h-full w-full object-cover ${
+            fill
+            priority={index === 0}
+            sizes="100vw"
+            className={`object-cover ${
               index === currentSlide ? "animate-kenburns" : ""
             }`}
           />
@@ -111,9 +142,24 @@ const Hero: React.FC<HeroProps> = ({
           Accra · Aburi · Adenta
         </span>
 
+        {/*
+          The headline must carry real text in the server-rendered HTML. The
+          typewriter starts from an empty string, so the previous markup shipped
+          `<h1><span></span></h1>` — an H1 with no content, which is the
+          strongest on-page signal the page has and was blank in every response
+          that does not run JavaScript (Bing, unfurlers, LLM crawlers).
+
+          The full sentence is rendered in an sr-only span; the animated
+          characters and the caret are hidden from assistive tech so the text is
+          announced once, not twice.
+        */}
         <h1 className="font-display text-[2.6rem] leading-[1.05] text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.45)] sm:text-6xl lg:text-7xl min-h-[3.5rem] sm:min-h-[4.5rem] flex items-center justify-center">
-          <span>{displayText}</span>
-          <span className="ml-1.5 inline-block h-[0.85em] w-[3px] animate-pulse bg-white/90 align-middle" />
+          <span aria-hidden="true">{displayText}</span>
+          <span
+            aria-hidden="true"
+            className="ml-1.5 inline-block h-[0.85em] w-[3px] animate-pulse bg-white/90 align-middle"
+          />
+          <span className="sr-only">{headline}</span>
         </h1>
 
         <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/85 sm:text-base">

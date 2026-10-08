@@ -14,6 +14,11 @@
 //   table closed to anonymous writers, which is also what stops anyone filling
 //   it with junk rows.
 //
+//   Because this route writes with a key that bypasses RLS entirely, it is also
+//   the one place a client could previously write an arbitrary `total_amount`
+//   into the admin's booking list. Price and nights are now derived from the
+//   property row, exactly as the paid path does — see app/lib/pricing.ts.
+//
 // The paid path is /api/payments/paystack/initialize, which creates the booking
 // the same way.
 // ---------------------------------------------------------------------------
@@ -24,38 +29,56 @@ import {
   isServiceRoleConfigured,
 } from "@/app/lib/supabase-server";
 import { validateStay, isValidDateKey, type DateRange } from "@/app/lib/dates";
-import { BLOCKED_DATES_TABLE } from "@/app/lib/availability";
+// From tables.ts, NOT from lib/availability — that module is "use client" and
+// would hand this route handler a client reference instead of the table name,
+// making the guard below throw on every call. See app/lib/tables.ts.
+import { BLOCKED_DATES_TABLE, BOOKINGS_TABLE, VILLAS_TABLE } from "@/app/lib/tables";
+import { priceRequest, type PriceableVilla } from "@/app/lib/pricing";
+import { clientKey, rateLimit } from "@/app/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const MAX_NAME_LENGTH = 120;
+const MAX_PHONE_LENGTH = 40;
+
+/** 5 requests per IP per minute. */
+const RATE_LIMIT = { limit: 5, windowMs: 60_000 };
+
 interface RequestBody {
   villaId?: number | string;
+  /** Identifiers only. Never prices. */
+  unitId?: string;
+  packageId?: string;
+  extraIds?: unknown;
   guestName?: string;
   guestEmail?: string;
   guestPhone?: string;
+  guests?: number | string;
   checkIn?: string;
   checkOut?: string;
-  nights?: number;
-  rate?: string;
-  totalAmount?: number;
   currency?: string;
-  packages?: string[];
 }
 
 function badRequest(message: string, status = 400) {
-  return NextResponse.json(
-    { successful: false, error: message },
-    { status },
-  );
+  return NextResponse.json({ successful: false, error: message }, { status });
+}
+
+function cleanText(value: unknown, maxLength: number): string {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 
 export async function POST(request: Request) {
-  if (!isServiceRoleConfigured()) {
-    return badRequest(
-      "Booking storage is not configured on the server.",
-      503,
+  const limit = rateLimit(clientKey(request, "booking-request"), RATE_LIMIT.limit, RATE_LIMIT.windowMs);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { successful: false, error: "Too many requests. Please wait a moment and try again." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
     );
+  }
+
+  if (!isServiceRoleConfigured()) {
+    return badRequest("Booking storage is not configured on the server.", 503);
   }
 
   let body: RequestBody;
@@ -65,20 +88,64 @@ export async function POST(request: Request) {
     return badRequest("Invalid JSON body.");
   }
 
-  const email = (body.guestEmail ?? "").trim();
-  const checkIn = (body.checkIn ?? "").trim();
-  const checkOut = (body.checkOut ?? "").trim();
+  const email = cleanText(body.guestEmail, 254);
+  const checkIn = cleanText(body.checkIn, 10);
+  const checkOut = cleanText(body.checkOut, 10);
+  const guestName = cleanText(body.guestName, MAX_NAME_LENGTH);
+  const guestPhone = cleanText(body.guestPhone, MAX_PHONE_LENGTH);
+  const unitId = cleanText(body.unitId, 80) || null;
+  const packageId = cleanText(body.packageId, 80) || null;
+  const guests = Math.max(1, Math.min(60, Math.floor(Number(body.guests) || 1)));
+  const extraIds = Array.isArray(body.extraIds)
+    ? body.extraIds.filter((entry): entry is string => typeof entry === "string").slice(0, 20)
+    : [];
   const villaId = Number(body.villaId);
-  const amount = Number(body.totalAmount);
 
-  if (!email.includes("@")) return badRequest("A valid email address is required.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return badRequest("A valid email address is required.");
+  }
   if (!isValidDateKey(checkIn)) return badRequest("A valid check-in date is required.");
   if (!isValidDateKey(checkOut)) return badRequest("A valid check-out date is required.");
-  if (Number.isNaN(villaId)) return badRequest("A property is required.");
-  if (!Number.isFinite(amount) || amount <= 0)
-    return badRequest("A positive amount is required.");
+  if (!Number.isInteger(villaId) || villaId <= 0) {
+    return badRequest("A valid property is required.");
+  }
 
   const supabase = createServiceClient();
+
+  // --- Price the stay from the database, not from the request body --------
+  const { data: villaRow, error: villaError } = await supabase
+    .from(VILLAS_TABLE)
+    .select("id, title, price, rates")
+    .eq("id", villaId)
+    .maybeSingle();
+
+  if (villaError) {
+    console.error("[bookings/request] could not read villa:", villaError.message);
+    return badRequest("We could not load this property. Please try again.", 503);
+  }
+  if (!villaRow) return badRequest("That property could not be found.", 404);
+
+  const pricing = priceRequest({
+    villa: villaRow as unknown as PriceableVilla,
+    unitId,
+    checkIn,
+    checkOut,
+    guests,
+    packageId,
+    extraIds,
+    currency: ((body.currency || "GHS") as string).toUpperCase().slice(0, 3),
+  });
+  if (!pricing.ok) return badRequest(pricing.message, pricing.status);
+
+  const {
+    quote,
+    unit,
+    nights,
+    occasionStatus,
+    packageSnapshot,
+    packageId: resolvedPackageId,
+    packageName,
+  } = pricing.priced;
 
   // Re-check availability server-side. The client already does this, but a
   // request that bypasses the UI must not be able to double-book a night.
@@ -89,7 +156,7 @@ export async function POST(request: Request) {
         .select("start_date, end_date")
         .eq("villa_id", villaId),
       supabase
-        .from("bookings")
+        .from(BOOKINGS_TABLE)
         .select("check_in_date, check_out_date")
         .eq("villa_id", villaId)
         .neq("status", "cancelled"),
@@ -120,19 +187,35 @@ export async function POST(request: Request) {
   }
 
   const { data, error } = await supabase
-    .from("bookings")
+    .from(BOOKINGS_TABLE)
     .insert([
       {
         villa_id: villaId,
-        guest_name: (body.guestName ?? "").trim(),
+        guest_name: guestName,
         guest_email: email,
-        guest_phone: (body.guestPhone ?? "").trim(),
+        guest_phone: guestPhone,
         check_in_date: checkIn,
         check_out_date: checkOut,
-        nights: Number.isFinite(Number(body.nights)) ? Number(body.nights) : null,
-        total_amount: amount,
-        currency: (body.currency || "GHS").toUpperCase(),
-        packages: Array.isArray(body.packages) ? body.packages : [],
+        guests,
+        nights,
+        accommodation_status: "pending_payment",
+        // An unpaid request never confirms anything, and an occasion on it stays
+        // `requested` until a human has reviewed and quoted it.
+        occasion_status: occasionStatus,
+        accommodation_unit_id: unit.id,
+        accommodation_unit_name: unit.name,
+        package_id: resolvedPackageId,
+        package_name: packageName,
+        package_snapshot: packageSnapshot,
+        accommodation_subtotal: quote.accommodationSubtotal,
+        package_subtotal: quote.packageSubtotal,
+        extras_subtotal: quote.extrasSubtotal,
+        total_amount: quote.total,
+        due_now: 0,
+        balance_due: quote.total,
+        unpriced_items: quote.unpricedItems,
+        currency: ((body.currency || "GHS") as string).toUpperCase().slice(0, 3),
+        extras: extraIds,
         payment_method: "unpaid-request",
         payment_status: "unpaid",
         status: "pending",
@@ -141,11 +224,20 @@ export async function POST(request: Request) {
     .select("id");
 
   if (error) {
-    return badRequest(`Could not save the request: ${error.message}`, 500);
+    // Log the detail; do not hand a raw Postgres error to the browser — it can
+    // name tables, columns and constraints.
+    console.error("[bookings/request] insert failed:", error.message);
+    return badRequest("Could not save your request. Please try again or contact us.", 500);
   }
 
   return NextResponse.json({
     successful: true,
     bookingId: data?.[0]?.id ?? null,
+    amount: quote.total,
+    nights,
+    unitName: unit.name,
+    occasionStatus,
+    hasUnpricedItems: quote.unpricedItems.length > 0,
+    unpricedItems: quote.unpricedItems,
   });
 }

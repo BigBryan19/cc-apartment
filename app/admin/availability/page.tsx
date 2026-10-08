@@ -74,7 +74,16 @@ export default function ManageAvailability() {
     load();
   }, []);
 
-  // Default the range inputs to today → tomorrow.
+  /*
+   * Default the range inputs to today → tomorrow.
+   *
+   * Deliberately an effect rather than a useState initialiser: `new Date()`
+   * resolves differently on the server that prerenders this page and in the
+   * browser that hydrates it (timezone, and either side of midnight), so
+   * seeding state from it risks a hydration mismatch. Rendering the inputs
+   * empty for one frame is the safer trade.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect -- clock-dependent default must not run during SSR; see comment above */
   useEffect(() => {
     if (!startDate) {
       const today = new Date();
@@ -84,6 +93,7 @@ export default function ManageAvailability() {
       setEndDate(toDateKey(tomorrow));
     }
   }, [startDate]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const selectedVilla = useMemo(
     () => villas.find((v) => v.id === selectedVillaId) ?? null,

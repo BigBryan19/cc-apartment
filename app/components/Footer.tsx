@@ -10,8 +10,15 @@
 // ---------------------------------------------------------------------------
 
 import React from "react";
+import Link from "next/link";
 import { Facebook, Instagram, Twitter } from "lucide-react";
 import ContactSection from "./ContactSection";
+
+const LEGAL_LINKS = [
+  { label: "Terms & Conditions", href: "/terms" },
+  { label: "Privacy Notice", href: "/privacy" },
+  { label: "Imprint", href: "/imprint" },
+] as const;
 
 interface FooterProps {
   /** Set false when the page already renders a ContactSection inline. */
@@ -45,15 +52,20 @@ const Footer: React.FC<FooterProps> = ({ showContact = true }) => {
             </p>
           </div>
 
-          <nav className="flex flex-col gap-3 font-medium md:items-center md:justify-center">
-            {["Terms & Conditions", "Privacy Notice", "Imprint"].map((item) => (
-              <a
-                key={item}
-                href="#"
-                className="transition-colors hover:text-[var(--color-ink)]"
+          {/* Real destinations. These three used to be `href="#"`, which looked
+              like a policy existed while giving the guest nothing. */}
+          <nav
+            aria-label="Legal and policies"
+            className="flex flex-col gap-3 font-medium md:items-center md:justify-center"
+          >
+            {LEGAL_LINKS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded transition-colors hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
               >
-                {item}
-              </a>
+                {item.label}
+              </Link>
             ))}
           </nav>
 
