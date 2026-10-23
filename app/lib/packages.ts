@@ -89,6 +89,8 @@ export interface PackageDefinition {
   summary: string;
   /** Longer introduction on the detail page. */
   introduction: string;
+  /** Image for the package card. */
+  image: string;
 
   whoItsFor: string[];
 
@@ -165,6 +167,7 @@ export const PACKAGES: PackageDefinition[] = [
     summary: "A private, quietly staged stay for two.",
     introduction:
       "A stay designed around privacy and a considered arrival. Tell us your dates and what would make the trip feel like yours, and we will confirm what we can stage, when we need access, and what it costs.",
+    image: "https://images.unsplash.com/photo-1583417319070-4a69db38a482?q=80&w=1000&auto=format&fit=crop",
     whoItsFor: [
       "Couples celebrating a honeymoon, anniversary or engagement",
       "Guests who want the room prepared before they arrive",
@@ -224,6 +227,7 @@ export const PACKAGES: PackageDefinition[] = [
     summary: "An overnight stay with the room prepared for a birthday.",
     introduction:
       "An overnight booking for your own party, with the room staged before you arrive. No additional event guests — for that, see Birthday Celebrations.",
+    image: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=1000&auto=format&fit=crop",
     whoItsFor: [
       "Guests marking a birthday with an overnight stay",
       "Small groups staying the night rather than hosting visitors",
@@ -283,6 +287,7 @@ export const PACKAGES: PackageDefinition[] = [
     summary: "A hosted birthday with additional attendees, quoted per event.",
     introduction:
       "A birthday with invited guests rather than just an overnight stay. Because it involves visitors, timings and additional rules, it is quoted per event once we have confirmed the property can accommodate it.",
+    image: "https://images.unsplash.com/photo-1464349153735-7db50ed83c84?q=80&w=1000&auto=format&fit=crop",
     whoItsFor: [
       "Birthdays with friends or family attending",
       "Guests who need a venue, timings and catering arranged",
@@ -349,6 +354,7 @@ export const PACKAGES: PackageDefinition[] = [
     summary: "A private event at one of our properties, by approval.",
     introduction:
       "A casual party, a private gathering or a small function. Every request is reviewed against the property's approved use, capacity and hours before anything is confirmed, and we quote per event.",
+    image: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=1000&auto=format&fit=crop",
     whoItsFor: [
       "Private celebrations and casual parties",
       "Small functions that need a venue rather than a stay",

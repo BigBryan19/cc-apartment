@@ -298,19 +298,24 @@ export default function VillaClient({
                   guest, and how authority flows from the property pages — the
                   strongest commercial pages — into the guides. */}
               {locationGuides.length > 0 && (
-                <div className="mt-8 rounded-2xl border border-[var(--color-line)] bg-[var(--color-canvas)] p-5">
-                  <p className="eyebrow mb-3">Planning your stay</p>
-                  <ul className="space-y-2.5">
+                <div className="mt-10 rounded-2xl border border-[var(--color-line)] bg-[var(--color-canvas)] p-6">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-[var(--color-ink)]">
+                    Planning your stay
+                  </h3>
+                  <p className="mt-2 text-xs leading-relaxed text-[var(--color-muted)]">
+                    Get the most out of your visit with our local guides and practical tips.
+                  </p>
+                  <ul className="mt-5 space-y-3">
                     {locationGuides.map((guide) => (
                       <li key={guide.href}>
                         <Link
                           href={guide.href}
-                          className="group inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-ink)] transition-opacity hover:opacity-70"
+                          className="group flex items-center justify-between rounded-xl border border-white bg-white p-3.5 text-sm font-medium text-[var(--color-ink)] transition-all hover:border-[var(--color-line)] hover:shadow-sm"
                         >
                           {guide.label}
                           <ArrowUpRight
-                            size={13}
-                            className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                            size={14}
+                            className="text-[var(--color-faint)] transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-[var(--color-ink)]"
                           />
                         </Link>
                       </li>
@@ -323,11 +328,13 @@ export default function VillaClient({
                 <h2 className="text-xl font-semibold tracking-tight">
                   What this place offers
                 </h2>
-                <div className="mt-5 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+                <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-2">
                   {villa.amenities?.map((item) => (
-                    <div key={item} className="flex items-center gap-3.5">
-                      {getAmenityIcon(item)}
-                      <span className="text-sm text-[var(--color-ink-soft)]">
+                    <div key={item} className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-canvas)] text-[var(--color-ink)]">
+                        {getAmenityIcon(item)}
+                      </span>
+                      <span className="text-sm font-medium text-[var(--color-ink-soft)]">
                         {item}
                       </span>
                     </div>
@@ -340,7 +347,7 @@ export default function VillaClient({
                 <h2 className="text-xl font-semibold tracking-tight">
                   Room options
                 </h2>
-                <div className="mt-5 divide-y divide-[var(--color-line-soft)] border-y border-[var(--color-line-soft)]">
+                <div className="mt-5 space-y-3">
                   {villa.units.map((unit) => {
                     const isSelected = selectedUnitId === unit.id;
                     const enquiryOnly = isEnquiryOnly(unit);
@@ -348,33 +355,30 @@ export default function VillaClient({
                     const facilities = unitFacilityLabels(unit);
 
                     return (
-                      <div key={unit.id} className="py-4">
+                      <div key={unit.id}>
                         <button
                           type="button"
                           onClick={() => setSelectedUnitId(unit.id)}
-                          aria-pressed={isSelected}
-                          className="flex w-full items-start justify-between gap-4 text-left"
+                          className={`group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border p-3 text-left transition-all ${
+                            isSelected
+                              ? "border-[var(--color-ink)] bg-white shadow-[var(--shadow-card)]"
+                              : "border-[var(--color-line-soft)] bg-white hover:border-[var(--color-line)]"
+                          }`}
                         >
-                          <span className="flex items-start gap-3">
-                            <span
-                              aria-hidden="true"
-                              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                                isSelected
-                                  ? "border-[var(--color-ink)] bg-[var(--color-ink)]"
-                                  : "border-[var(--color-line)]"
-                              }`}
-                            >
-                              {isSelected && <Check size={10} className="text-white" />}
-                            </span>
-                            <span className="min-w-0">
-                              <span className="block text-sm font-medium">{unit.name}</span>
-                              {/*
-                                The unit's OWN capacity, never the property total.
-                                Showing "4 Beds - 4 Guests" against a single room was
-                                the reported checkout defect.
-                              */}
+                          <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-[var(--color-canvas)]">
+                            <img
+                              src={villa.images[0]}
+                              alt={unit.name}
+                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                          </div>
+                          <div className="flex flex-1 items-center justify-between gap-4">
+                            <div className="min-w-0">
+                              <span className="block text-sm font-semibold text-[var(--color-ink)]">
+                                {unit.name}
+                              </span>
                               {capacity && (
-                                <span className="mt-1 block text-xs text-[var(--color-muted)]">
+                                <span className="mt-0.5 block text-xs text-[var(--color-muted)]">
                                   {capacity}
                                 </span>
                               )}
@@ -383,23 +387,27 @@ export default function VillaClient({
                                   {facilities.join(" · ")}
                                 </span>
                               )}
-                            </span>
-                          </span>
-                          <span className="shrink-0 text-right text-sm">
-                            {enquiryOnly ? (
-                              <span className="text-[var(--color-muted)]">Enquire</span>
-                            ) : (
-                              <>
-                                <span className="font-semibold">
-                                  {formatPrice(unit.amount, currency)}
+                            </div>
+                            <div className="shrink-0 text-right">
+                              {enquiryOnly ? (
+                                <span className="text-xs font-medium text-[var(--color-muted)]">
+                                  Enquire
                                 </span>
-                                <span className="text-[var(--color-muted)]">
-                                  {" "}
-                                  {priceBasisSuffix(unit.priceBasis)}
-                                </span>
-                              </>
-                            )}
-                          </span>
+                              ) : (
+                                <div className="flex flex-col items-end">
+                                  <span className="text-sm font-bold text-[var(--color-ink)]">
+                                    {formatPrice(unit.amount, currency)}
+                                  </span>
+                                  <span className="text-[10px] text-[var(--color-faint)]">
+                                    {priceBasisSuffix(unit.priceBasis)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <div className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[var(--color-ink)]" />
+                          )}
                         </button>
 
                         {/*
@@ -407,7 +415,7 @@ export default function VillaClient({
                           showing a price that the checkout would then refuse.
                         */}
                         {enquiryOnly && (
-                          <p className="mt-2 pl-7 text-xs leading-relaxed text-[var(--color-faint)]">
+                          <p className="mt-2 pl-3 text-[10px] leading-relaxed text-[var(--color-faint)]">
                             {unit.reviewNote ??
                               "This option is arranged by enquiry. Ask us and we will confirm availability and price."}
                           </p>

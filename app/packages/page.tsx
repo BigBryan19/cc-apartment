@@ -160,37 +160,46 @@ export default function PackagesPage() {
                     <li key={entry.slug}>
                       <Link
                         href={`/packages/${entry.slug}`}
-                        className="group flex h-full flex-col rounded-2xl border border-[var(--color-line)] bg-white p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-ink)] hover:shadow-[var(--shadow-card)]"
+                        className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--color-line)] bg-white transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-ink)] hover:shadow-[var(--shadow-card)]"
                       >
-                        <h3 className="text-base font-semibold leading-snug text-[var(--color-ink)]">
-                          {entry.name}
-                        </h3>
-                        <p className="mt-3 flex-1 text-sm leading-relaxed text-[var(--color-muted)]">
-                          {entry.summary}
-                        </p>
-
-                        <dl className="mt-4 space-y-1.5 text-xs">
-                          <div className="flex gap-2">
-                            <dt className="text-[var(--color-faint)]">Accommodation</dt>
-                            <dd className="text-[var(--color-ink)]">
-                              {accommodationNote(entry.slug)}
-                            </dd>
-                          </div>
-                          <div className="flex gap-2">
-                            <dt className="text-[var(--color-faint)]">Price</dt>
-                            {/* Honest: no approved figure exists, so none is shown. */}
-                            <dd className="text-[var(--color-ink)]">Request a quote</dd>
-                          </div>
-                        </dl>
-
-                        <span className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-ink)]">
-                          {primaryActionLabel(entry)}
-                          <ArrowUpRight
-                            size={13}
-                            aria-hidden="true"
-                            className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                        <div className="relative h-48 w-full overflow-hidden bg-[var(--color-canvas)]">
+                          <img
+                            src={entry.image}
+                            alt={entry.name}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                           />
-                        </span>
+                        </div>
+                        <div className="flex flex-1 flex-col p-6">
+                          <h3 className="text-base font-semibold leading-snug text-[var(--color-ink)]">
+                            {entry.name}
+                          </h3>
+                          <p className="mt-3 flex-1 text-sm leading-relaxed text-[var(--color-muted)]">
+                            {entry.summary}
+                          </p>
+
+                          <dl className="mt-4 space-y-1.5 text-xs">
+                            <div className="flex gap-2">
+                              <dt className="text-[var(--color-faint)]">Accommodation</dt>
+                              <dd className="text-[var(--color-ink)]">
+                                {accommodationNote(entry.slug)}
+                              </dd>
+                            </div>
+                            <div className="flex gap-2">
+                              <dt className="text-[var(--color-faint)]">Price</dt>
+                              {/* Honest: no approved figure exists, so none is shown. */}
+                              <dd className="text-[var(--color-ink)]">Request a quote</dd>
+                            </div>
+                          </dl>
+
+                          <span className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-ink)]">
+                            {primaryActionLabel(entry)}
+                            <ArrowUpRight
+                              size={13}
+                              aria-hidden="true"
+                              className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                            />
+                          </span>
+                        </div>
                       </Link>
                     </li>
                   ))}
