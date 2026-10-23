@@ -522,8 +522,8 @@ console.log("\n=== Regression: DB row -> VillaProps ===\n");
 
   check(
     "R1",
-    "toVillaProps populates units from the rates column",
-    Array.isArray(villa.units) && villa.units.length === 2,
+    "toVillaProps populates units from the rates column (plus the injected Test Room)",
+    Array.isArray(villa.units) && villa.units.length === 3,
     `got ${JSON.stringify(villa.units?.length)}`,
   );
   check(
