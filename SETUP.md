@@ -1,9 +1,9 @@
-# Connecting Supabase and Paystack
+# Connecting Supabase and Payaza Africa
 
 A first-time walkthrough. Budget about 20 minutes.
 
 You need two free accounts: [supabase.com](https://supabase.com) (database) and
-[paystack.com](https://paystack.com) (payments). Neither requires you to enter
+[payaza.africa](https://payaza.africa) (payments). Neither requires you to enter
 card details to start.
 
 ---
@@ -15,8 +15,8 @@ card details to start.
 | Project URL | Supabase | `NEXT_PUBLIC_SUPABASE_URL` |
 | anon / publishable key | Supabase | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
 | service_role / secret key | Supabase | `SUPABASE_SERVICE_ROLE_KEY` |
-| Public key | Paystack | `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` |
-| Secret key | Paystack | `PAYSTACK_SECRET_KEY` |
+| Merchant Key | Payaza | `PAYAZA_MERCHANT_KEY` |
+| API Key | Payaza | `PAYAZA_API_KEY` |
 | Your site's URL | you | `NEXT_PUBLIC_SITE_URL` |
 
 The `NEXT_PUBLIC_` prefix means the value is visible in the browser. The other
@@ -153,21 +153,17 @@ address from `ADMIN_EMAILS`.
 
 ---
 
-## Part B — Paystack
+## Part B — Payaza Africa
 
-1. Sign in at [paystack.com](https://paystack.com) and complete their onboarding.
-2. **Stay in Test mode** for now — there's a toggle in the dashboard. Test mode
-   takes no real money.
-3. Go to **Settings → API Keys & Webhooks**.
-4. Copy your **Test Secret Key** (`sk_test_…`) and **Test Public Key**
-   (`pk_test_…`).
+1. Sign in at [payaza.africa](https://payaza.africa) and complete their onboarding.
+2. Go to **Settings → API Keys**.
+3. Copy your **Merchant Key** and **API Key**.
 
-Keep both — you'll paste them in the next step. Live keys look the same but
-start with `sk_live_` / `pk_live_`; only switch to those once you're happy.
+Note: Payaza uses different keys for Live and Test mode. Ensure you are using
+the correct ones for your environment.
 
-> Only the secret key is actually read by the code. The current flow redirects
-> to Paystack's hosted page, so the public key is unused — it is kept for a
-> future inline-checkout switch.
+> The API Key is used for both signature verification (webhook) and transaction
+> status queries. Keep it secret.
 
 ---
 
@@ -278,22 +274,22 @@ npm run dev
 
 ## Part E — The webhook (do this after deploying)
 
-A webhook is how Paystack tells your server "this payment succeeded" even if the
+A webhook is how Payaza tells your server "this payment succeeded" even if the
 guest closes the browser. Without it, bookings still confirm via the callback
 page, but a dropped connection could lose one.
 
-1. In Paystack: **Settings → API Keys & Webhooks**.
+1. In Payaza: **Settings → Webhook**.
 2. Set the **Webhook URL** to:
 
    ```
-   https://your-domain.com/api/payments/paystack/webhook
+   https://your-domain.com/api/payments/payaza/webhook
    ```
 
 3. Save.
 
-Paystack will now POST every event there. Your route verifies the
-`x-paystack-signature` header (HMAC-SHA512 of the raw body, using your secret
-key) and marks the booking paid/confirmed on `charge.success`.
+Payaza will now POST every event there. Your route verifies the
+`x-payaza-signature` header (HMAC-SHA512 of the raw body, using your API Key)
+and marks the booking paid/confirmed on "Funds Received".
 
 **Important:** Paystack cannot deliver to `localhost` — the URL must be publicly
 reachable. To test webhooks locally, expose your dev server with a tunnel
@@ -304,13 +300,13 @@ reachable. To test webhooks locally, expose your dev server with a tunnel
 ## Part F — Test the whole thing
 
 1. Open a property, choose dates, click **Reserve now**.
-2. Complete the Paystack test checkout.
+2. Complete the Payaza checkout.
 3. You should land on **Payment Confirmed** with a reference and amount.
 4. In Supabase **Table Editor → bookings**, that row should now have
    `status = confirmed`, `payment_status = paid`, and a `payment_reference`.
 
-To also verify the webhook fired, open the Paystack dashboard's webhook/event
-log and confirm the `charge.success` delivery shows a 200.
+To also verify the webhook fired, open the Payaza dashboard's event
+log and confirm the delivery shows a 200.
 
 ---
 
@@ -319,9 +315,9 @@ log and confirm the `charge.success` delivery shows a 200.
 | Symptom | Cause |
 | --- | --- |
 | Properties show but change never persists | Supabase not configured — you're seeing the bundled fallback in `app/lib/data.ts` |
-| "Payments are not configured" / `503` | `PAYSTACK_SECRET_KEY` missing or misspelled |
+| "Payments are not configured" / `503` | `PAYAZA_API_KEY` or `PAYAZA_MERCHANT_KEY` missing |
 | Checkout says the booking can't be completed | `NEXT_PUBLIC_SUPABASE_URL` / `ANON_KEY` wrong, or the `villas` table is empty |
-| Redirected to Paystack, then "Payment not confirmed" | Secret key mismatch between environments, or test/live keys mixed |
+| Redirected to Payaza, then "Payment not confirmed" | Secret key mismatch between environments, or test/live keys mixed |
 | Booking stays `pending` after paying | Webhook not set up, or not reachable from the internet |
 | Admin → Availability says blockouts aren't persisted | `supabase/schema.sql` hasn't been run |
 | Variable changed but nothing happened on Vercel | Env vars only apply after a redeploy |
@@ -351,7 +347,7 @@ Reaching `/admin` requires **two independent things**, and both are checked:
 Three things worth understanding about this design:
 
 - **`bookings` has no public write policy.** A guest has no account, so both the
-  paid path (`/api/payments/paystack/initialize`) and the unpaid fallback
+  paid path (`/api/payments/payaza/initialize`) and the unpaid fallback
   (`/api/bookings/request`) create the row server-side with the service-role key,
   which bypasses RLS by design. An earlier version opened INSERT to the anonymous
   role "so the checkout fallback can record a request". That was wrong twice
@@ -366,7 +362,7 @@ Three things worth understanding about this design:
   `is_admin()` — do not loosen the policies.
 
 - **Both money-taking routes are rate limited, and the amount is not the
-  client's to choose.** `/api/payments/paystack/initialize` ignores any `amount`
+  client's to choose.** `/api/payments/payaza/initialize` ignores any `amount`
   in the request body and re-derives the price from `villas.rates` plus the two
   dates (`app/lib/pricing.ts`); `/verify` and the webhook reconcile the settled
   amount against the stored one before confirming anything.

@@ -28,7 +28,7 @@ import { nightsBetween, validateStay } from "../lib/dates";
 import { formatPrice } from "../components/villas/utils";
 
 /**
- * When the Paystack keys are not configured we still record the reservation as
+ * When the Payaza keys are not configured we still record the reservation as
  * a pending request so the flow remains testable. The guest is told plainly
  * that no payment was taken. Set to false to hard-require online payment.
  */
@@ -242,14 +242,14 @@ const CheckoutContent = () => {
     const guestName = `${formData.firstName} ${formData.lastName}`.trim();
 
     try {
-      // 1) Ask the server to create the Paystack transaction.
+      // 1) Ask the server to create the Payaza transaction.
       //
       // NOTE: `amount` and `nights` are deliberately NOT sent. The server prices
       // the stay from the property row and the two dates (app/lib/pricing.ts),
       // and ignores anything the browser says about money. `displayAmount` above
       // is for showing the guest a total before they commit — it is never the
       // figure that gets charged.
-      const response = await fetch("/api/payments/paystack/initialize", {
+      const response = await fetch("/api/payments/payaza/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -587,7 +587,7 @@ const CheckoutContent = () => {
                 Payment
               </h2>
               <p className="mb-6 text-xs text-[var(--color-muted)]">
-                You will be redirected to Paystack, where you can pay by card or
+                You will be redirected to Payaza, where you can pay by card or
                 mobile money.
               </p>
 
@@ -614,7 +614,7 @@ const CheckoutContent = () => {
                 )}
               </button>
               <div className="mt-4 flex items-center justify-center gap-2 text-xs font-medium text-[var(--color-muted)]">
-                <ShieldCheck size={14} /> Secured by Paystack
+                <ShieldCheck size={14} /> Secured by Payaza
               </div>
             </form>
           </div>

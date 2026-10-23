@@ -12,7 +12,7 @@
 //
 // The reference doubles as the access token for this page, so it must stay
 // unguessable. `generateReference()` uses 8 random bytes (64 bits) for exactly
-// that reason — see app/lib/paystack.ts. /receipt/ is disallowed in robots.txt
+// that reason — see app/lib/payaza.ts. /receipt/ is disallowed in robots.txt
 // so an indexed copy can never leak a guest's name, email and phone number.
 // ---------------------------------------------------------------------------
 

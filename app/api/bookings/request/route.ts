@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // POST /api/bookings/request
 //
-// Records a booking request WITHOUT taking payment. Used only when the Paystack
+// Records a booking request WITHOUT taking payment. Used only when the Payaza
 // secret key is absent, so the site stays usable before payments are wired up.
 //
 // Why this is a server route rather than a direct insert from the browser:
@@ -19,7 +19,7 @@
 //   into the admin's booking list. Price and nights are now derived from the
 //   property row, exactly as the paid path does — see app/lib/pricing.ts.
 //
-// The paid path is /api/payments/paystack/initialize, which creates the booking
+// The paid path is /api/payments/payaza/initialize, which creates the booking
 // the same way.
 // ---------------------------------------------------------------------------
 

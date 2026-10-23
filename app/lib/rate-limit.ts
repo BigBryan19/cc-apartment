@@ -3,7 +3,7 @@
 // A small fixed-window rate limiter for the public API routes.
 //
 // WHY THIS EXISTS
-//   /api/payments/paystack/verify is an unauthenticated GET that calls Paystack,
+//   /api/payments/payaza/verify is an unauthenticated GET that calls Payaza,
 //   mutates a booking and sends an email. /api/bookings/request writes with the
 //   service-role key, which bypasses RLS by design — so row-level security
 //   cannot stop a loop. Neither route had any throttle at all.

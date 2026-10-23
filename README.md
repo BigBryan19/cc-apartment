@@ -1,13 +1,13 @@
 # Cosy Crest — Apartment Booking Platform
 
-Next.js (App Router) + TypeScript + Tailwind v4 + Supabase, with Paystack payments.
+Next.js (App Router) + TypeScript + Tailwind v4 + Supabase, with Payaza Africa payments.
 
 ---
 
 ## Getting started
 
 > **First time here?** Follow **[SETUP.md](SETUP.md)** — a step-by-step guide to
-> creating the Supabase project, running the schema, and getting Paystack keys.
+> creating the Supabase project, running the schema, and getting Payaza keys.
 
 ```bash
 npm install
@@ -26,19 +26,19 @@ bundled in `app/lib/data.ts`, so the site is browsable but nothing persists.
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public | everything | Supabase publishable/anon key (browser reads) |
 | `SUPABASE_SERVICE_ROLE_KEY` | **server only** | **taking payments** | Records bookings, blocks paid dates, sends receipts. Bypasses RLS |
 | `ADMIN_EMAILS` | **server only** | **the admin panel** | Comma-separated allowlist for `/admin`. Fails closed when empty |
-| `PAYSTACK_SECRET_KEY` | **server only** | **taking payments** | `sk_test_xxx` / `sk_live_xxx` — signs + verifies transactions |
-| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | public | — | Kept for a future inline-checkout switch; not read today |
+| `PAYAZA_MERCHANT_KEY` | **server only** | **taking payments** | Your Payaza Merchant Key |
+| `PAYAZA_API_KEY` | **server only** | **taking payments** | Your Payaza API Key — used for webhooks and verification |
 | `RESEND_API_KEY` | **server only** | receipt emails | Optional — without it the guest gets no email, but the booking is valid |
 | `RECEIPT_FROM_EMAIL` | **server only** | receipt emails | `Cosy Crest <receipts@yourdomain.com>`, on a Resend-verified domain |
-| `NEXT_PUBLIC_SITE_URL` | public | correct SEO | Absolute origin for Paystack `callback_url`, receipt links, canonical tags and OG images |
+| `NEXT_PUBLIC_SITE_URL` | public | correct SEO | Absolute origin for Payaza `redirect_url`, receipt links, canonical tags and OG images |
 
 #### Three of these are hard requirements, and two of them fail quietly
 
-- **`SUPABASE_SERVICE_ROLE_KEY` missing** ⇒ `/api/payments/paystack/initialize`
+- **`SUPABASE_SERVICE_ROLE_KEY` missing** ⇒ `/api/payments/payaza/initialize`
   now *refuses to charge* rather than taking money it cannot record. Before this
   was enforced, a missing key produced the worst possible outcome: the guest paid,
   the success page said the dates were held, and no booking existed.
-  Check it live with `GET /api/payments/paystack/webhook` → `"storage":true`.
+  Check it live with `GET /api/payments/payaza/webhook` → `"storage":true`.
 - **`ADMIN_EMAILS` missing** ⇒ nobody can reach `/admin`. That is intentional —
   the panel exposes guest contact details and edits prices, so it fails closed.
   Set it, then confirm `/admin` still redirects to the login page.
@@ -52,10 +52,10 @@ bundled in `app/lib/data.ts`, so the site is browsable but nothing persists.
 
 ### What happens after a payment succeeds
 
-Both the Paystack webhook and `/api/payments/paystack/verify` run the same
+Both the Payaza webhook and `/api/payments/payaza/verify` run the same
 idempotent steps, because either can be the first to learn a charge succeeded —
 the guest always returns through `/checkout/success`, while the webhook may lag
-or, until it is registered in Paystack, never arrive.
+or, until it is registered in Payaza, never arrive.
 
 1. The booking flips to `confirmed` / `paid`.
 2. Its nights are written to `blocked_dates` as a **Reserved** hold, so they can
@@ -68,7 +68,7 @@ alone would not free the dates, because the reservation marks them unavailable
 on its own. Refunds must be issued separately in Paystack.
 
 The guest can download the same receipt any time at
-`/receipt/<paystack-reference>`; the reference is the access token, which is why
+`/receipt/<payment-reference>`; the reference is the access token, which is why
 it carries 64 bits of randomness.
 
 ### Database
@@ -140,17 +140,17 @@ rejects everything. See [SETUP.md](SETUP.md) → *A4. Create your admin login*.
 Note: with credentials absent the app runs in a bundled-catalogue demo mode and
 the gate deliberately steps aside, since there is no database to protect.
 
-### Paystack webhook
+### Payaza webhook
 
-In **Paystack Dashboard → Settings → API Keys & Webhooks**, set the webhook URL to:
+In **Payaza Dashboard → Settings → Webhook**, set the webhook URL to:
 
 ```
-https://<your-domain>/api/payments/paystack/webhook
+https://<your-domain>/api/payments/payaza/webhook
 ```
 
-The endpoint accepts `charge.success` and flips the booking to **paid /
+The endpoint accepts "Funds Received" and flips the booking to **paid /
 confirmed**. It is unauthenticated by design and instead verifies the
-`x-paystack-signature` header (HMAC-SHA512 of the raw body with the secret key).
+`x-payaza-signature` header (HMAC-SHA512 of the raw body with the API key).
 
 ---
 
@@ -180,9 +180,9 @@ dates, and already-booked nights are all disabled in the picker.
 
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
-| `/api/payments/paystack/initialize` | POST | Validates the request, re-checks availability server-side, creates a `pending` booking, returns the Paystack checkout URL |
-| `/api/payments/paystack/verify` | GET | Called by `/checkout/success`; confirms the transaction against Paystack so a delayed webhook cannot lose a sale |
-| `/api/payments/paystack/webhook` | POST | Verifies the signature and marks the booking paid/confirmed on `charge.success` |
+| `/api/payments/payaza/initialize` | POST | Validates the request, re-checks availability server-side, creates a `pending` booking, returns the Payaza checkout URL |
+| `/api/payments/payaza/verify` | GET | Called by `/checkout/success`; confirms the transaction against Payaza so a delayed webhook cannot lose a sale |
+| `/api/payments/payaza/webhook` | POST | Verifies the signature and marks the booking paid/confirmed on "Funds Received" |
 
 Amounts are converted to the currency subunit (pesewas/cents) with `toSubunit()`.
 Card, mobile money, bank transfer and USSD channels are enabled.
@@ -222,4 +222,4 @@ npx tsc --noEmit  # typecheck
 
 > **Note on `next.config.ts`:** this project previously used `output: "export"`
 > (static HTML export). That was removed because a static export cannot host
-> Route Handlers, which the Paystack endpoints require.
+> Route Handlers, which the Payaza endpoints require.

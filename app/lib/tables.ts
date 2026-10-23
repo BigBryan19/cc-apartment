@@ -13,7 +13,7 @@
 //
 //   The effect was silent: `supabase.from(<clientReference>)` throws
 //   "Invalid relation name: relation must be a non-empty string.", and both
-//   /api/payments/paystack/initialize and /api/bookings/request wrap their
+//   /api/payments/payaza/initialize and /api/bookings/request wrap their
 //   availability check in a try/catch that deliberately does not fail the
 //   request. So the check threw on every call and was swallowed — meaning the
 //   server-side double-booking guard, the thing the code comments describe as

@@ -53,7 +53,6 @@ const csp = [
   "default-src 'self'",
   unique(
     "script-src 'self' 'unsafe-inline'",
-    "https://js.paystack.co",
     isDev && "'unsafe-eval'",
   ),
   "style-src 'self' 'unsafe-inline'",
@@ -72,16 +71,16 @@ const csp = [
     `https://${supabaseHost}`,
     "https://*.supabase.co",
     "https://*.supabase.in",
-    "https://api.paystack.co",
+    "https://api.payaza.africa",
     // Leaflet fetches nothing over XHR for raster tiles, but keep the tile host
     // available in case the map is later switched to a vector/style source.
     "https://*.basemaps.cartocdn.com",
     isDev && "ws: wss:",
   ),
-  "frame-src https://checkout.paystack.com https://*.paystack.co",
+  "frame-src https://payment.payaza.africa",
   "frame-ancestors 'none'",
   "base-uri 'self'",
-  "form-action 'self' https://checkout.paystack.com",
+  "form-action 'self' https://payment.payaza.africa",
   "object-src 'none'",
   "upgrade-insecure-requests",
 ].join("; ");
@@ -117,8 +116,8 @@ const assetCache = [
 
 const nextConfig: NextConfig = {
   // NOTE: `output: "export"` was removed intentionally.
-  // A fully static export cannot host Route Handlers, which the Paystack
-  // payment integration requires (/api/payments/paystack/*).
+  // A fully static export cannot host Route Handlers, which the Payaza
+  // payment integration requires (/api/payments/payaza/*).
   // Vercel deploys this as a standard Next.js app (SSR + serverless API routes).
   reactStrictMode: true,
 

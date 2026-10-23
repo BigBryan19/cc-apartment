@@ -60,7 +60,7 @@ function SuccessContent() {
     const verify = async () => {
       try {
         const response = await fetch(
-          `/api/payments/paystack/verify?reference=${encodeURIComponent(reference)}`,
+          `/api/payments/payaza/verify?reference=${encodeURIComponent(reference)}`,
         );
         const payload = (await response.json()) as VerifyResponse;
         if (cancelled) return;
@@ -105,7 +105,7 @@ function SuccessContent() {
               Confirming your payment
             </h2>
             <p className="text-slate-500 text-sm leading-relaxed">
-              Please wait while we verify this transaction with Paystack. Do not
+              Please wait while we verify this transaction with Payaza. Do not
               close this page.
             </p>
           </>
@@ -227,7 +227,7 @@ function SuccessContent() {
         </Link>
 
         <div className="flex items-center justify-center gap-2 mt-6 text-xs text-slate-400 font-medium">
-          <ShieldCheck size={14} /> Secured by Paystack
+          <ShieldCheck size={14} /> Secured by Payaza
         </div>
       </div>
     </div>
