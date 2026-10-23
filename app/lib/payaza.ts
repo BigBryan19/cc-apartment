@@ -112,16 +112,21 @@ export interface PayazaTransactionResponse {
  * Queries Payaza for the status of a specific transaction reference.
  */
 export async function verifyTransaction(reference: string): Promise<PayazaTransactionResponse | null> {
-  const apiKey = process.env.PAYAZA_API_KEY;
-  if (!apiKey) {
-    console.error("PAYAZA_API_KEY is missing");
+  // Payaza documentation states that the Authorization header should be:
+  // "Payaza {{Public API Key in Base 64}}"
+  // In our mapping, PAYAZA_MERCHANT_KEY is the Public Key.
+  const publicKey = process.env.PAYAZA_MERCHANT_KEY;
+  if (!publicKey) {
+    console.error("PAYAZA_MERCHANT_KEY is missing for verification");
     return null;
   }
 
-  const encodedKey = Buffer.from(apiKey).toString("base64");
+  const encodedKey = Buffer.from(publicKey).toString("base64");
   
   try {
     const url = `${PAYAZA_API_BASE_URL}/transaction-query?merchant_reference=${reference}`;
+    console.log(`[payaza/verify] querying reference=${reference}`);
+    
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -136,7 +141,9 @@ export async function verifyTransaction(reference: string): Promise<PayazaTransa
       return null;
     }
 
-    return await response.json();
+    const payload = await response.json();
+    console.log(`[payaza/verify] result success=${payload.success} status=${payload.data?.transaction_status}`);
+    return payload;
   } catch (error) {
     console.error("Payaza verify network error:", error);
     return null;

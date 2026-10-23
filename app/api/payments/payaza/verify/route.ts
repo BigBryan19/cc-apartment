@@ -54,8 +54,9 @@ export async function GET(request: Request) {
     const transaction = await verifyTransaction(reference);
     
     if (!transaction || !transaction.success) {
+      console.warn(`[payaza/verify] FAILED reference=${reference} message=${transaction?.message}`);
       return NextResponse.json(
-        { error: transaction?.message || "Transaction not found." },
+        { error: transaction?.message || "Transaction not found or could not be verified." },
         { status: 404 }
       );
     }
