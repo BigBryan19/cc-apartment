@@ -22,7 +22,7 @@ export function generateReference(prefix = "CC"): string {
 
 export interface PayazaCheckoutParams {
   merchant_key: string;
-  connection_mode: "live" | "test";
+  connection_mode: "Live" | "Test";
   checkout_amount: number;
   currency_code: string;
   email_address: string;

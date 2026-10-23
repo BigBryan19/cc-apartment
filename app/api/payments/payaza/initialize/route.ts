@@ -150,8 +150,10 @@ export async function POST(request: Request) {
   const firstName = names[0] || "Guest";
   const lastName = names.slice(1).join(" ") || "Customer";
 
-  const connectionMode = (process.env.PAYAZA_CONNECTION_MODE as "live" | "test") || 
-                         (process.env.NODE_ENV === "production" ? "live" : "test");
+  const rawMode = process.env.PAYAZA_CONNECTION_MODE?.toLowerCase() || 
+                    (process.env.NODE_ENV === "production" ? "live" : "test");
+  
+  const connectionMode: "Live" | "Test" = rawMode === "live" ? "Live" : "Test";
 
   console.log(`[payaza/init] mode=${connectionMode} key=${process.env.PAYAZA_MERCHANT_KEY?.slice(0, 7)}...`);
 
