@@ -348,7 +348,11 @@ export function rateWarnings(units: AccommodationUnit[]): RateWarning[] {
   if (!Array.isArray(units)) return warnings;
 
   const nightly = units.filter(
-    (unit) => unit.active && unit.priceBasis === "per_night" && unit.amount > 0,
+    (unit) =>
+      unit.active &&
+      unit.priceBasis === "per_night" &&
+      unit.amount > 0 &&
+      !unit.name.toLowerCase().includes("test"),
   );
   const cheapestNightly = nightly.length
     ? Math.min(...nightly.map((unit) => unit.amount))

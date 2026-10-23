@@ -180,7 +180,7 @@ const BUNDLED_ROWS: VillaRow[] = [
       { option: "Whole apartment (3 bedrooms)", amount: 3500, priceBasis: "per_night" },
       { option: "Monthly Rate (Whole apartment)", amount: 36000, priceBasis: "monthly" },
       { option: "Special Party Rate", amount: 5000, priceBasis: "per_stay" },
-      { option: "Test Room", amount: 5, priceBasis: "per_night", maxGuests: 1 },
+      { option: "Test Room", amount: 1, priceBasis: "per_night", maxGuests: 1 },
     ],
   },
   {
@@ -206,7 +206,7 @@ const BUNDLED_ROWS: VillaRow[] = [
       { option: "Whole apartment (4 bedrooms)", amount: 3500, priceBasis: "per_night" },
       { option: "Monthly Rate (Whole apartment)", amount: 30000, priceBasis: "monthly" },
       { option: "Special Party Rate", amount: 5000, priceBasis: "per_stay" },
-      { option: "Test Room", amount: 5, priceBasis: "per_night", maxGuests: 1 },
+      { option: "Test Room", amount: 1, priceBasis: "per_night", maxGuests: 1 },
     ],
   },
   {
@@ -230,7 +230,7 @@ const BUNDLED_ROWS: VillaRow[] = [
       { option: "Whole apartment (4 bedrooms)", amount: 3500, priceBasis: "per_night" },
       { option: "Monthly Rate (Whole apartment)", amount: 42000, priceBasis: "monthly" },
       { option: "Special Party Rate", amount: 5000, priceBasis: "per_stay" },
-      { option: "Test Room", amount: 5, priceBasis: "per_night", maxGuests: 1 },
+      { option: "Test Room", amount: 1, priceBasis: "per_night", maxGuests: 1 },
     ],
   },
   {

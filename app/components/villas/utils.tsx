@@ -23,7 +23,11 @@ export const formatPrice = (amount: number, currency: "GHS" | "USD") => {
   if (currency === "GHS") {
     return `₵${amount.toLocaleString()}`;
   } else {
-    const usdAmount = Math.round(amount / EXCHANGE_RATE);
-    return `$${usdAmount.toLocaleString()}`;
+    const usdAmount = amount / EXCHANGE_RATE;
+    // Show cents if the amount is small, otherwise round to nearest dollar
+    if (usdAmount < 1 && usdAmount > 0) {
+      return `$${usdAmount.toFixed(2)}`;
+    }
+    return `$${Math.round(usdAmount).toLocaleString()}`;
   }
 };
