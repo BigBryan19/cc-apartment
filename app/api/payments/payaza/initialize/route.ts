@@ -150,9 +150,14 @@ export async function POST(request: Request) {
   const firstName = names[0] || "Guest";
   const lastName = names.slice(1).join(" ") || "Customer";
 
+  const connectionMode = (process.env.PAYAZA_CONNECTION_MODE as "live" | "test") || 
+                         (process.env.NODE_ENV === "production" ? "live" : "test");
+
+  console.log(`[payaza/init] mode=${connectionMode} key=${process.env.PAYAZA_MERCHANT_KEY?.slice(0, 7)}...`);
+
   const authorizationUrl = generateCheckoutUrl({
     merchant_key: process.env.PAYAZA_MERCHANT_KEY!,
-    connection_mode: process.env.NODE_ENV === "production" ? "live" : "test",
+    connection_mode: connectionMode,
     checkout_amount: quote.dueNow,
     currency_code: currency,
     email_address: email,
