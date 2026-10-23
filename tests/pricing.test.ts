@@ -368,11 +368,11 @@ console.log("\n=== Data integrity ===\n");
     { option: "Two bedrooms", amount: 42000 },
   ]);
 
-  check("7", "both duplicate 'Two bedrooms' entries are kept", units.length === 4);
+  check("7", "both duplicate 'Two bedrooms' entries are kept", units.length === 5);
   check(
     "7",
     "…with distinct ids so neither silently wins",
-    new Set(units.map((entry) => entry.id)).size === 4,
+    new Set(units.map((entry) => entry.id)).size === 5,
   );
   check(
     "7",

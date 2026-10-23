@@ -342,8 +342,11 @@ export function normalizeUnits(
       bathrooms: 1,
       kitchen: true,
       pool: "shared",
+      exclusiveAreas: undefined,
+      sharedAreas: undefined,
       active: true,
       needsReview: false,
+      reviewNote: undefined,
     });
   }
 
