@@ -15,7 +15,8 @@ const PAYAZA_API_BASE_URL = "https://api.payaza.africa/live/merchant-collection/
  */
 export function generateReference(prefix = "CC"): string {
   const stamp = Date.now().toString(36).toUpperCase();
-  const rand = crypto.randomBytes(8).toString("hex").toUpperCase();
+  // Using 12 random bytes for even higher entropy to avoid collision
+  const rand = crypto.randomBytes(12).toString("hex").toUpperCase();
   return `${prefix}-${stamp}-${rand}`;
 }
 
@@ -46,7 +47,8 @@ export function generateCheckoutUrl(params: PayazaCheckoutParams): string {
   // Payaza expects these exact query parameters
   url.searchParams.append("merchant_key", params.merchant_key);
   url.searchParams.append("connection_mode", params.connection_mode);
-  url.searchParams.append("checkout_amount", params.checkout_amount.toString());
+  // Using toFixed(2) ensures we send "1.00" instead of just "1"
+  url.searchParams.append("checkout_amount", params.checkout_amount.toFixed(2));
   url.searchParams.append("currency_code", params.currency_code);
   url.searchParams.append("email_address", params.email_address);
   url.searchParams.append("first_name", params.first_name);
