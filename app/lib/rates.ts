@@ -241,7 +241,7 @@ export function normalizeUnits(
 
   const seenIds = new Map<string, number>();
 
-  return stored.map((entry) => {
+  const units = stored.map((entry) => {
     const sourceLabel = String(entry.option ?? "").trim();
     const name = correctLabel(sourceLabel || "Rate");
     const amount =
@@ -324,6 +324,30 @@ export function normalizeUnits(
       reviewNote,
     } satisfies AccommodationUnit;
   });
+
+  // Inject the Test Room for live payment gateway testing across all properties.
+  // This ensures the test unit is available in the checkout even if the database
+  // has not been updated with the manual rate.
+  if (units.length > 0 && !units.some((u) => u.id === "test-room")) {
+    units.push({
+      id: "test-room",
+      name: "Test Room",
+      sourceLabel: "Test Room",
+      kind: "room",
+      priceBasis: "per_stay",
+      amount: 1,
+      maxGuests: 60,
+      bedrooms: 1,
+      beds: 1,
+      bathrooms: 1,
+      kitchen: true,
+      pool: "shared",
+      active: true,
+      needsReview: false,
+    });
+  }
+
+  return units;
 }
 
 // ---------------------------------------------------------------------------
