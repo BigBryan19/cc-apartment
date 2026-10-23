@@ -359,6 +359,10 @@ export function rateWarnings(units: AccommodationUnit[]): RateWarning[] {
     : null;
 
   for (const unit of units) {
+    // Test units are allowed to be unpriced or exceptionally cheap for
+    // live gateway verification.
+    if (unit.name.toLowerCase().includes("test")) continue;
+
     if (unit.priceBasis === "quote") {
       warnings.push({
         unitId: unit.id,

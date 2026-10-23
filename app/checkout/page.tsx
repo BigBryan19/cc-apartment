@@ -86,7 +86,7 @@ const CheckoutContent = () => {
    */
   /* eslint-disable react-hooks/set-state-in-effect -- URL-derived form seed; see comment above */
   useEffect(() => {
-    const rate = searchParams.get("rate");
+    const rate = searchParams.get("unitId") || searchParams.get("rate");
     const curr = searchParams.get("currency");
     const checkInParam = searchParams.get("checkIn");
     const checkOutParam = searchParams.get("checkOut");
