@@ -35,6 +35,7 @@ create table if not exists public.villas (
   guests      integer     not null default 2,
   bedrooms    integer     not null default 1,
   bathrooms   integer     not null default 1,
+  rating      numeric(2,1),
   has_pool    boolean     not null default false,
   image       text,                                -- card / hero image path
   images      text[]      not null default '{}',   -- gallery
@@ -59,6 +60,7 @@ alter table public.villas
   add column if not exists guests      integer default 2,
   add column if not exists bedrooms    integer default 1,
   add column if not exists bathrooms   integer default 1,
+  add column if not exists rating      numeric(2,1),
   add column if not exists has_pool    boolean default false,
   add column if not exists image       text,
   add column if not exists images      text[]  default '{}',

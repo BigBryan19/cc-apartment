@@ -132,6 +132,37 @@ but the deposit figures are not stored.
 
 ---
 
+## 5b. Managing properties without code
+
+**Admin → Properties** now edits everything a guest sees.
+
+| What | Where | Effect |
+|---|---|---|
+| Add a property | “Add property” | Creates the row the site reads |
+| Name, location, description | Editor | Listing card and detail page |
+| **Rating** | Editor (0–5, one decimal) | The star figure on the card — previously a hard-coded 4.9 |
+| **Headline price** | Editor | Card price when no rates exist |
+| **Bookable rates** | “Bookable rates” | What the booking engine actually charges: name, amount, per night / per stay / per day / per month / on enquiry, and a max-guests cap per rate |
+| **Photographs** | “Photographs” | Add by path or URL, **upload a file**, reorder, remove. The first is the cover |
+| Walkthrough video | Editor | Card preview and detail-page player |
+| Amenities, pool, guests, bedrooms, bathrooms | Editor | Detail page and filters |
+
+Saving a rate with no amount is refused, because a published rate with no price
+would let a night book for zero.
+
+**Two SQL files to run once:**
+
+- `supabase/migrations/2026-10-30-admin-rating.sql` — adds the `rating` column and
+  creates the public `villa-media` Storage bucket used by the uploader.
+- `supabase/migrations/2026-10-30-gallery-and-deposits.sql` — gallery, settings and
+  deposit columns.
+
+Until the rating migration is run, the editor still saves everything else and
+tells you the rating was skipped. Until the Storage bucket exists, upload shows
+the exact bucket name to create; adding by path or URL keeps working.
+
+---
+
 ## 6. Villa-by-villa media checklist
 
 | Villa | Photos | Listing video preview | Detail-page video | Missing coverage |

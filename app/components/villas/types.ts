@@ -23,6 +23,8 @@ export interface VillaProps {
   hasPool: boolean;
   bathrooms: number;
   description: string;
+  /** Owner-entered guest rating (0–5). Null falls back to the published 4.9. */
+  rating?: number | null;
   amenities?: string[];
   /**
    * The canonical bookable inventory.

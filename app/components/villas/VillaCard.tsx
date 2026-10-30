@@ -131,7 +131,9 @@ const VillaCard: React.FC<VillaCardProps> = ({
           </h3>
           <span className="flex shrink-0 items-center gap-1 text-[13px] text-[var(--color-ink-soft)]">
             <Star size={12} className="fill-[var(--color-ink)] text-[var(--color-ink)]" />
-            4.9
+            {/* Owner-set rating; 4.9 is the figure the site has always
+                published, used only when the property has none. */}
+            {(data.rating ?? 4.9).toFixed(1)}
           </span>
         </div>
 

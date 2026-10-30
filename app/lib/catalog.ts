@@ -54,6 +54,7 @@ export interface VillaRow {
   location?: string | null;
   coordinates?: unknown;
   guests?: number | null;
+  rating?: number | null;
   bedrooms?: number | null;
   has_pool?: boolean | null;
   bathrooms?: number | null;
@@ -143,6 +144,7 @@ export function toVillaProps(row: VillaRow): VillaProps {
     hasPool: Boolean(row.has_pool),
     bathrooms: Number(row.bathrooms ?? 0),
     description: row.description ?? "",
+    rating: typeof row.rating === "number" ? row.rating : null,
     amenities: toStringArray(row.amenities),
     units,
   };
