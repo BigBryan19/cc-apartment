@@ -30,3 +30,13 @@ export const VILLAS_TABLE = "villas";
 
 /** Guest reservations, including contact details. Authenticated read only. */
 export const BOOKINGS_TABLE = "bookings";
+
+/** Owner-editable gallery. Public read, authenticated write. */
+export const GALLERY_TABLE = "gallery_media";
+
+/**
+ * Key/value store for owner settings (the deposit policy lives here).
+ * Public read — the checkout must show the terms before payment — and
+ * authenticated write.
+ */
+export const SETTINGS_TABLE = "site_settings";

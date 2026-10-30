@@ -6,9 +6,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft,
+  ChevronRight,
   MapPin,
   Check,
-  Calendar,
   Heart,
   Gift,
   CarFront,
@@ -19,6 +19,9 @@ import {
   BedDouble,
   Bath,
   ArrowUpRight,
+  Play,
+  X,
+  Images,
 } from "lucide-react";
 import { bundledVillas as villasData } from "../../lib/catalog";
 import {
@@ -31,7 +34,7 @@ import { priceUnit } from "../../lib/quote";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 import { formatPrice, getAmenityIcon } from "../../components/villas/utils";
-import DateRangePicker from "../../components/booking/DateRangePicker";
+import StayDateFields from "../../components/booking/StayDateFields";
 import { useVillaAvailability } from "../../lib/availability";
 import { validateStay } from "../../lib/dates";
 
@@ -107,7 +110,11 @@ export default function VillaClient({
   const [checkInDate, setCheckInDate] = useState<string>("");
   const [checkOutDate, setCheckOutDate] = useState<string>("");
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  /**
+   * Index into the media list shown in the lightbox. Photos and the walkthrough
+   * video share one list, so the arrows move between both.
+   */
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   /*
    * Preselects the cheapest sellable unit. Only the *identifier* is held in
@@ -189,12 +196,36 @@ export default function VillaClient({
     router.push(`/checkout?${query.toString()}`);
   };
 
-  const gallery = [
-    villa.images[0],
-    villa.images[1] ?? villa.images[0],
-    villa.images[2] ?? villa.images[0],
-    villa.images[3] ?? villa.images[0],
+  /**
+   * Every asset that belongs to this property, video first.
+   *
+   * The gallery used to pad itself to four tiles by repeating `images[0]`, so a
+   * villa with one photo showed the same room four times. It now lists the real
+   * files only — each villa currently has four photographs and one walkthrough —
+   * and the lightbox covers all of them.
+   */
+  const media: { type: "photo" | "video"; src: string; poster?: string; title: string }[] = [
+    ...(villa.video
+      ? [{ type: "video" as const, src: villa.video, poster: villa.images[0], title: `${villa.title} walkthrough` }]
+      : []),
+    ...villa.images.map((src, index) => ({
+      type: "photo" as const,
+      src,
+      title: `${villa.title} — photo ${index + 1}`,
+    })),
   ];
+
+  const lightboxItem = lightboxIndex !== null ? media[lightboxIndex] : null;
+
+  const stepLightbox = (delta: number) => {
+    setLightboxIndex((current) => {
+      if (current === null) return current;
+      const next = current + delta;
+      if (next < 0) return media.length - 1;
+      if (next >= media.length) return 0;
+      return next;
+    });
+  };
 
   const facts = [
     { Icon: Users, label: `${villa.guests} guests` },
@@ -248,32 +279,53 @@ export default function VillaClient({
             </button>
           </div>
 
-          {/* Gallery */}
+          {/* Gallery — the property's own media, never a placeholder tile. */}
           <div className="mt-6 grid grid-cols-4 grid-rows-2 gap-2 overflow-hidden rounded-2xl md:h-[440px]">
             <button
-              onClick={() => setLightbox(gallery[0])}
-              className="col-span-4 row-span-2 h-64 overflow-hidden md:col-span-2 md:h-auto"
+              onClick={() => setLightboxIndex(0)}
+              className="relative col-span-4 row-span-2 h-64 overflow-hidden md:col-span-2 md:h-auto"
+              aria-label={`Open ${media[0]?.type === "video" ? "video" : "photo"} 1`}
             >
               <img
-                src={gallery[0]}
+                src={media[0]?.poster ?? media[0]?.src ?? villa.image}
                 alt={villa.title}
                 className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
               />
+              {media[0]?.type === "video" && (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-[var(--color-ink)] shadow-lg">
+                    <Play size={20} fill="currentColor" aria-hidden="true" />
+                  </span>
+                </span>
+              )}
             </button>
-            {gallery.slice(1, 5).map((src, i) => (
+            {media.slice(1, 5).map((item, i) => (
               <button
-                key={i}
-                onClick={() => setLightbox(src)}
+                key={item.src + i}
+                onClick={() => setLightboxIndex(i + 1)}
                 className="hidden overflow-hidden md:block"
+                aria-label={`Open ${item.type === "video" ? "video" : "photo"} ${i + 2}`}
               >
                 <img
-                  src={src}
+                  src={item.poster ?? item.src}
                   alt={`${villa.title} photo ${i + 2}`}
+                  loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
                 />
               </button>
             ))}
           </div>
+
+          {media.length > 0 && (
+            <button
+              onClick={() => setLightboxIndex(0)}
+              className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)]"
+            >
+              <Images size={14} aria-hidden="true" />
+              View all {villa.images.length} photos
+              {villa.video ? " & walkthrough video" : ""}
+            </button>
+          )}
 
           {/* Body */}
           <div className="mt-10 grid grid-cols-1 gap-12 lg:grid-cols-12">
@@ -341,6 +393,30 @@ export default function VillaClient({
                   ))}
                 </div>
               </div>
+
+              {/* Walkthrough video. Present for every property; if a future
+                  listing has none, the section is omitted rather than showing
+                  an empty player. */}
+              {villa.video && (
+                <div className="mt-10 border-t border-[var(--color-line-soft)] pt-8">
+                  <h2 className="text-xl font-semibold tracking-tight">
+                    Walkthrough
+                  </h2>
+                  <p className="mt-1 text-sm text-[var(--color-muted)]">
+                    A short tour of the apartment before you book.
+                  </p>
+                  <video
+                    src={villa.video}
+                    poster={villa.images[0]}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="mt-4 w-full rounded-2xl bg-black"
+                  >
+                    Your browser does not support embedded video.
+                  </video>
+                </div>
+              )}
 
               {/* Rate card */}
               <div className="mt-10 border-t border-[var(--color-line-soft)] pt-8">
@@ -437,7 +513,9 @@ export default function VillaClient({
                     </span>
                     <span className="text-sm text-[var(--color-muted)]">
                       {" "}
-                      / night
+                      {/* The basis decides the suffix; a per-stay unit is not
+                          "per night" just because it is accommodation. */}
+                      {selectedUnit ? priceBasisSuffix(selectedUnit.priceBasis) : ""}
                     </span>
                   </p>
                   <span className="flex items-center gap-1 text-[13px] text-[var(--color-muted)]">
@@ -448,18 +526,13 @@ export default function VillaClient({
 
                 {/* Dates */}
                 <div className="mt-5 rounded-xl border border-[var(--color-line)] p-4">
-                  <span className="flex items-center justify-between">
-                    <span className="eyebrow flex items-center gap-1.5">
-                      <Calendar size={13} /> Stay dates
+                  {availability.isLoading && (
+                    <span className="text-[10px] uppercase tracking-wider text-[var(--color-faint)]">
+                      Checking availability…
                     </span>
-                    {availability.isLoading && (
-                      <span className="text-[10px] uppercase tracking-wider text-[var(--color-faint)]">
-                        Checking…
-                      </span>
-                    )}
-                  </span>
+                  )}
 
-                  <DateRangePicker
+                  <StayDateFields
                     className="mt-3"
                     checkIn={checkInDate}
                     checkOut={checkOutDate}
@@ -505,8 +578,10 @@ export default function VillaClient({
                   <dl className="mt-6 space-y-2.5 border-t border-[var(--color-line-soft)] pt-5 text-sm">
                     <div className="flex justify-between text-[var(--color-muted)]">
                       <dt>
-                        {formatPrice(selectedUnit.amount, currency)} × {totalNights}{" "}
-                        night{totalNights === 1 ? "" : "s"}
+                        {/* The engine's own wording: a per-stay rate is not
+                            "x nights", and printing it that way is how the
+                            monthly/nightly confusion started. */}
+                        {unitPrice.ok ? unitPrice.detail : selectedUnit.name}
                       </dt>
                       <dd className="text-[var(--color-ink)]">
                         {formatPrice(computedTotalPrice, currency)}
@@ -555,19 +630,79 @@ export default function VillaClient({
         </div>
       </div>
 
-      {/* Lightbox */}
-      {lightbox && (
+      {/* Lightbox — photographs and the walkthrough share one sequence. */}
+      {lightboxItem && (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-4"
-          onClick={() => setLightbox(null)}
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/92 p-4"
+          onClick={() => setLightboxIndex(null)}
           role="dialog"
           aria-modal="true"
+          aria-label={lightboxItem.title}
         >
-          <img
-            src={lightbox}
-            alt={villa.title}
-            className="max-h-full max-w-full rounded-lg object-contain"
-          />
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(null)}
+            aria-label="Close"
+            className="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2.5 text-white transition-colors hover:bg-white/20"
+          >
+            <X size={20} />
+          </button>
+
+          {media.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  stepLightbox(-1);
+                }}
+                aria-label="Previous"
+                className="absolute left-3 z-10 rounded-full bg-white/10 p-3 text-white transition-colors hover:bg-white/20 md:left-6"
+              >
+                <ChevronLeft size={22} />
+              </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  stepLightbox(1);
+                }}
+                aria-label="Next"
+                className="absolute right-3 z-10 rounded-full bg-white/10 p-3 text-white transition-colors hover:bg-white/20 md:right-6"
+              >
+                <ChevronRight size={22} />
+              </button>
+            </>
+          )}
+
+          <div
+            className="w-full max-w-5xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {lightboxItem.type === "video" ? (
+              <video
+                key={lightboxItem.src}
+                src={lightboxItem.src}
+                poster={lightboxItem.poster}
+                controls
+                autoPlay
+                playsInline
+                preload="metadata"
+                className="mx-auto max-h-[80vh] w-full rounded-lg bg-black"
+              >
+                Your browser does not support embedded video.
+              </video>
+            ) : (
+              <img
+                src={lightboxItem.src}
+                alt={villa.title}
+                className="mx-auto max-h-[80vh] w-auto max-w-full rounded-lg object-contain"
+              />
+            )}
+            <p className="mt-3 text-center text-[10px] uppercase tracking-[0.14em] text-white/50">
+              {lightboxIndex !== null ? lightboxIndex + 1 : 1} / {media.length}
+            </p>
+          </div>
         </div>
       )}
 

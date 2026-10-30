@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   FileText,
+  Images,
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "../utils/supabase";
 
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { name: "Availability", href: "/admin/availability", icon: CalendarOff },
   { name: "Bookings", href: "/admin/bookings", icon: CalendarCheck },
   { name: "Create Invoice", href: "/admin/invoice", icon: FileText },
+  { name: "Gallery", href: "/admin/gallery", icon: Images },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
 

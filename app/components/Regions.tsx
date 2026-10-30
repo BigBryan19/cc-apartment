@@ -1,22 +1,35 @@
 import React from "react";
 import { ArrowUpRight } from "lucide-react";
 
+/**
+ * Destinations.
+ *
+ * The two cards used to show Unsplash photographs of landscapes that are not in
+ * Ghana — the Greater Accra card was a coastal scene from elsewhere entirely.
+ * They are now our own photographs: the Aburi apartment for the Eastern Region
+ * and the Adenta exterior for Greater Accra.
+ *
+ * These are property photographs, not regional landscapes, so the section says
+ * so rather than implying the image is the destination. A dedicated photograph
+ * of the Aburi hills is still needed — see the handover notes — but a real
+ * apartment beats a foreign landscape that misrepresents where a guest is going.
+ */
 const REGIONS = [
   {
     id: "eastern",
     title: "Eastern Region",
     subtitle: "Aburi, near Aburi Girls School",
-    image:
-      "https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?q=80&w=2070&auto=format&fit=crop",
-    alt: "Lush hills of the Eastern Region",
+    image: "/Aburi2.jpeg",
+    alt: "Living room at our Aburi Mountain Retreat in the Eastern Region",
+    caption: "Aburi Mountain Retreat",
   },
   {
     id: "accra",
     title: "Greater Accra",
     subtitle: "Lakeside Estate & Adenta",
-    image:
-      "https://images.unsplash.com/photo-1534008897995-27a23e859048?q=80&w=2070&auto=format&fit=crop",
-    alt: "Greater Accra coastline",
+    image: "/Adenta1.jpg",
+    alt: "The exterior of Adenta Serenity in Greater Accra",
+    caption: "Adenta Serenity",
   },
 ];
 
@@ -48,7 +61,7 @@ const Regions: React.FC = () => {
                 loading="lazy"
                 className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
               <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-6 md:p-7">
                 <div>
@@ -56,6 +69,9 @@ const Regions: React.FC = () => {
                     {region.title}
                   </h3>
                   <p className="mt-1 text-sm text-white/80">{region.subtitle}</p>
+                  <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-white/55">
+                    {region.caption}
+                  </p>
                 </div>
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-md transition-colors group-hover:bg-white group-hover:text-[var(--color-ink)]">
                   <ArrowUpRight size={18} />
@@ -64,6 +80,10 @@ const Regions: React.FC = () => {
             </a>
           ))}
         </div>
+
+        <p className="mt-4 text-[11px] leading-relaxed text-[var(--color-faint)]">
+          Both photographs show our own apartments in each region.
+        </p>
       </div>
     </section>
   );

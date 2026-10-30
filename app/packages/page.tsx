@@ -19,6 +19,7 @@ import JsonLd from "../components/JsonLd";
 import { SITE, SITE_URL, breadcrumbJsonLd } from "../lib/seo";
 import { PACKAGES } from "../lib/packages";
 import PackagesClient from "./PackagesClient";
+import Services from "../components/Services";
 
 const DESCRIPTION =
   "Honeymoon and romantic getaways, birthday stays and celebrations, and private gatherings at Cosy Crest apartments in Aburi, Adenta and Lakeside, Ghana.";
@@ -89,6 +90,15 @@ export default function PackagesPage() {
               and inclusions. Send us your dates and what you have in mind, and we will
               come back with an itemised quote — nothing is charged until you accept it.
             </p>
+          </div>
+
+          <Services compact />
+
+          <div className="mt-16">
+            <span className="eyebrow">Occasion packages</span>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
+              Celebrations and gatherings
+            </h2>
           </div>
 
           <PackagesClient />

@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     
     const { data: booking, error: lookupError } = await supabase
       .from("bookings")
-      .select("id, total_amount, currency")
+      .select("id, total_amount, due_now, currency")
       .eq("payment_reference", lookupRef)
       .maybeSingle();
 
@@ -62,7 +62,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ received: true, matched: false });
     }
 
-    const expectedAmount = Number(booking.total_amount ?? 0);
+    // Compare with what this booking asked for today: a deposit is a valid
+    // part-payment, not a mismatch.
+    const totalAmount = Number(booking.total_amount ?? 0);
+    const expectedAmount = Number(booking.due_now ?? totalAmount);
     if (Math.abs(amount - expectedAmount) > AMOUNT_TOLERANCE) {
       console.error(`[payaza/webhook] AMOUNT MISMATCH ref=${lookupRef} expected=${expectedAmount} paid=${amount}`);
       return NextResponse.json({ received: true, confirmed: false });
@@ -72,7 +75,14 @@ export async function POST(request: Request) {
       .from("bookings")
       .update({
         status: "confirmed",
-        payment_status: "paid",
+        // Confirmed dates and settled money are separate facts. A deposit
+        // leaves the booking partially paid with a balance outstanding.
+        payment_status:
+          totalAmount - expectedAmount > AMOUNT_TOLERANCE ? "partially_paid" : "paid",
+        balance_due:
+          totalAmount - expectedAmount > AMOUNT_TOLERANCE
+            ? Math.round((totalAmount - amount) * 100) / 100
+            : 0,
         paid_at: new Date().toISOString(),
         amount_paid: amount,
         currency: currency,

@@ -1,7 +1,7 @@
 // app/components/villas/VillaCard.tsx
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Heart, Play, MapPin, Star, Users, BedDouble, Bath } from "lucide-react";
 import { VillaProps } from "./types";
 import { formatPrice } from "./utils";
@@ -27,6 +27,24 @@ const VillaCard: React.FC<VillaCardProps> = ({
   // Derived from the units, so the card and the detail page cannot disagree.
   const nightly = fromNightlyPrice(data.units);
 
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  /**
+   * The preview only becomes visible once the browser has actually started
+   * playing it. Browsers block muted-autoplay in some power-saving and
+   * data-saving modes; when that happens the poster image and the play button
+   * stay on screen instead of a frozen first frame with no affordance.
+   */
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => {
+    const element = videoRef.current;
+    if (!element) return;
+    const attempt = element.play();
+    if (attempt && typeof attempt.catch === "function") {
+      attempt.catch(() => setIsPlaying(false));
+    }
+  }, [data.video]);
+
   return (
     <article
       onClick={() => onClick(data)}
@@ -34,22 +52,41 @@ const VillaCard: React.FC<VillaCardProps> = ({
     >
       {/* ---- Media ---- */}
       <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-[var(--color-canvas)]">
-        {data.video ? (
+        {/* Poster first. The video fades in over it only once it is playing, so
+            the card always has a real photograph even when autoplay is refused. */}
+        <img
+          src={data.image}
+          alt={data.title}
+          loading="lazy"
+          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
+        />
+
+        {data.video && (
           <video
+            ref={videoRef}
             src={data.video}
+            poster={data.image}
             autoPlay
             loop
             muted
             playsInline
-            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
+            preload="metadata"
+            aria-hidden="true"
+            tabIndex={-1}
+            onPlaying={() => setIsPlaying(true)}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
+              isPlaying ? "opacity-100" : "opacity-0"
+            }`}
           />
-        ) : (
-          <img
-            src={data.image}
-            alt={data.title}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
-          />
+        )}
+
+        {/* Visible play affordance — shown while autoplay has not taken over. */}
+        {data.video && !isPlaying && (
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-[var(--color-ink)] shadow-lg">
+              <Play size={18} fill="currentColor" aria-hidden="true" />
+            </span>
+          </span>
         )}
 
         {/* Pool badge — a real attribute, not decoration */}

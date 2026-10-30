@@ -214,6 +214,23 @@ export function priceUnit(
       };
     }
 
+    case "per_day": {
+      // A rental is charged per day held. The caller passes the rental days as
+      // `nights`, because for a service attached to a stay the two are the same
+      // span. A zero-day rental is a validation error, not a free service.
+      if (nights <= 0) {
+        return { ok: false, code: "invalid_duration", reason: "Choose at least one rental day." };
+      }
+      if (unit.amount <= 0) {
+        return { ok: false, code: "unit_unpriced", reason: `${unit.name} has no published daily rate.` };
+      }
+      return {
+        ok: true,
+        amount: round2(unit.amount * nights),
+        detail: `GHS ${formatMajor(unit.amount)} x ${nights} day${nights === 1 ? "" : "s"}`,
+      };
+    }
+
     case "per_person": {
       if (nights <= 0) {
         return { ok: false, code: "invalid_duration", reason: "Check-out must be after check-in." };

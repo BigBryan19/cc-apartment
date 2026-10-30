@@ -14,6 +14,12 @@ import Link from "next/link";
 import { Facebook, Instagram, Twitter } from "lucide-react";
 import ContactSection from "./ContactSection";
 
+const SITE_LINKS = [
+  { label: "Stays", href: "/#villas" },
+  { label: "Experiences & Packages", href: "/packages" },
+  { label: "Gallery", href: "/gallery" },
+] as const;
+
 const LEGAL_LINKS = [
   { label: "Terms & Conditions", href: "/terms" },
   { label: "Privacy Notice", href: "/privacy" },
@@ -55,10 +61,10 @@ const Footer: React.FC<FooterProps> = ({ showContact = true }) => {
           {/* Real destinations. These three used to be `href="#"`, which looked
               like a policy existed while giving the guest nothing. */}
           <nav
-            aria-label="Legal and policies"
+            aria-label="Site"
             className="flex flex-col gap-3 font-medium md:items-center md:justify-center"
           >
-            {LEGAL_LINKS.map((item) => (
+            {[...SITE_LINKS, ...LEGAL_LINKS].map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

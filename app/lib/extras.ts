@@ -2,27 +2,27 @@
 // ---------------------------------------------------------------------------
 // Optional extras that can be attached to a stay.
 //
-// EVERY EXTRA HERE IS UNPRICED, ON PURPOSE
+// PRICED ONLY WHERE THE BUSINESS HAS APPROVED A PRICE
 //
-//   The three add-ons the checkout previously offered — Honeymoon Setup,
-//   Birthday Decoration and Luxury Car Rental — have no approved prices anywhere
-//   in the repository, the database or the brief. The buy-flow consequence was
-//   the reported defect: they appeared in the order summary, showed
-//   "Quote pending", contributed nothing to the total, and then the booking was
-//   marked fully confirmed anyway.
+//   Two extras now carry approved figures, because the client supplied them:
 //
-//   Inventing a figure for "Honeymoon Setup" would put a price commitment in
-//   front of a guest that nobody at Cosy Crest has agreed. So each extra is
-//   marked `requiresQuote: true` with `amount: null`. The pricing engine then
-//   lists it as an explicit unpriced line, excludes it from the payable amount,
-//   and the occasion track stays `requested` rather than `confirmed`.
+//     Honeymoon room setup  GHS 3,500 per stay   (matches the service card)
+//     Car rental            GHS 1,000 per day    (Hyundai Tucson)
 //
-//   Car rental is kept as an optional extra rather than elevated to a fourth
-//   occasion category — the brief reserves the three categories for honeymoon,
-//   birthday and private gatherings.
+//   Everything else stays `requiresQuote: true` with `amount: null`, so the
+//   pricing engine lists it as an explicit unpriced line, excludes it from the
+//   payable amount, and the occasion track stays `requested` rather than
+//   `confirmed`. Inventing a figure for a service nobody has priced is a
+//   commitment, not a placeholder.
 //
-//   An admin sets `amount` and flips `requiresQuote` to false to make an extra
-//   instantly bookable. Nothing else needs to change.
+//   Car rental uses the `per_day` basis, so a rental attached to a stay is
+//   charged by the days it is actually held — the defect class this model was
+//   built to stop (a per-day figure multiplied by nothing, or a monthly figure
+//   multiplied by nights) cannot recur here.
+//
+//   The same two figures live in app/lib/services.ts, which drives the service
+//   cards. If one changes, both must: the card and the charge are the same
+//   promise.
 // ---------------------------------------------------------------------------
 
 import type { PriceBasis } from "./rates";
@@ -47,13 +47,13 @@ export interface ExtraDefinition {
 export const EXTRAS: ExtraDefinition[] = [
   {
     id: "car-rental",
-    name: "Luxury car rental",
-    summary: "An additional vehicle for the duration of your stay.",
-    amount: null,
-    priceBasis: "per_stay",
-    requiresQuote: true,
+    name: "Car rental — Hyundai Tucson",
+    summary: "A Hyundai Tucson with driver for the duration of your stay.",
+    amount: 1000,
+    priceBasis: "per_day",
+    requiresQuote: false,
     active: true,
-    note: "Vehicle, duration and rate are confirmed on your quote.",
+    note: "Charged per rental day.",
   },
   {
     id: "airport-pickup",
@@ -69,12 +69,22 @@ export const EXTRAS: ExtraDefinition[] = [
     id: "honeymoon-setup",
     name: "Honeymoon room setup",
     summary: "The room staged before you arrive.",
+    amount: 3500,
+    priceBasis: "per_stay",
+    requiresQuote: false,
+    categories: ["honeymoon"],
+    active: true,
+    note: "Starting price per stay. The final figure depends on the property and the setup.",
+  },
+  {
+    id: "massage",
+    name: "Massage service",
+    summary: "A therapist comes to the apartment.",
     amount: null,
     priceBasis: "per_stay",
     requiresQuote: true,
-    categories: ["honeymoon"],
     active: true,
-    note: "What we can stage is confirmed with you before anything is charged.",
+    note: "Priced by treatment and number of guests — confirmed before you book.",
   },
   {
     id: "birthday-decoration",

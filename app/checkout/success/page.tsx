@@ -34,6 +34,9 @@ interface VerifyResponse {
   amount?: number;
   currency?: string;
   email?: string;
+  /** Set when the guest paid a deposit rather than the full total. */
+  paymentStatus?: "paid" | "partially_paid";
+  balanceDue?: number;
   error?: string;
 }
 
@@ -120,7 +123,9 @@ function SuccessContent() {
               Payment confirmed
             </h2>
             <p className="mb-8 leading-relaxed text-[var(--color-muted)]">
-              Thank you! Your booking is confirmed and your dates are now held.
+              {details?.paymentStatus === "partially_paid"
+                ? "Thank you! Your dates are now held and your deposit has been received. The outstanding balance is shown below — we will send a payment link before it falls due."
+                : "Thank you! Your booking is confirmed and your dates are now held."}{" "}
               We have emailed your receipt — if it has not arrived, you can
               download it below.
             </p>
@@ -142,6 +147,15 @@ function SuccessContent() {
                   </dd>
                 </div>
               )}
+              {details?.paymentStatus === "partially_paid" &&
+                typeof details?.balanceDue === "number" && (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-slate-500">Outstanding balance</dt>
+                    <dd className="font-semibold text-slate-900">
+                      {details.currency} {details.balanceDue.toLocaleString()}
+                    </dd>
+                  </div>
+                )}
               {details?.email && (
                 <div className="flex justify-between gap-4">
                   <dt className="text-slate-500">Paid by</dt>

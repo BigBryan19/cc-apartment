@@ -22,10 +22,23 @@ import {
 import { accommodationOnlyNotice } from "../lib/status";
 import { EXTRAS_BY_ID } from "../lib/extras";
 import { VillaProps } from "../components/villas/types";
-import DateRangePicker from "../components/booking/DateRangePicker";
+import StayDateFields from "../components/booking/StayDateFields";
 import { useVillaAvailability } from "../lib/availability";
 import { nightsBetween, validateStay } from "../lib/dates";
 import { formatPrice } from "../components/villas/utils";
+import { SETTINGS_TABLE } from "../lib/tables";
+import {
+  NO_DEPOSIT_POLICY,
+  balanceDueDateKey,
+  balanceTermsNote,
+  isDepositConfigured,
+  parseDepositPolicy,
+  policyFromEnv,
+  resolveDue,
+  type DepositPolicy,
+  type PaymentPlan,
+} from "../lib/deposit";
+import { whatsappLink } from "../lib/contact";
 
 /**
  * When the Payaza keys are not configured we still record the reservation as
@@ -58,6 +71,13 @@ const CheckoutContent = () => {
   const [checkOutDate, setCheckOutDate] = useState<string>("");
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
 
+  /**
+   * Deposit policy, resolved from the owner's settings. Starts unconfigured so
+   * the page never flashes a deposit amount that has not been loaded.
+   */
+  const [depositPolicy, setDepositPolicy] = useState<DepositPolicy>(NO_DEPOSIT_POLICY);
+  const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>("full");
+
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -76,6 +96,43 @@ const CheckoutContent = () => {
   );
 
   const supabase = useMemo(() => createClient(), []);
+
+  /*
+   * The deposit policy is public information — the guest has to see the terms
+   * before paying — so it is read straight from `site_settings`. The environment
+   * fallback covers a deployment where the SQL migration has not been run yet.
+   * An unreadable policy stays "unconfigured", which shows pay-in-full only,
+   * rather than defaulting to a percentage nobody approved.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect -- policy is fetched once on mount */
+  useEffect(() => {
+    const fromEnv = policyFromEnv("client");
+    if (isDepositConfigured(fromEnv)) setDepositPolicy(fromEnv);
+
+    if (!isSupabaseConfigured()) return;
+    let cancelled = false;
+
+    Promise.resolve(
+      createClient()
+        .from(SETTINGS_TABLE)
+        .select("value")
+        .eq("key", "deposit_policy")
+        .maybeSingle(),
+    )
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const parsed = parseDepositPolicy((data as { value?: unknown }).value);
+        if (isDepositConfigured(parsed)) setDepositPolicy(parsed);
+      })
+      .catch(() => {
+        /* Leave the policy unconfigured; the UI offers an enquiry instead. */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   /*
    * Seeds the form from the query string the villa page linked with. Written as
@@ -199,9 +256,20 @@ const CheckoutContent = () => {
   const quote = quoteResult?.ok ? quoteResult.quote : null;
   const quoteRefusal = quoteResult && !quoteResult.ok ? quoteResult.reason : null;
 
-  // `total` excludes anything still awaiting a quote; `computedTotal` below is
-  // what the guest will actually be charged.
-  const computedTotal = quote?.dueNow ?? 0;
+  // `quote.total` excludes anything still awaiting a quote. What is charged
+  // today is then decided by the payment plan and the owner's deposit policy.
+  const bookingTotal = quote?.total ?? 0;
+
+  const due = resolveDue(bookingTotal, depositPolicy, paymentPlan);
+  const depositConfigured = isDepositConfigured(depositPolicy);
+  // Falls back to pay-in-full whenever a deposit was requested but is not
+  // configured, so the button can never show a figure that does not exist.
+  const activePlan: PaymentPlan = due.unavailable ? "full" : due.plan;
+
+  const computedTotal = due.unavailable ? bookingTotal : due.dueNow;
+  const balanceDueDate =
+    activePlan === "deposit" ? balanceDueDateKey(checkInDate, depositPolicy) : null;
+  const balanceNote = balanceTermsNote(depositPolicy);
 
   const stayError = useMemo(
     () =>
@@ -266,6 +334,9 @@ const CheckoutContent = () => {
           extraIds: selectedPackages,
           guestName,
           guestPhone: formData.phone,
+          // The plan is an input, not a price. The server re-reads the policy
+          // and computes what to charge from its own records.
+          paymentPlan: activePlan,
         }),
       });
 
@@ -562,7 +633,7 @@ const CheckoutContent = () => {
                 dates
               </h2>
               <div className="mb-8 rounded-xl border border-[var(--color-line)] p-4">
-                <DateRangePicker
+                <StayDateFields
                   checkIn={checkInDate}
                   checkOut={checkOutDate}
                   unavailableRanges={availability.all}
@@ -586,6 +657,90 @@ const CheckoutContent = () => {
               <h2 className="mb-4 text-lg font-semibold tracking-tight text-[var(--color-ink)]">
                 Payment
               </h2>
+
+              {/* Pay in full / pay a deposit. A deposit option only exists when
+                  the owner has configured one — otherwise the guest is offered
+                  an enquiry rather than a percentage nobody agreed. */}
+              <fieldset className="mb-6 space-y-3">
+                <legend className="eyebrow mb-2">How would you like to pay?</legend>
+
+                {(
+                  [
+                    {
+                      plan: "full" as const,
+                      title: "Pay in full",
+                      detail:
+                        bookingTotal > 0
+                          ? `${formatPrice(bookingTotal, currency)} today`
+                          : "The full booking total today",
+                    },
+                    ...(depositConfigured
+                      ? [
+                          {
+                            plan: "deposit" as const,
+                            title: "Pay a deposit",
+                            detail:
+                              bookingTotal > 0
+                                ? `${formatPrice(
+                                    depositPolicy.mode === "percent"
+                                      ? (bookingTotal * (depositPolicy.percent as number)) / 100
+                                      : (depositPolicy.fixedAmount as number),
+                                    currency,
+                                  )} today, the rest later`
+                                : "A deposit today, the balance later",
+                          },
+                        ]
+                      : []),
+                  ]
+                ).map((option) => {
+                  const selected = activePlan === option.plan;
+                  return (
+                    <label
+                      key={option.plan}
+                      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
+                        selected
+                          ? "border-[var(--color-ink)] bg-white"
+                          : "border-[var(--color-line)] bg-white hover:border-[var(--color-line)]"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentPlan"
+                        value={option.plan}
+                        checked={selected}
+                        onChange={() => setPaymentPlan(option.plan)}
+                        className="mt-1 h-4 w-4 accent-[var(--color-ink)]"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-[var(--color-ink)]">
+                          {option.title}
+                        </span>
+                        <span className="mt-0.5 block text-xs leading-relaxed text-[var(--color-muted)]">
+                          {option.detail}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+
+                {!depositConfigured && (
+                  <p className="rounded-xl border border-dashed border-[var(--color-line)] bg-[var(--color-canvas)] p-3 text-[11px] leading-relaxed text-[var(--color-muted)]">
+                    Paying in instalments is arranged by our team.{" "}
+                    <a
+                      href={whatsappLink(
+                        "Hello Cosy Crest — I'd like to ask about paying a deposit rather than in full.",
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-[var(--color-ink)] underline underline-offset-2"
+                    >
+                      Ask about a deposit
+                    </a>
+                    .
+                  </p>
+                )}
+              </fieldset>
+
               <p className="mb-6 text-xs text-[var(--color-muted)]">
                 You will be redirected to Payaza, where you can pay by card or
                 mobile money.
@@ -609,6 +764,8 @@ const CheckoutContent = () => {
                   </>
                 ) : totalNights === 0 ? (
                   "Select dates to continue"
+                ) : activePlan === "deposit" && due.deposit > 0 ? (
+                  `Pay deposit ${formatPrice(displayAmount, currency)}`
                 ) : (
                   `Pay ${formatPrice(displayAmount, currency)}`
                 )}
@@ -807,14 +964,48 @@ const CheckoutContent = () => {
                 </ul>
               )}
 
+              {/* Deposit breakdown. Shown whenever a deposit is actually being
+                  taken, so the guest sees the full cost, what leaves their
+                  account today, and what is still owed — before paying. */}
+              {activePlan === "deposit" && due.deposit > 0 && (
+                <dl className="mb-5 space-y-2 rounded-xl border border-[var(--color-line)] bg-[var(--color-canvas)] p-4 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-[var(--color-muted)]">Booking total</dt>
+                    <dd className="font-medium text-[var(--color-ink)]">
+                      {formatPrice(bookingTotal, currency)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-[var(--color-muted)]">Deposit due now</dt>
+                    <dd className="font-semibold text-[var(--color-ink)]">
+                      {formatPrice(due.deposit, currency)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-[var(--color-muted)]">Outstanding balance</dt>
+                    <dd className="font-semibold text-[var(--color-ink)]">
+                      {formatPrice(due.balance, currency)}
+                    </dd>
+                  </div>
+                  {(balanceDueDate || balanceNote) && (
+                    <p className="border-t border-[var(--color-line)] pt-2 text-[11px] leading-relaxed text-[var(--color-muted)]">
+                      {balanceDueDate ? `Balance due by ${balanceDueDate}. ` : ""}
+                      {balanceNote ?? ""}
+                    </p>
+                  )}
+                </dl>
+              )}
+
               <div className="flex justify-between items-end gap-4">
                 <div>
                   <span className="block font-bold text-slate-900 mb-1">
-                    {/* Was "Total Room Bill", which read as the whole cost even
-                        when a package was still to be quoted. */}
+                    {/* The label has to match what is actually charged: an
+                        accommodation-only total, a deposit, or the full stay. */}
                     {quote && quote.unpricedItems.length > 0
                       ? "Accommodation total"
-                      : "Total due today"}
+                      : activePlan === "deposit" && due.deposit > 0
+                        ? "Deposit due today"
+                        : "Total due today"}
                   </span>
                   <span className="text-[10px] text-slate-400 uppercase tracking-widest">
                     {currency} Currency

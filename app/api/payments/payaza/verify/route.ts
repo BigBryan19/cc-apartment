@@ -67,6 +67,9 @@ export async function GET(request: Request) {
 
     let receiptEmail: string | null = null;
     let reconciled = true;
+    // Declared here so the response can report them after the block below.
+    let isPartial = false;
+    let totalAmount = 0;
 
     if (isSuccessful && isServiceRoleConfigured()) {
       const supabase = createServiceClient();
@@ -74,7 +77,7 @@ export async function GET(request: Request) {
       // Read the booking first — we need its recorded total to reconcile.
       const { data: booking } = await supabase
         .from("bookings")
-        .select("id, total_amount, currency, payment_reference")
+        .select("id, total_amount, due_now, payment_plan, balance_due, currency, payment_reference, payment_status")
         .eq("payment_reference", reference)
         .maybeSingle();
 
@@ -98,7 +101,14 @@ export async function GET(request: Request) {
       const resolvedId = String(booking.id);
 
       // --- Reconcile the amount before confirming --------------------------
-      const expectedAmount = Number(booking.total_amount ?? 0);
+      // Against what this booking asked for *today*, not the full stay: a
+      // deposit is a legitimate part-payment, and comparing it to the total
+      // would flag every deposit as a mismatch.
+      const expectedAmount = Number(
+        booking.due_now ?? booking.total_amount ?? 0,
+      );
+      totalAmount = Number(booking.total_amount ?? expectedAmount);
+      isPartial = expectedAmount > 0 && totalAmount - expectedAmount > AMOUNT_TOLERANCE;
       const currencyMatches =
         !booking.currency || booking.currency === data.currency;
 
@@ -121,15 +131,20 @@ export async function GET(request: Request) {
             amount: paidAmount,
             currency: data.currency,
             error:
-              "The amount paid does not match this reservation, so it has not been confirmed. Please contact us with the reference below — you will not be charged twice.",
+                "The amount paid does not match what this reservation asked for, so it has not been confirmed. Please contact us with the reference below — you will not be charged twice.",
           },
           { status: 409 },
         );
       }
 
-      const update = {
+      // Booking confirmation and payment status are two different facts:
+      // the dates are held and confirmed, but only the deposit has been paid.
+      const update: Record<string, unknown> = {
         status: "confirmed",
-        payment_status: "paid",
+        payment_status: isPartial ? "partially_paid" : "paid",
+        balance_due: isPartial
+          ? Math.round((totalAmount - paidAmount) * 100) / 100
+          : 0,
         paid_at: new Date().toISOString(),
         amount_paid: paidAmount,
         currency: data.currency,
@@ -181,6 +196,8 @@ export async function GET(request: Request) {
       reference: reference,
       amount: paidAmount,
       currency: data.currency,
+      paymentStatus: isPartial ? "partially_paid" : "paid",
+      balanceDue: isPartial ? Math.round((totalAmount - paidAmount) * 100) / 100 : 0,
       receiptEmail,
     });
   } catch (error) {

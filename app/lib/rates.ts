@@ -48,6 +48,8 @@ export type PriceBasis =
   | "per_night"
   /** amount once, regardless of nights */
   | "per_stay"
+  /** amount × days (a rental held for a number of days) */
+  | "per_day"
   /** amount × guests (occupancy charge, not duration) */
   | "per_person"
   /** amount once for the event, plus whatever accommodation is added */
@@ -509,6 +511,8 @@ export function priceBasisSuffix(basis: PriceBasis): string {
   switch (basis) {
     case "per_night":
       return "/ night";
+    case "per_day":
+      return "/ day";
     case "per_stay":
       return "/ stay";
     case "per_person":

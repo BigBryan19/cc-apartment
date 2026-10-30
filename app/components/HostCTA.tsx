@@ -8,9 +8,11 @@ const HostCTA: React.FC = () => {
         `fill` replaces the manual `absolute inset-0 h-full w-full` — the wrapper
         is already `relative`. Below the fold, so it stays lazy.
       */}
+      {/* A real Cosy Crest pool terrace. The previous image was a stock villa
+          with a Mediterranean shoreline, presented as one of our residences. */}
       <Image
-        src="/pool.jpg"
-        alt="Poolside at a Cosy Crest residence"
+        src="/Adenta2.jpg"
+        alt="The pool terrace at Adenta Serenity"
         fill
         sizes="100vw"
         className="-z-10 object-cover"

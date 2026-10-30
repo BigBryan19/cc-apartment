@@ -12,8 +12,12 @@
 export const CONTACT = {
   phoneDisplay: "+233 54 053 4870",
   phoneE164: "+233540534870",
-  /** wa.me needs the number without punctuation or a leading plus. */
-  whatsappNumber: "2330540534870",
+  /**
+   * wa.me needs the number without punctuation or a leading plus, and without
+   * the trunk `0` after the country code. The previous value kept that zero
+   * ("233" + "054…"), which produced a number WhatsApp does not recognise.
+   */
+  whatsappNumber: "233540534870",
   email: "officialcosycrestaparts@gmail.com",
   /** Responses are handled by a person, not a queue. */
   responseNote:

@@ -30,6 +30,7 @@ const LINKS = [
   // Packages previously appeared nowhere in the navigation, which is why they
   // were effectively undiscoverable even once they existed.
   { label: "Experiences & Packages", href: "/packages" },
+  { label: "Gallery", href: "/gallery" },
   { label: "About", href: "/#aboutus" },
   { label: "Guides", href: "/guides" },
   // Was "/#contact" — the homepage anchor rather than the page, so it shared a

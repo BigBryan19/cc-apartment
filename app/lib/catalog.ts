@@ -67,6 +67,36 @@ function toStringArray(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === "string");
 }
 
+/**
+ * Media that belongs to a known property, keyed by its id.
+ *
+ * Used only as a fallback when the database row has no `images` or `video` —
+ * a production row that predates those columns is common, and without this the
+ * listing card silently loses its photograph and its walkthrough. The fallback
+ * still respects the one rule that matters: these files were photographed at
+ * *this* property, so nothing is borrowed from another listing.
+ */
+const BUNDLED_MEDIA: Record<
+  number,
+  { image: string; images: string[]; video: string }
+> = {
+  1: {
+    image: "/Lake2.jpg",
+    images: ["/Lake2.jpg", "/Lake4.jpg", "/Lake3.jpg", "/Lake1.jpg"],
+    video: "/lakeside.mp4",
+  },
+  2: {
+    image: "/Aburi1.jpeg",
+    images: ["/Aburi1.jpeg", "/Aburi2.jpeg", "/Aburi3.jpeg", "/Aburi4.jpeg"],
+    video: "/aburi.mp4",
+  },
+  3: {
+    image: "/Adenta1.jpg",
+    images: ["/Adenta1.jpg", "/Adenta2.jpg", "/Adenta3.jpg", "/Adenta4.jpg"],
+    video: "/adenta.mp4",
+  },
+};
+
 function toCoordinates(value: unknown, fallbackId: number): { lat: number; lng: number } {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const record = value as Record<string, unknown>;
@@ -86,8 +116,11 @@ function toCoordinates(value: unknown, fallbackId: number): { lat: number; lng: 
  * excluded from online sale where the basis cannot be trusted.
  */
 export function toVillaProps(row: VillaRow): VillaProps {
-  const images = toStringArray(row.images);
-  const image = row.image ?? images[0] ?? "";
+  const bundled = BUNDLED_MEDIA[row.id];
+  const storedImages = toStringArray(row.images);
+  const images = storedImages.length ? storedImages : (bundled?.images ?? []);
+  const image = row.image ?? images[0] ?? bundled?.image ?? "";
+  const video = row.video ?? bundled?.video ?? undefined;
 
   const units = normalizeUnits(row.rates as StoredRate[] | undefined | null, {
     price: row.price ?? null,
@@ -100,7 +133,7 @@ export function toVillaProps(row: VillaRow): VillaProps {
     id: row.id,
     image,
     images: images.length ? images : image ? [image] : [],
-    video: row.video ?? undefined,
+    video,
     price: Number(row.price ?? 0),
     title: row.title ?? "",
     location: row.location ?? "",
@@ -169,8 +202,11 @@ const BUNDLED_ROWS: VillaRow[] = [
     bedrooms: 3,
     bathrooms: 4,
     has_pool: true,
-    image: "/Lakeside1.jpg",
-    images: ["/Lakeside1.jpg", "/Lakeside2.jpg", "/Lakeside3.jpg", "/Lakeside4.jpg"],
+    // The files on disk are Lake1–4.jpg. The old `/Lakeside#.jpg` paths 404ed,
+    // which is why the Lakeside card and gallery showed broken images.
+    image: "/Lake2.jpg",
+    images: ["/Lake2.jpg", "/Lake4.jpg", "/Lake3.jpg", "/Lake1.jpg"],
+    video: "/lakeside.mp4",
     description:
       "A modern, stylishly designed apartment located in the serene environment of Lakeside Estate, offering premium comfort and a relaxing atmosphere.",
     amenities: LAKESIDE_AMENITIES,
@@ -195,6 +231,7 @@ const BUNDLED_ROWS: VillaRow[] = [
     has_pool: true,
     image: "/Aburi1.jpeg",
     images: ["/Aburi1.jpeg", "/Aburi2.jpeg", "/Aburi3.jpeg", "/Aburi4.jpeg"],
+    video: "/aburi.mp4",
     description:
       "Nestled in the serene and refreshing environment of Aburi, this beautifully furnished apartment offers complete comfort.",
     amenities: ABURI_AMENITIES,
@@ -221,6 +258,7 @@ const BUNDLED_ROWS: VillaRow[] = [
     has_pool: true,
     image: "/Adenta1.jpg",
     images: ["/Adenta1.jpg", "/Adenta2.jpg", "/Adenta3.jpg", "/Adenta4.jpg"],
+    video: "/adenta.mp4",
     description:
       "Located in the heart of Adenta, this premium apartment combines luxury, comfort, and entertainment with modern furnishings and a grand piano.",
     amenities: ADENTA_AMENITIES,
