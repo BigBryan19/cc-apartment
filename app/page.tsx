@@ -7,7 +7,6 @@ import Villas from "./components/villas/Villas";
 import Regions from "./components/Regions";
 import Specialties from "./components/Specialties";
 import Services from "./components/Services";
-import GallerySection from "./components/gallery/GallerySection";
 import Testimonials from "./components/Testimonials";
 import HostCTA from "./components/HostCTA";
 import FAQ from "./components/FAQ";
@@ -53,8 +52,6 @@ const App: React.FC = () => {
         <Specialties />
 
         <Services />
-
-        <GallerySection />
 
         <Testimonials />
 

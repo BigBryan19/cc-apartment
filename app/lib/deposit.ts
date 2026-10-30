@@ -1,232 +1,293 @@
 // app/lib/deposit.ts
 // ---------------------------------------------------------------------------
-// The deposit policy: how much a guest may pay now versus later.
+// The deposit policy: how much a guest may pay now to hold the apartment.
 //
-// NOTHING IS INVENTED
+// THE RULE (set by the business)
 //
-//   There is no approved deposit in the repository or the brief, so the policy
-//   ships *unconfigured*. Until the owner sets it — in admin, or through the
-//   DEPOSIT_* environment variables — the checkout offers "Pay in full" only and
-//   shows an enquiry route instead of a made-up percentage. A deposit figure
-//   that nobody agreed is a payment commitment, not a placeholder.
+//   A guest can reserve with a part payment of **30% or more** of the booking
+//   total, and the remainder is settled before arrival. So the deposit is not a
+//   single fixed number — it is a guest-chosen share with a floor of 30%.
 //
-// WHY THE POLICY IS PUBLIC
+//   The owner can raise the floor (or turn part payment off) in Admin →
+//   Settings. The floor is never allowed below the approved 30%, and a choice of
+//   100% is simply "pay in full".
 //
-//   The checkout has to show the guest what is due now, what remains and when
-//   the balance falls due *before* they are sent to the gateway. That is not
-//   sensitive information, so it lives in `site_settings` with a public read
-//   policy rather than behind the service role.
+// WHO DECIDES THE MONEY
 //
-// THE ARITHMETIC IS SHARED
-//
-//   The browser renders the summary and the server decides what to charge. Both
-//   call the functions here, so the two cannot disagree; the server still
-//   re-reads the policy itself and never trusts a figure from the request.
+//   The guest sends the percentage they picked; the server clamps it to the
+//   configured range and multiplies it by the total it calculated itself. No
+//   amount is ever taken from the request body.
 // ---------------------------------------------------------------------------
 
 import { addDaysToKey } from "./dates";
 
-/** Payment plan chosen by the guest. */
+/** The approved minimum share for a part payment. */
+export const MIN_DEPOSIT_PERCENT = 30;
+
+export type DepositMode = "percent" | "fixed";
 export type PaymentPlan = "full" | "deposit";
 
-/** How the deposit is expressed. */
-export type DepositMode = "percent" | "fixed";
-
 export interface DepositPolicy {
-  /** Null when the owner has not configured a deposit at all. */
-  mode: DepositMode | null;
-  /** 1–99, used when mode is "percent". */
-  percent: number | null;
-  /** Major units, used when mode is "fixed". */
+  /** When false, checkout offers pay-in-full only. */
+  enabled: boolean;
+  /**
+   * "percent" is the normal mode: the guest picks a share at or above
+   * `minPercent`. "fixed" pins the deposit to one amount.
+   */
+  mode: DepositMode;
+  /** The smallest share a guest may pay to reserve. Never below 30. */
+  minPercent: number;
+  /** Only used when `mode` is "fixed". */
   fixedAmount: number | null;
-  /** Days before check-in the balance must be settled by. Null = not stated. */
+  /** Days before check-in the balance falls due. */
   balanceDueDays: number | null;
-  /** Owner's own wording for how the balance is paid. */
+  /** Owner's own wording for how the balance is settled. */
   instructions: string | null;
 }
 
-export const NO_DEPOSIT_POLICY: DepositPolicy = {
-  mode: null,
-  percent: null,
+/**
+ * The policy in force when nothing has been configured: part payment at 30%,
+ * because the business has approved that floor.
+ */
+export const DEFAULT_DEPOSIT_POLICY: DepositPolicy = {
+  enabled: true,
+  mode: "percent",
+  minPercent: MIN_DEPOSIT_PERCENT,
   fixedAmount: null,
   balanceDueDays: null,
   instructions: null,
 };
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-function positiveNumber(value: unknown): number | null {
-  const number = typeof value === "string" ? Number(value) : value;
-  if (typeof number === "number" && Number.isFinite(number) && number > 0) {
-    return number;
-  }
-  return null;
-}
-
-/**
- * Coerce whatever is stored (JSON column, environment string, or nothing) into
- * a policy that the rest of the app can rely on. An invalid policy degrades to
- * "unconfigured" rather than to a plausible-looking wrong number.
- */
-export function parseDepositPolicy(raw: unknown): DepositPolicy {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return NO_DEPOSIT_POLICY;
-
-  const record = raw as Record<string, unknown>;
-  const mode = record.mode === "percent" || record.mode === "fixed" ? record.mode : null;
-
-  const percentRaw = positiveNumber(record.percent);
-  const fixedRaw = positiveNumber(record.fixedAmount);
-  const daysRaw =
-    record.balanceDueDays === 0
-      ? 0
-      : positiveNumber(record.balanceDueDays);
-
-  if (mode === "percent" && (percentRaw === null || percentRaw >= 100)) {
-    return NO_DEPOSIT_POLICY;
-  }
-  if (mode === "fixed" && fixedRaw === null) {
-    return NO_DEPOSIT_POLICY;
-  }
-  if (!mode) return NO_DEPOSIT_POLICY;
-
-  return {
-    mode,
-    percent: mode === "percent" ? percentRaw : null,
-    fixedAmount: mode === "fixed" ? fixedRaw : null,
-    balanceDueDays: daysRaw === null ? null : Math.max(0, Math.floor(daysRaw)),
-    instructions:
-      typeof record.instructions === "string" && record.instructions.trim()
-        ? record.instructions.trim()
-        : null,
-  };
-}
-
-export function isDepositConfigured(policy: DepositPolicy): boolean {
-  if (policy.mode === "percent") return policy.percent !== null && policy.percent < 100;
-  if (policy.mode === "fixed") return policy.fixedAmount !== null;
-  return false;
-}
-
-/**
- * The deposit for a given total, in major units.
- *
- * Capped at the total so a fixed deposit larger than the stay can never take
- * more than the stay is worth.
- */
-export function depositAmountFor(total: number, policy: DepositPolicy): number {
-  if (!isDepositConfigured(policy) || total <= 0) return 0;
-  const raw =
-    policy.mode === "percent"
-      ? (total * (policy.percent as number)) / 100
-      : (policy.fixedAmount as number);
-  return round2(Math.min(Math.max(0, raw), total));
-}
+/** Part payment switched off entirely. */
+export const NO_DEPOSIT_POLICY: DepositPolicy = {
+  ...DEFAULT_DEPOSIT_POLICY,
+  enabled: false,
+};
 
 export interface DueBreakdown {
-  /** What is payable now. */
-  dueNow: number;
-  /** What remains after the payment. */
-  balance: number;
-  /** The deposit actually applied (0 when paying in full). */
-  deposit: number;
+  /** "full" or "deposit" — what the guest is actually doing. */
   plan: PaymentPlan;
-  /** True when the plan asked for a deposit but none is configured. */
+  /** Charged today. */
+  dueNow: number;
+  /** Left for later. */
+  balance: number;
+  /** The part-payment portion; zero when paying in full. */
+  deposit: number;
+  /** The share that will be charged today (100 for a full payment). */
+  percent: number;
+  /**
+   * True when a deposit was asked for but part payment is unavailable or the
+   * total is unknown — the caller must fall back to pay-in-full rather than
+   * inventing a figure.
+   */
   unavailable: boolean;
 }
 
+function round2(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function toFinite(value: unknown): number | null {
+  const number = typeof value === "string" ? Number(value) : value;
+  return typeof number === "number" && Number.isFinite(number) ? number : null;
+}
+
 /**
- * Resolve a plan against a total.
+ * Coerce a stored value into a policy.
  *
- * A guest who asks for a deposit when the owner has not configured one gets
- * `unavailable: true` and no amount — the caller offers an enquiry instead of
- * charging a number that does not exist.
+ * Anything unusable falls back to the default 30% policy rather than to a
+ * made-up number, and a floor below 30 is raised to 30 — the business rule is
+ * not something a stored row should be able to undercut.
+ */
+export function parseDepositPolicy(raw: unknown): DepositPolicy {
+  if (!raw) return DEFAULT_DEPOSIT_POLICY;
+
+  let source: Record<string, unknown> | null = null;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      source = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+    } catch {
+      return DEFAULT_DEPOSIT_POLICY;
+    }
+  } else if (typeof raw === "object") {
+    source = raw as Record<string, unknown>;
+  }
+
+  if (!source) return DEFAULT_DEPOSIT_POLICY;
+
+  const enabled = source.enabled === false ? false : true;
+  const mode: DepositMode = source.mode === "fixed" ? "fixed" : "percent";
+
+  const requestedMin = toFinite(source.minPercent ?? source.percent);
+  const minPercent = Math.min(
+    100,
+    Math.max(MIN_DEPOSIT_PERCENT, requestedMin === null ? MIN_DEPOSIT_PERCENT : Math.round(requestedMin)),
+  );
+
+  const fixed = toFinite(source.fixedAmount);
+  const fixedAmount = fixed !== null && fixed > 0 ? round2(fixed) : null;
+
+  if (mode === "fixed" && fixedAmount === null) {
+    // A fixed policy with no amount is not a policy.
+    return { ...DEFAULT_DEPOSIT_POLICY, enabled };
+  }
+
+  const days = toFinite(source.balanceDueDays ?? source.balanceDays);
+  const balanceDueDays =
+    days !== null && days >= 0 ? Math.round(days) : null;
+
+  const instructions =
+    typeof source.instructions === "string" && source.instructions.trim()
+      ? source.instructions.trim().slice(0, 240)
+      : null;
+
+  return { enabled, mode, minPercent, fixedAmount, balanceDueDays, instructions };
+}
+
+/**
+ * Read the policy from the environment.
+ *
+ * `NEXT_PUBLIC_` variables are what the browser can see; the server checks the
+ * private names first. Used as a fallback when the settings row is absent.
+ */
+export function policyFromEnv(scope: "server" | "client" = "server"): DepositPolicy {
+  const read = (name: string): string | undefined => {
+    const publicName = `NEXT_PUBLIC_${name}`;
+    if (scope === "client") return process.env[publicName];
+    return process.env[name] ?? process.env[publicName];
+  };
+
+  const enabled = read("DEPOSIT_ENABLED");
+  const percent = read("DEPOSIT_MIN_PERCENT");
+  const days = read("DEPOSIT_BALANCE_DAYS");
+  const instructions = read("DEPOSIT_INSTRUCTIONS");
+
+  if (enabled === undefined && percent === undefined && days === undefined && instructions === undefined) {
+    return DEFAULT_DEPOSIT_POLICY;
+  }
+
+  return parseDepositPolicy({
+    enabled: enabled === undefined ? true : enabled !== "false",
+    mode: "percent",
+    minPercent: percent,
+    balanceDueDays: days,
+    instructions,
+  });
+}
+
+export function isDepositConfigured(policy: DepositPolicy): boolean {
+  return policy.enabled;
+}
+
+/** Deposit amount for a total, honouring the floor and the fixed mode. */
+export function depositAmountFor(
+  total: number,
+  policy: DepositPolicy,
+  chosenPercent?: number | null,
+): number {
+  if (!Number.isFinite(total) || total <= 0) return 0;
+
+  if (policy.mode === "fixed") {
+    const fixed = policy.fixedAmount ?? 0;
+    return round2(Math.min(Math.max(fixed, 0), total));
+  }
+
+  const percent = clampPercent(chosenPercent, policy);
+  return round2((total * percent) / 100);
+}
+
+/** The share a guest may actually pay, given their choice and the floor. */
+export function clampPercent(
+  chosenPercent: number | null | undefined,
+  policy: DepositPolicy,
+): number {
+  const floor = Math.min(100, Math.max(MIN_DEPOSIT_PERCENT, policy.minPercent));
+  const chosen = toFinite(chosenPercent ?? null);
+  if (chosen === null) return floor;
+  return Math.min(100, Math.max(floor, Math.round(chosen)));
+}
+
+/**
+ * Work out what is charged today.
+ *
+ * A deposit that comes out at or above the total is not a deposit — it is a
+ * full payment, and reporting it as a part payment would leave a zero balance
+ * and a confusing "pay the rest" instruction.
  */
 export function resolveDue(
   total: number,
   policy: DepositPolicy,
   plan: PaymentPlan,
+  chosenPercent?: number | null,
 ): DueBreakdown {
-  const safeTotal = round2(Math.max(0, total));
+  const safeTotal = Number.isFinite(total) && total > 0 ? round2(total) : 0;
 
-  if (plan === "deposit") {
-    if (!isDepositConfigured(policy)) {
-      return { dueNow: safeTotal, balance: 0, deposit: 0, plan, unavailable: true };
-    }
-    const deposit = depositAmountFor(safeTotal, policy);
-    if (deposit <= 0 || deposit >= safeTotal) {
-      // A deposit equal to (or larger than) the total is just pay-in-full.
-      return { dueNow: safeTotal, balance: 0, deposit: 0, plan, unavailable: false };
-    }
-    return {
-      dueNow: deposit,
-      balance: round2(safeTotal - deposit),
-      deposit,
-      plan,
-      unavailable: false,
-    };
+  if (plan === "full") {
+    return { plan: "full", dueNow: safeTotal, balance: 0, deposit: 0, percent: 100, unavailable: false };
   }
 
-  return { dueNow: safeTotal, balance: 0, deposit: 0, plan: "full", unavailable: false };
+  if (!isDepositConfigured(policy)) {
+    return { plan: "full", dueNow: safeTotal, balance: 0, deposit: 0, percent: 100, unavailable: true };
+  }
+
+  if (safeTotal === 0) {
+    // Nothing to divide yet (dates or unit not chosen).
+    return { plan: "full", dueNow: 0, balance: 0, deposit: 0, percent: 100, unavailable: true };
+  }
+
+  const percent = clampPercent(chosenPercent, policy);
+  const deposit = Math.min(depositAmountFor(safeTotal, policy, percent), safeTotal);
+
+  if (deposit >= safeTotal) {
+    return { plan: "full", dueNow: safeTotal, balance: 0, deposit: 0, percent: 100, unavailable: false };
+  }
+
+  return {
+    plan: "deposit",
+    dueNow: deposit,
+    balance: round2(safeTotal - deposit),
+    deposit,
+    percent,
+    unavailable: false,
+  };
 }
 
-/** The date the balance falls due, or null when the owner has not set one. */
+/** The date the balance is due, or null when no term is configured. */
 export function balanceDueDateKey(
-  checkInKey: string,
+  checkIn: string | null | undefined,
   policy: DepositPolicy,
 ): string | null {
-  if (policy.balanceDueDays === null) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(checkInKey)) return null;
-  return addDaysToKey(checkInKey, -policy.balanceDueDays);
-}
-
-/** One-line explanation of the balance terms, in the owner's words where set. */
-export function balanceTermsNote(policy: DepositPolicy): string | null {
-  if (policy.instructions) return policy.instructions;
-  if (policy.balanceDueDays === null) return null;
-  if (policy.balanceDueDays === 0) return "The balance is due on the check-in date.";
-  return `The balance is due ${policy.balanceDueDays} day${
-    policy.balanceDueDays === 1 ? "" : "s"
-  } before check-in.`;
-}
-
-// ---------------------------------------------------------------------------
-// Environment fallback
-//
-// The database is the owner's preferred route (admin → Settings). These
-// variables exist so a deployment can be configured before the SQL migration
-// has been run, and so local development can exercise the deposit flow.
-// ---------------------------------------------------------------------------
-
-function envValue(scope: "server" | "client", name: string): string | undefined {
-  if (scope === "client") {
-    // Only NEXT_PUBLIC_* survives into the browser bundle.
-    return process.env[`NEXT_PUBLIC_DEPOSIT_${name}`];
+  if (!checkIn || policy.balanceDueDays === null) return null;
+  try {
+    return addDaysToKey(checkIn, -policy.balanceDueDays);
+  } catch {
+    return null;
   }
-  return process.env[`DEPOSIT_${name}`] ?? process.env[`NEXT_PUBLIC_DEPOSIT_${name}`];
 }
 
-export function policyFromEnv(scope: "server" | "client" = "server"): DepositPolicy {
-  const modeRaw = (envValue(scope, "MODE") ?? "").toLowerCase();
-  if (modeRaw !== "percent" && modeRaw !== "fixed") return NO_DEPOSIT_POLICY;
+/** One line describing how the balance is settled. */
+export function balanceTermsNote(policy: DepositPolicy): string | null {
+  const parts: string[] = [];
 
-  return parseDepositPolicy({
-    mode: modeRaw,
-    percent: envValue(scope, "PERCENT"),
-    fixedAmount: envValue(scope, "AMOUNT"),
-    balanceDueDays: envValue(scope, "BALANCE_DAYS"),
-    instructions: envValue(scope, "INSTRUCTIONS"),
-  });
+  if (policy.balanceDueDays !== null && policy.balanceDueDays > 0) {
+    parts.push(`Balance due ${policy.balanceDueDays} day${policy.balanceDueDays === 1 ? "" : "s"} before check-in.`);
+  } else if (policy.balanceDueDays === 0) {
+    parts.push("Balance due on arrival.");
+  }
+
+  if (policy.instructions) parts.push(policy.instructions);
+
+  return parts.length ? parts.join(" ") : null;
 }
 
-/** Human summary of the configured policy, for the admin screen. */
+/** Human summary used by the admin screen. */
 export function describeDepositPolicy(policy: DepositPolicy): string {
-  if (!isDepositConfigured(policy)) return "No deposit configured — guests pay in full.";
-  const amount =
-    policy.mode === "percent"
-      ? `${policy.percent}% of the booking total`
-      : `GHS ${(policy.fixedAmount as number).toLocaleString()}`;
-  const terms = balanceTermsNote(policy);
-  return terms ? `Deposit of ${amount}. ${terms}` : `Deposit of ${amount}.`;
+  if (!policy.enabled) {
+    return "Part payment is off. Guests can only pay in full.";
+  }
+  if (policy.mode === "fixed") {
+    return `Guests pay a fixed deposit of GHS ${(policy.fixedAmount ?? 0).toLocaleString()} to reserve.`;
+  }
+  return `Guests can reserve by paying ${policy.minPercent}%–99% of the total; the rest falls due before arrival.`;
 }

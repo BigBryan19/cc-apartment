@@ -50,6 +50,8 @@ interface InitializeBody {
   guestPhone?: string;
   /** "full" or "deposit". An input, never a price. */
   paymentPlan?: string;
+  /** The share the guest chose to pay now; clamped to the policy's floor. */
+  depositPercent?: number | string;
 }
 
 /**
@@ -150,11 +152,17 @@ export async function POST(request: Request) {
   // from the policy and the total it calculated itself.
   const requestedPlan = body.paymentPlan === "deposit" ? "deposit" : "full";
   const policy = await loadDepositPolicy(supabase);
-  const due = resolveDue(quote.total, policy, requestedPlan);
+  // The guest's percentage is an input: it is clamped to the configured floor
+  // here, then multiplied by the total this route calculated itself.
+  const chosenPercent =
+    typeof body.depositPercent === "number" || typeof body.depositPercent === "string"
+      ? Number(body.depositPercent)
+      : null;
+  const due = resolveDue(quote.total, policy, requestedPlan, chosenPercent);
 
   if (requestedPlan === "deposit" && due.unavailable) {
     return badRequest(
-      "Paying a deposit is not available on this booking. Please pay in full, or contact us to arrange it.",
+      "Part payment is not available on this booking. Please pay in full.",
       409,
     );
   }

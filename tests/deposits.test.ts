@@ -17,6 +17,7 @@ import {
   balanceDueDateKey,
   depositAmountFor,
   isDepositConfigured,
+  clampPercent,
   parseDepositPolicy,
   resolveDue,
 } from "../app/lib/deposit";
@@ -35,11 +36,17 @@ function check(id: string, label: string, condition: boolean, detail?: string) {
   }
 }
 
+const defaultPolicy = parseDepositPolicy(undefined);
 const percent30 = parseDepositPolicy({ mode: "percent", percent: 30 });
 const fixed1000 = parseDepositPolicy({ mode: "fixed", fixedAmount: 1000 });
 
 // --- 1. Unconfigured -------------------------------------------------------
 check("D1", "no policy means no deposit", !isDepositConfigured(NO_DEPOSIT_POLICY));
+check(
+  "D1",
+  "the default policy offers part payment at 30%",
+  defaultPolicy.minPercent === 30 && defaultPolicy.enabled,
+);
 check(
   "D1",
   "requesting a deposit without a policy reports it as unavailable",
@@ -84,10 +91,32 @@ check(
       .deposit === 0,
 );
 
-// --- 5. Invalid configuration --------------------------------------------
-check("D5", "100% is not a deposit", !isDepositConfigured(parseDepositPolicy({ mode: "percent", percent: 100 })));
-check("D5", "a negative fixed amount is rejected", !isDepositConfigured(parseDepositPolicy({ mode: "fixed", fixedAmount: -50 })));
-check("D5", "a malformed value degrades to unconfigured", !isDepositConfigured(parseDepositPolicy("nonsense")));
+// --- 5. The 30% floor is not negotiable ----------------------------------
+check(
+  "D5",
+  "a stored floor below 30% is raised to 30%",
+  parseDepositPolicy({ mode: "percent", percent: 10 }).minPercent === 30,
+);
+check(
+  "D5",
+  "a guest choosing 10% is charged 30%",
+  clampPercent(10, percent30) === 30,
+);
+check(
+  "D5",
+  "a guest choosing 45% is allowed to",
+  resolveDue(1000, percent30, "deposit", 45).dueNow === 450,
+);
+check(
+  "D5",
+  "a guest choosing more than 100% is capped at the total",
+  resolveDue(1000, percent30, "deposit", 150).plan === "full",
+);
+check(
+  "D5",
+  "an owner may raise the floor above 30%",
+  parseDepositPolicy({ mode: "percent", percent: 60 }).minPercent === 60,
+);
 
 // --- 6. Balance due date ---------------------------------------------------
 check(

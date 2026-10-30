@@ -36,7 +36,7 @@ not views of the region.
 | Service | Price shown | Charged by the booking engine | Image |
 |---|---|---|---|
 | Honeymoon & Couples | From GHS 3,500 per stay | Yes — `honeymoon-setup` extra, per stay | `/Adenta4.jpg` (a prepared bedroom) |
-| Birthday Celebrations | From GHS 5,000 per stay | Yes — package, unchanged | `/Adenta3.jpg` |
+| Birthday Celebrations | From GHS 5,000 per stay | Yes — `birthday-decoration` extra, per stay | `/Adenta3.jpg` |
 | Car Rental | GHS 1,000 per day | Yes — `car-rental` extra, per day | `/car-rental-tucson.jpg` |
 | Massage Services | Enquire for pricing | No price — quotation only | `/massage-service.jpg` |
 
@@ -64,11 +64,16 @@ your own treatment setup.
 
 ## 3. Media & Gallery
 
-- New section on the home page and a full page at `/gallery`, linked from the
-  header and footer.
+- A full page at `/gallery`, linked from the header and footer. It is **not** on
+  the home page — the home page stays focused on stays and services.
 - Filters: **All, Stays, Birthdays, Couples, Other Experiences**, with counts.
 - Photos open in a lightbox with keyboard and arrow navigation; videos open in a
   `<video controls>` player and never autoplay audio.
+- **Every image of every apartment is in the gallery** — 12 photographs across
+  the three properties, plus their three walkthrough videos. The villa pages
+  also show all of a property's own images: the mosaic previously hid the extra
+  tiles on mobile (`hidden md:block`), so a phone visitor saw one photo and never
+  knew the rest existed. That is fixed.
 - Video tiles use a poster frame plus a play badge, so the grid costs one
   thumbnail per video rather than three half-downloaded files.
 - Owner-managed: **/admin/gallery** adds, categorises, reorders (up/down) and
@@ -102,13 +107,14 @@ without a deploy.
 
 ## 5. Flexible payments and deposits
 
-- Checkout offers **"Pay in full"** and **"Pay a deposit"**.
-- The deposit is **not configured by default**. Until you set it, only pay-in-full
-  is offered, and a guest who wants instalments is given a WhatsApp enquiry link
-  rather than a made-up percentage.
-- Configure it in **Admin → Settings → Deposit policy**: percentage or fixed
-  amount, days before check-in the balance is due, and your own wording for how
-  the balance is paid.
+- Checkout offers **"Pay in full"** and **"Part payment"**. Nothing is sent to
+  your team — the guest completes the part payment on the same screen.
+- **Part payment is live by default at a 30% minimum.** The guest moves a slider
+  between 30% and 99%, sees the exact amount for their choice, and pays the
+  balance before arrival. 100% is simply "pay in full".
+- The owner can raise the floor above 30%, or switch part payment off entirely,
+  in **Admin → Settings → Deposit policy**. A stored floor below 30% is raised to
+  30% — the business rule cannot be undercut by a settings row.
 - Before payment the summary shows: booking total, deposit due now, outstanding
   balance, and the balance deadline/instructions.
 - Server-side, the amount to charge is computed from trusted pricing records and

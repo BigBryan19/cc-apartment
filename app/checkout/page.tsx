@@ -28,9 +28,12 @@ import { nightsBetween, validateStay } from "../lib/dates";
 import { formatPrice } from "../components/villas/utils";
 import { SETTINGS_TABLE } from "../lib/tables";
 import {
+  DEFAULT_DEPOSIT_POLICY,
+  MIN_DEPOSIT_PERCENT,
   NO_DEPOSIT_POLICY,
   balanceDueDateKey,
   balanceTermsNote,
+  clampPercent,
   isDepositConfigured,
   parseDepositPolicy,
   policyFromEnv,
@@ -75,8 +78,10 @@ const CheckoutContent = () => {
    * Deposit policy, resolved from the owner's settings. Starts unconfigured so
    * the page never flashes a deposit amount that has not been loaded.
    */
-  const [depositPolicy, setDepositPolicy] = useState<DepositPolicy>(NO_DEPOSIT_POLICY);
+  const [depositPolicy, setDepositPolicy] = useState<DepositPolicy>(DEFAULT_DEPOSIT_POLICY);
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>("full");
+  /** Share the guest has chosen to pay now; the policy enforces the 30% floor. */
+  const [depositPercent, setDepositPercent] = useState(MIN_DEPOSIT_PERCENT);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -260,7 +265,7 @@ const CheckoutContent = () => {
   // today is then decided by the payment plan and the owner's deposit policy.
   const bookingTotal = quote?.total ?? 0;
 
-  const due = resolveDue(bookingTotal, depositPolicy, paymentPlan);
+  const due = resolveDue(bookingTotal, depositPolicy, paymentPlan, depositPercent);
   const depositConfigured = isDepositConfigured(depositPolicy);
   // Falls back to pay-in-full whenever a deposit was requested but is not
   // configured, so the button can never show a figure that does not exist.
@@ -337,6 +342,7 @@ const CheckoutContent = () => {
           // The plan is an input, not a price. The server re-reads the policy
           // and computes what to charge from its own records.
           paymentPlan: activePlan,
+          depositPercent: due.percent,
         }),
       });
 
@@ -658,85 +664,108 @@ const CheckoutContent = () => {
                 Payment
               </h2>
 
-              {/* Pay in full / pay a deposit. A deposit option only exists when
-                  the owner has configured one — otherwise the guest is offered
-                  an enquiry rather than a percentage nobody agreed. */}
+              {/* Pay in full, or reserve with a part payment of 30% or more. */}
               <fieldset className="mb-6 space-y-3">
                 <legend className="eyebrow mb-2">How would you like to pay?</legend>
 
-                {(
-                  [
-                    {
-                      plan: "full" as const,
-                      title: "Pay in full",
-                      detail:
-                        bookingTotal > 0
-                          ? `${formatPrice(bookingTotal, currency)} today`
-                          : "The full booking total today",
-                    },
-                    ...(depositConfigured
-                      ? [
-                          {
-                            plan: "deposit" as const,
-                            title: "Pay a deposit",
-                            detail:
-                              bookingTotal > 0
-                                ? `${formatPrice(
-                                    depositPolicy.mode === "percent"
-                                      ? (bookingTotal * (depositPolicy.percent as number)) / 100
-                                      : (depositPolicy.fixedAmount as number),
-                                    currency,
-                                  )} today, the rest later`
-                                : "A deposit today, the balance later",
-                          },
-                        ]
-                      : []),
-                  ]
-                ).map((option) => {
-                  const selected = activePlan === option.plan;
-                  return (
-                    <label
-                      key={option.plan}
-                      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
-                        selected
-                          ? "border-[var(--color-ink)] bg-white"
-                          : "border-[var(--color-line)] bg-white hover:border-[var(--color-line)]"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="paymentPlan"
-                        value={option.plan}
-                        checked={selected}
-                        onChange={() => setPaymentPlan(option.plan)}
-                        className="mt-1 h-4 w-4 accent-[var(--color-ink)]"
-                      />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-[var(--color-ink)]">
-                          {option.title}
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
+                    activePlan === "full"
+                      ? "border-[var(--color-ink)] bg-white"
+                      : "border-[var(--color-line)] bg-white"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentPlan"
+                    value="full"
+                    checked={activePlan === "full"}
+                    onChange={() => setPaymentPlan("full")}
+                    className="mt-1 h-4 w-4 accent-[var(--color-ink)]"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-[var(--color-ink)]">
+                      Pay in full
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-[var(--color-muted)]">
+                      {bookingTotal > 0
+                        ? `${formatPrice(bookingTotal, currency)} today`
+                        : "The full booking total today"}
+                    </span>
+                  </span>
+                </label>
+
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
+                    activePlan === "deposit"
+                      ? "border-[var(--color-ink)] bg-white"
+                      : "border-[var(--color-line)] bg-white"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentPlan"
+                    value="deposit"
+                    checked={activePlan === "deposit"}
+                    onChange={() => setPaymentPlan("deposit")}
+                    className="mt-1 h-4 w-4 accent-[var(--color-ink)]"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="block text-sm font-semibold text-[var(--color-ink)]">
+                        Part payment
+                      </span>
+                      <span className="text-sm font-semibold text-[var(--color-ink)]">
+                        {bookingTotal > 0
+                          ? formatPrice(
+                              Math.min(
+                                bookingTotal,
+                                (bookingTotal * clampPercent(depositPercent, depositPolicy)) / 100,
+                              ),
+                              currency,
+                            )
+                          : "—"}
+                      </span>
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-[var(--color-muted)]">
+                      Reserve with {MIN_DEPOSIT_PERCENT}% or more now
+                      {depositPolicy.minPercent > MIN_DEPOSIT_PERCENT
+                        ? ` (minimum ${depositPolicy.minPercent}% on this booking)`
+                        : ""}
+                      , and pay the balance before you arrive.
+                    </span>
+
+                    {activePlan === "deposit" && (
+                      <span className="mt-3 block">
+                        <span className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-[var(--color-faint)]">
+                          <span>Pay now</span>
+                          <span className="text-[var(--color-ink)]">
+                            {clampPercent(depositPercent, depositPolicy)}%
+                          </span>
                         </span>
-                        <span className="mt-0.5 block text-xs leading-relaxed text-[var(--color-muted)]">
-                          {option.detail}
+                        <input
+                          type="range"
+                          min={Math.max(MIN_DEPOSIT_PERCENT, depositPolicy.minPercent)}
+                          max={99}
+                          step={1}
+                          value={clampPercent(depositPercent, depositPolicy)}
+                          onChange={(event) => setDepositPercent(Number(event.target.value))}
+                          aria-label="Percentage to pay now"
+                          className="mt-2 w-full accent-[var(--color-ink)]"
+                        />
+                        <span className="mt-1 flex justify-between text-[10px] text-[var(--color-faint)]">
+                          <span>{Math.max(MIN_DEPOSIT_PERCENT, depositPolicy.minPercent)}%</span>
+                          <span>99%</span>
                         </span>
                       </span>
-                    </label>
-                  );
-                })}
+                    )}
+                  </span>
+                </label>
 
                 {!depositConfigured && (
                   <p className="rounded-xl border border-dashed border-[var(--color-line)] bg-[var(--color-canvas)] p-3 text-[11px] leading-relaxed text-[var(--color-muted)]">
-                    Paying in instalments is arranged by our team.{" "}
-                    <a
-                      href={whatsappLink(
-                        "Hello Cosy Crest — I'd like to ask about paying a deposit rather than in full.",
-                      )}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-[var(--color-ink)] underline underline-offset-2"
-                    >
-                      Ask about a deposit
-                    </a>
-                    .
+                    Part payment is currently switched off for this property, so
+                    the full amount is due today.
                   </p>
                 )}
               </fieldset>

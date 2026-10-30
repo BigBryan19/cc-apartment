@@ -6,7 +6,8 @@ import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 import { KeyRound, Loader2, ShieldCheck, Wallet } from "lucide-react";
 import { SETTINGS_TABLE } from "../../lib/tables";
 import {
-  NO_DEPOSIT_POLICY,
+  DEFAULT_DEPOSIT_POLICY,
+  MIN_DEPOSIT_PERCENT,
   describeDepositPolicy,
   isDepositConfigured,
   parseDepositPolicy,
@@ -36,7 +37,7 @@ function toDraft(policy: DepositPolicy): DraftPolicy {
   return {
     enabled: isDepositConfigured(policy),
     mode: policy.mode ?? "percent",
-    percent: policy.percent !== null ? String(policy.percent) : "",
+    percent: policy.minPercent !== null ? String(policy.minPercent) : "",
     fixedAmount: policy.fixedAmount !== null ? String(policy.fixedAmount) : "",
     balanceDueDays:
       policy.balanceDueDays !== null ? String(policy.balanceDueDays) : "",
@@ -49,7 +50,11 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
 
-  const [draft, setDraft] = useState<DraftPolicy>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<DraftPolicy>({
+    ...EMPTY_DRAFT,
+    enabled: true,
+    percent: String(MIN_DEPOSIT_PERCENT),
+  });
   const [policyLoading, setPolicyLoading] = useState(true);
   const [policySaving, setPolicySaving] = useState(false);
   const [policyMessage, setPolicyMessage] = useState({ text: "", type: "" });
@@ -123,15 +128,18 @@ export default function SettingsPage() {
     // Validate before saving. An invalid policy is stored as "unconfigured" by
     // the parser, which would silently switch the checkout back to pay-in-full
     // — the owner deserves to be told why instead.
-    let payload: DepositPolicy = NO_DEPOSIT_POLICY;
+    let payload: DepositPolicy = { ...DEFAULT_DEPOSIT_POLICY, enabled: false };
 
     if (draft.enabled) {
       const percent = Number(draft.percent);
       const fixed = Number(draft.fixedAmount);
 
-      if (draft.mode === "percent" && (!Number.isFinite(percent) || percent <= 0 || percent >= 100)) {
+      if (
+        draft.mode === "percent" &&
+        (!Number.isFinite(percent) || percent < MIN_DEPOSIT_PERCENT || percent >= 100)
+      ) {
         setPolicyMessage({
-          text: "Enter a percentage between 1 and 99.",
+          text: `The minimum part payment is ${MIN_DEPOSIT_PERCENT}% and it must be below 100%.`,
           type: "error",
         });
         return;
@@ -145,8 +153,9 @@ export default function SettingsPage() {
       }
 
       payload = parseDepositPolicy({
+        enabled: true,
         mode: draft.mode,
-        percent: draft.mode === "percent" ? percent : null,
+        minPercent: draft.mode === "percent" ? percent : MIN_DEPOSIT_PERCENT,
         fixedAmount: draft.mode === "fixed" ? fixed : null,
         balanceDueDays: draft.balanceDueDays === "" ? null : Number(draft.balanceDueDays),
         instructions: draft.instructions,
@@ -233,11 +242,13 @@ export default function SettingsPage() {
                 />
                 <span>
                   <span className="block text-sm font-semibold text-slate-900">
-                    Offer a deposit at checkout
+                    Offer part payment at checkout
                   </span>
                   <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
-                    When this is off, guests can only pay in full. No deposit
-                    figure is shown anywhere until you set one here.
+                    Guests can reserve by paying a share of the total now and the
+                    rest before arrival. The share can never go below{" "}
+                    {MIN_DEPOSIT_PERCENT}%. Switch this off to require payment in
+                    full.
                   </span>
                 </span>
               </label>
@@ -254,14 +265,14 @@ export default function SettingsPage() {
                         }
                         className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-slate-900"
                       >
-                        <option value="percent">Percentage of total</option>
-                        <option value="fixed">Fixed amount (GHS)</option>
+                        <option value="percent">Guest chooses ({MIN_DEPOSIT_PERCENT}% minimum)</option>
+                        <option value="fixed">One fixed amount (GHS)</option>
                       </select>
                     </label>
 
                     {draft.mode === "percent" ? (
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                        Percentage
+                        Minimum part payment (%)
                         <input
                           value={draft.percent}
                           onChange={(event) =>

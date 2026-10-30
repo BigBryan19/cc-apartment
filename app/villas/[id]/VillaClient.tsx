@@ -279,17 +279,20 @@ export default function VillaClient({
             </button>
           </div>
 
-          {/* Gallery — the property's own media, never a placeholder tile. */}
-          <div className="mt-6 grid grid-cols-4 grid-rows-2 gap-2 overflow-hidden rounded-2xl md:h-[440px]">
+          {/* Gallery.
+              Every image that belongs to this apartment is shown — the mosaic
+              used to hide the extra tiles on mobile behind `hidden md:block`,
+              so a phone visitor saw one photo and never knew the rest existed. */}
+          <div className="mt-6 overflow-hidden rounded-2xl">
             <button
               onClick={() => setLightboxIndex(0)}
-              className="relative col-span-4 row-span-2 h-64 overflow-hidden md:col-span-2 md:h-auto"
+              className="relative block aspect-[16/10] w-full overflow-hidden md:aspect-[21/9]"
               aria-label={`Open ${media[0]?.type === "video" ? "video" : "photo"} 1`}
             >
               <img
                 src={media[0]?.poster ?? media[0]?.src ?? villa.image}
                 alt={villa.title}
-                className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+                className="h-full w-full object-cover transition-transform duration-700 hover:scale-[1.03]"
               />
               {media[0]?.type === "video" && (
                 <span className="absolute inset-0 flex items-center justify-center bg-black/20">
@@ -299,22 +302,32 @@ export default function VillaClient({
                 </span>
               )}
             </button>
-            {media.slice(1, 5).map((item, i) => (
-              <button
-                key={item.src + i}
-                onClick={() => setLightboxIndex(i + 1)}
-                className="hidden overflow-hidden md:block"
-                aria-label={`Open ${item.type === "video" ? "video" : "photo"} ${i + 2}`}
-              >
-                <img
-                  src={item.poster ?? item.src}
-                  alt={`${villa.title} photo ${i + 2}`}
-                  loading="lazy"
-                  className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
-                />
-              </button>
-            ))}
           </div>
+
+          {media.length > 1 && (
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              {media.slice(1).map((item, i) => (
+                <button
+                  key={item.src + i}
+                  onClick={() => setLightboxIndex(i + 1)}
+                  className="relative aspect-[4/3] overflow-hidden rounded-lg"
+                  aria-label={`Open ${item.type === "video" ? "video" : "photo"} ${i + 2}`}
+                >
+                  <img
+                    src={item.poster ?? item.src}
+                    alt={`${villa.title} — view ${i + 2}`}
+                    loading="lazy"
+                    className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+                  />
+                  {item.type === "video" && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+                      <Play size={16} className="text-white" fill="currentColor" aria-hidden="true" />
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
 
           {media.length > 0 && (
             <button
@@ -322,8 +335,8 @@ export default function VillaClient({
               className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)]"
             >
               <Images size={14} aria-hidden="true" />
-              View all {villa.images.length} photos
-              {villa.video ? " & walkthrough video" : ""}
+              All {villa.images.length} photos
+              {villa.video ? " & the walkthrough video" : ""}
             </button>
           )}
 
