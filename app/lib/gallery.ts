@@ -360,8 +360,28 @@ export function galleryCounts(items: GalleryItem[]): Record<GalleryFilter, numbe
  * Map a `gallery_media` row (or anything row-shaped) to a GalleryItem.
  * Unknown categories fall back to "other" rather than crashing the section.
  */
+/**
+ * Files that were proven to belong to a different property.
+ *
+ * A `gallery_media` row written before the reassignment still points at
+ * `/adenta.mp4`, which is the Aburi studio. Until the migration is run, a live
+ * gallery would keep publishing it as an Adenta walkthrough — the exact claim
+ * the owner asked to remove. The correction happens here as well so the public
+ * page is right immediately, and the migration persists it.
+ */
+const MISATTRIBUTED_MEDIA: Record<string, { src: string; poster?: string; title: string; villaId: number }> = {
+  "/adenta.mp4": {
+    src: "/aburi-studio.mp4",
+    poster: "/aburi-studio-poster.jpg",
+    title: "Aburi Studio",
+    villaId: 2,
+  },
+};
+
 export function toGalleryItem(row: Record<string, unknown>, index: number): GalleryItem | null {
-  const src = typeof row.src === "string" ? row.src.trim() : "";
+  const rawSrc = typeof row.src === "string" ? row.src.trim() : "";
+  const correction = MISATTRIBUTED_MEDIA[rawSrc];
+  const src = correction?.src ?? rawSrc;
   if (!src) return null;
 
   const type = row.type === "video" ? "video" : "photo";
@@ -383,11 +403,23 @@ export function toGalleryItem(row: Record<string, unknown>, index: number): Gall
     id: typeof row.id === "string" ? row.id : `media-${index}`,
     type,
     src,
-    poster: typeof row.poster === "string" && row.poster ? row.poster : undefined,
+    poster: correction?.poster
+      ? correction.poster
+      : typeof row.poster === "string" && row.poster
+        ? row.poster
+        : undefined,
     category,
-    title: typeof row.title === "string" && row.title ? row.title : "Cosy Crest",
+    title: correction?.title
+      ? correction.title
+      : typeof row.title === "string" && row.title
+        ? row.title
+        : "Cosy Crest",
     caption: typeof row.caption === "string" && row.caption ? row.caption : undefined,
-    villaId: typeof row.villa_id === "number" ? row.villa_id : undefined,
+    villaId: correction?.villaId
+      ? correction.villaId
+      : typeof row.villa_id === "number"
+        ? row.villa_id
+        : undefined,
     sortOrder,
   };
 }

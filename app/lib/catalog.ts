@@ -112,6 +112,22 @@ const BUNDLED_MEDIA: Record<
 };
 
 /**
+ * A room's own clip, keyed by property id and unit id.
+ *
+ * Production `villas.rates` predates the `video` field, so a stored rate list
+ * carries no room clip and the studio would show only the house tour until the
+ * migration is run. This is the same pattern as BUNDLED_MEDIA: the fallback
+ * belongs to *this* property and *this* room, so it cannot mislabel anything.
+ */
+const BUNDLED_UNIT_CLIPS: Record<number, Record<string, { video: string; poster: string }>> = {
+  2: {
+    // The Aburi Studio. This footage was previously published as the Adenta
+    // Serenity walkthrough.
+    studio: { video: "/aburi-studio.mp4", poster: "/aburi-studio-poster.jpg" },
+  },
+};
+
+/**
  * Clips proven, by frame comparison, to belong to a different property.
  *
  * A database row can still point at one of these after the file has been
@@ -185,6 +201,12 @@ export function toVillaProps(row: VillaRow): VillaProps {
     guests: guests || null,
     bedrooms: bedrooms || null,
     bathrooms: row.bathrooms ?? null,
+  }).map((unit) => {
+    // A stored clip always wins; the bundled one fills the gap for a row that
+    // predates room clips.
+    if (unit.video) return unit;
+    const clip = BUNDLED_UNIT_CLIPS[row.id]?.[unit.id];
+    return clip ? { ...unit, video: clip.video, videoPoster: clip.poster } : unit;
   });
 
   return {

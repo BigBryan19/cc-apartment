@@ -170,6 +170,43 @@ check(
   DEFAULT_GALLERY.some((item) => item.src === "/aburi-studio.mp4" && item.villaId === 2),
 );
 
+// A production-shaped row: rates stored before room clips existed, and a guests
+// column that still says 4. Neither may lose the studio clip or the capacity.
+{
+  const productionAburi = toVillaProps({
+    id: 2,
+    title: "Aburi Mountain Retreat",
+    location: "Eastern Region • Aburi",
+    price: 600,
+    guests: 4,
+    bedrooms: 4,
+    bathrooms: 5,
+    has_pool: true,
+    image: "/Aburi1.jpeg",
+    images: ["/Aburi1.jpeg"],
+    video: "/aburi.mp4",
+    amenities: [],
+    coordinates: { lat: 5.84, lng: -0.17 },
+    rates: [
+      { option: "Single bedroom", amount: 600, priceBasis: "per_night" },
+      { option: "Studio", amount: 800, priceBasis: "per_night" },
+      { option: "Whole apartment (4 bedrooms)", amount: 3500, priceBasis: "per_night", maxGuests: 4 },
+    ],
+  } as never);
+
+  check(
+    "M8",
+    "a row written before room clips still shows the Aburi studio clip",
+    productionAburi.units.find((unit) => unit.name === "Studio")?.video === "/aburi-studio.mp4",
+  );
+  check("M9", "that row now advertises 8 guests", productionAburi.guests === 8);
+  check(
+    "M10",
+    "its whole-house rate accepts 8, not the stored 4",
+    productionAburi.units.find((unit) => unit.kind === "whole_property")?.maxGuests === 8,
+  );
+}
+
 // --- 3. Services -----------------------------------------------------------
 
 console.log("\n=== Services ===\n");
