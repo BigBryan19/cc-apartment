@@ -16,7 +16,7 @@
 import { toVillaProps, bundledVillas, bundledVillaById } from "../app/lib/catalog";
 import { approvedCapacity, capacityIsApprovedByRule } from "../app/lib/capacity";
 import { normalizeUnits } from "../app/lib/rates";
-import { maxPropertyOccupancy } from "../app/lib/quote";
+import { maxPropertyOccupancy, priceUnit } from "../app/lib/quote";
 import { SERVICES } from "../app/lib/services";
 import { DEFAULT_GALLERY } from "../app/lib/gallery";
 
@@ -121,6 +121,30 @@ check("C5", "only the stated bedroom counts are governed by the rule", capacityI
     "Lakeside 6, Aburi 8, Adenta 8",
     wrong.length === 0,
     wrong.map((villa) => `${villa.title}=${villa.guests}`).join(", "),
+  );
+}
+
+// Booking validation must accept the group the corrected capacity allows.
+{
+  const aburi = bundledVillaById(2)!;
+  const wholeHouse = aburi.units.find((unit) => unit.kind === "whole_property")!;
+  const five = priceUnit(wholeHouse, 2, 5);
+  check("C10", "a party of five can book the four-bedroom house", five.ok === true);
+  check(
+    "C11",
+    "and is charged the published nightly rate, not a made-up one",
+    five.ok === true && five.amount === wholeHouse.amount * 2,
+  );
+  const nine = priceUnit(wholeHouse, 2, 9);
+  check("C12", "a party of nine is still refused", nine.ok === false);
+}
+{
+  const lakeside = bundledVillaById(1)!;
+  const wholeHouse = lakeside.units.find((unit) => unit.kind === "whole_property")!;
+  check(
+    "C13",
+    "the three-bedroom house accepts six and refuses seven",
+    priceUnit(wholeHouse, 2, 6).ok === true && priceUnit(wholeHouse, 2, 7).ok === false,
   );
 }
 
