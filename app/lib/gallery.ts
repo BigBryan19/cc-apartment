@@ -162,7 +162,13 @@ export const DEFAULT_GALLERY: GalleryItem[] = [
   photo("aburi-4", "/Aburi4.jpeg", 2, "Kitchen", "Open kitchen with breakfast bar.", 90),
   photo("aburi-3", "/Aburi3.jpeg", 2, "Bar", "The bar beneath the staircase.", 100),
 
-  video("adenta-video", "/adenta.mp4", "/Adenta1.jpg", 3, "Adenta Serenity walkthrough", 110),
+  /*
+   * The clip that used to be labelled "Adenta Serenity walkthrough" is the Aburi
+   * studio — same room, proven by frame comparison with `/aburi.mp4` at 55–75s.
+   * It is credited to the room it was filmed in, and Adenta keeps no video until
+   * a real one is supplied.
+   */
+  video("aburi-studio-video", "/aburi-studio.mp4", "/aburi-studio-poster.jpg", 2, "Aburi Studio", 65),
   photo("adenta-1", "/Adenta1.jpg", 3, "Exterior", "The front elevation at Adenta Serenity.", 120),
   photo("adenta-2", "/Adenta2.jpg", 3, "Pool", "The pool and pergola seating.", 130),
   photo("adenta-3", "/Adenta3.jpg", 3, "Living & dining", "Open living and dining area.", 140),

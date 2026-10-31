@@ -1,5 +1,5 @@
 import React from "react";
-import { Dog, Dumbbell, Waves, CarFront, LucideIcon } from "lucide-react";
+import { Dog, Waves, CarFront, LucideIcon } from "lucide-react";
 
 interface SpecialtyItem {
   title: string;
@@ -7,10 +7,16 @@ interface SpecialtyItem {
   Icon: LucideIcon;
 }
 
+/**
+ * Only what the properties actually have.
+ *
+ * "Fitness & gym — train on site" used to sit in this row. Cosy Crest has no gym
+ * on any property, so the claim is gone rather than reworded: a facility that
+ * does not exist cannot be softened into one.
+ */
 const SPECIALTIES: SpecialtyItem[] = [
   { title: "Private pool", sub: "Every residence", Icon: Waves },
   { title: "Pet friendly", sub: "Pets welcome", Icon: Dog },
-  { title: "Fitness & gym", sub: "Train on site", Icon: Dumbbell },
   { title: "Secure parking", sub: "Gated compound", Icon: CarFront },
 ];
 
@@ -25,7 +31,7 @@ const Specialties: React.FC = () => {
           </h2>
         </div>
 
-        <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-3">
           {SPECIALTIES.map((item) => (
             <div key={item.title} className="flex items-start gap-4">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-canvas)] text-[var(--color-ink)]">

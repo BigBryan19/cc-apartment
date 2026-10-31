@@ -253,21 +253,21 @@ begin
       (title, location, price, guests, bedrooms, bathrooms, has_pool,
        image, images, description, amenities, rates, coordinates)
       values
-      ('Lakeside Estate', 'Greater Accra • Lakeside', 2000, 4, 3, 5, true,
+      ('Lakeside Estate', 'Greater Accra • Lakeside', 2000, 6, 3, 5, true,
        '/Lake1.jpg', array['/Lake1.jpg','/Lake2.jpg','/Lake3.jpg','/Lake4.jpg'],
        'Experience comfort, privacy, and elegance in this beautifully furnished apartment located in the serene and secure Lakeside Estate.',
        array['Free Wi-Fi','Kitchen','Pool','Well-furnished hall','Television in all rooms','PS5 Gaming Console'],
        '[{"option":"One bedrooms","amount":1500},{"option":"Two bedrooms","amount":2000},{"option":"Whole apartment","amount":3500},{"option":"Monthly Rate","amount":36000}]'::jsonb,
        '{"lat":5.726743173934811,"lng":-0.1200319741836416}'::jsonb),
 
-      ('Aburi Mountain Retreat', 'Eastern Region • Aburi', 600, 4, 4, 5, true,
+      ('Aburi Mountain Retreat', 'Eastern Region • Aburi', 600, 8, 4, 5, true,
        '/Aburi1.jpeg', array['/Aburi1.jpeg','/Aburi2.jpeg','/Aburi3.jpeg','/Aburi4.jpeg'],
        'Nestled in the serene and refreshing environment of Aburi, this beautifully furnished apartment offers complete comfort.',
        array['Free Wi-Fi','Kitchen','Pool','Well-furnished hall','Television in all rooms'],
        '[{"option":"Single bedroom","amount":600},{"option":"Studio","amount":800},{"option":"One bedrooms","amount":1200},{"option":"Two bedrooms","amount":2000},{"option":"Whole apartment","amount":3500},{"option":"Monthly Rate","amount":30000}]'::jsonb,
        '{"lat":5.843870554138503,"lng":-0.17225994962774632}'::jsonb),
 
-      ('Adenta Serenity', 'Greater Accra • Adenta', 600, 4, 4, 5, true,
+      ('Adenta Serenity', 'Greater Accra • Adenta', 600, 8, 4, 5, true,
        '/Adenta1.jpg', array['/Adenta1.jpg','/Adenta2.jpg','/Adenta3.jpg','/Adenta4.jpg'],
        'Located in the heart of Adenta, this premium apartment combines luxury, comfort, and entertainment with modern furnishings and a grand piano.',
        array['Free Wi-Fi','Kitchen','Pool','Well-furnished hall','Grand Piano','PS5 Gaming Console'],

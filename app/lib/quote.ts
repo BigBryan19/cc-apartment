@@ -510,11 +510,23 @@ export function findUnitsForGuests<T extends AccommodationUnit>(
   return { suited, tooSmall };
 }
 
-/** The largest occupancy any unit on a property will actually accept. */
+/**
+ * The largest occupancy any *real* unit on a property will accept.
+ *
+ * Test units are excluded. The gateway Test Room is injected into every
+ * property with a 60-guest limit so it can be booked for a cedi, and counting it
+ * here made every property match every guest search — the filter stopped
+ * filtering. Capacity is advertised from what a guest can actually stay in.
+ */
 export function maxPropertyOccupancy(units: AccommodationUnit[]): number | null {
   if (!Array.isArray(units)) return null;
   const capacities = units
-    .filter((unit) => unit.active && unit.maxGuests !== null)
+    .filter(
+      (unit) =>
+        unit.active &&
+        unit.maxGuests !== null &&
+        !unit.name.toLowerCase().includes("test"),
+    )
     .map((unit) => unit.maxGuests as number);
   return capacities.length ? Math.max(...capacities) : null;
 }

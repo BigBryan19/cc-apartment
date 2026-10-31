@@ -2,8 +2,10 @@
 // ---------------------------------------------------------------------------
 // Experiences & services.
 //
-// Four cards, one shape: same image ratio, same type scale, same button
-// position, so the row reads as a set rather than four unrelated offers. Prices
+// Five cards, one shape: same image ratio, same type scale, same button
+// position, so the row reads as a set rather than five unrelated offers. The grid
+// steps 1 → 2 → 3 columns; three across leaves a balanced 3 + 2 rather than an
+// orphaned fifth card under a four-column row. Prices
 // come from app/lib/services.ts — the same file the booking engine's extras
 // read, so a card can never advertise a figure the checkout will not charge.
 //
@@ -79,13 +81,13 @@ const Services: React.FC<ServicesProps> = ({
             Make the stay an occasion
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-[var(--color-muted)]">
-            Honeymoon setups, birthday stays, a car for your time here and a
-            therapist who comes to you — arranged before you arrive and billed
-            with your stay.
+            Honeymoon setups, birthday stays, a chef in your kitchen, a car for
+            your time here and a therapist who comes to you — arranged before you
+            arrive, and quoted to you before anything is charged.
           </p>
         </div>
 
-        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {SERVICES.map((service) => {
             // The rental card scrolls to the planner; it needs dates, which the
             // card itself has no room for.

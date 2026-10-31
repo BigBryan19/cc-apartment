@@ -22,6 +22,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "../../utils/supabase";
 import {
+  approvedCapacity,
+  capacityIsApprovedByRule,
+  capacityRuleNote,
+} from "../../lib/capacity";
+import {
   Plus,
   Trash2,
   Loader2,
@@ -44,6 +49,8 @@ interface UnitDraft {
   amount: string;
   priceBasis: PriceBasis;
   maxGuests: string;
+  /** Optional clip of this specific room, e.g. "/aburi-studio.mp4". */
+  video: string;
 }
 
 interface VillaRow {
@@ -60,7 +67,16 @@ interface VillaRow {
   video: string | null;
   description: string | null;
   amenities: string[] | null;
-  rates: { option?: string; amount?: number; priceBasis?: string; maxGuests?: number }[] | null;
+  rates:
+    | {
+        option?: string;
+        amount?: number;
+        priceBasis?: string;
+        maxGuests?: number;
+        video?: string;
+        videoPoster?: string;
+      }[]
+    | null;
   rating: number | null;
 }
 
@@ -95,7 +111,9 @@ const EMPTY_EDITOR: EditorState = {
   video: "",
   amenities: "Free Wi-Fi, Air conditioning, Kitchen, Parking",
   images: [],
-  units: [{ option: "Whole apartment", amount: "", priceBasis: "per_night", maxGuests: "" }],
+  units: [
+    { option: "Whole apartment", amount: "", priceBasis: "per_night", maxGuests: "", video: "" },
+  ],
 };
 
 const BASIS_OPTIONS: { value: PriceBasis; label: string }[] = [
@@ -131,8 +149,17 @@ function toEditor(row: VillaRow): EditorState {
             unit.maxGuests !== null && unit.maxGuests !== undefined
               ? String(unit.maxGuests)
               : "",
+          video: unit.video ?? "",
         }))
-      : [{ option: "Whole apartment", amount: "", priceBasis: "per_night", maxGuests: "" }],
+      : [
+          {
+            option: "Whole apartment",
+            amount: "",
+            priceBasis: "per_night",
+            maxGuests: "",
+            video: "",
+          },
+        ],
   };
 }
 
@@ -256,6 +283,7 @@ export default function ManageVillas() {
         amount: unit.amount === "" ? null : Number(unit.amount),
         priceBasis: unit.priceBasis,
         maxGuests: unit.maxGuests === "" ? undefined : Number(unit.maxGuests),
+        ...(unit.video.trim() ? { video: unit.video.trim() } : {}),
       }));
 
     const badUnit = units.find(
@@ -274,7 +302,10 @@ export default function ManageVillas() {
       location: editor.location.trim() || null,
       description: editor.description.trim() || null,
       price: editor.price === "" ? 0 : Number(editor.price),
-      guests: Number(editor.guests) || 1,
+      // Stored as the rule's figure, not whatever the old row said. A four-
+      // bedroom house was saved as 4 guests and checkout refused five.
+      guests:
+        approvedCapacity(Number(editor.bedrooms), Number(editor.guests)) || 1,
       bedrooms: Number(editor.bedrooms) || 0,
       bathrooms: Number(editor.bathrooms) || 0,
       has_pool: editor.hasPool,
@@ -534,13 +565,28 @@ export default function ManageVillas() {
                   <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
                     Guests
                   </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={editor.guests}
-                    onChange={(event) => setEditor({ ...editor, guests: event.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-600 focus:outline-none"
-                  />
+                  {capacityIsApprovedByRule(Number(editor.bedrooms)) ? (
+                    <>
+                      <input
+                        type="number"
+                        value={approvedCapacity(Number(editor.bedrooms), Number(editor.guests))}
+                        readOnly
+                        aria-describedby="guests-rule"
+                        className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                      />
+                      <p id="guests-rule" className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                        {capacityRuleNote(Number(editor.bedrooms))}
+                      </p>
+                    </>
+                  ) : (
+                    <input
+                      type="number"
+                      min={1}
+                      value={editor.guests}
+                      onChange={(event) => setEditor({ ...editor, guests: event.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-blue-600 focus:outline-none"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -637,7 +683,7 @@ export default function ManageVillas() {
                         ...editor,
                         units: [
                           ...editor.units,
-                          { option: "", amount: "", priceBasis: "per_night", maxGuests: "" },
+                          { option: "", amount: "", priceBasis: "per_night", maxGuests: "", video: "" },
                         ],
                       })
                     }
@@ -716,6 +762,19 @@ export default function ManageVillas() {
                           <Trash2 size={13} />
                         </button>
                       </div>
+                      {/* Optional clip of this room. Leave blank to show only the
+                          property walkthrough and the photographs. */}
+                      <input
+                        value={unit.video}
+                        onChange={(event) => {
+                          const next = [...editor.units];
+                          next[index] = { ...unit, video: event.target.value };
+                          setEditor({ ...editor, units: next });
+                        }}
+                        placeholder={`Clip for this room only (optional), e.g. /aburi-studio.mp4`}
+                        aria-label={`Video clip for ${unit.option || "this rate"}`}
+                        className="col-span-12 rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs text-slate-700"
+                      />
                     </div>
                   ))}
                 </div>

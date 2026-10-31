@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:pricing": "tsc -p tsconfig.test.json && node .test-build/tests/pricing.test.js && node .test-build/tests/deposits.test.js",
+    "test:pricing": "tsc -p tsconfig.test.json && node .test-build/tests/pricing.test.js && node .test-build/tests/deposits.test.js && node .test-build/tests/media-and-capacity.test.js",
     "check:live-mapping": "tsc -p tsconfig.test.json && node .test-build/tests/live-mapping.check.js"
   },
   "dependencies": {

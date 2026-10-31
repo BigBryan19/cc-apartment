@@ -127,6 +127,17 @@ export interface AccommodationUnit {
   pool: PoolAccess | null;
   exclusiveAreas?: string;
   sharedAreas?: string;
+  /**
+   * A clip of *this* room, when one exists.
+   *
+   * A property walkthrough shows the whole house; a studio's own clip shows the
+   * studio. Kept on the unit so footage can never be shown against a room it
+   * was not filmed in — the "Adenta" clip was really the Aburi studio, and it
+   * now lives here instead.
+   */
+  video?: string;
+  /** Still frame from the same clip, shown before it plays. */
+  videoPoster?: string;
   /** Excluded from sale until an admin publishes it. */
   active: boolean;
   /** True when the basis or amount was inferred rather than configured. */
@@ -150,6 +161,8 @@ export interface StoredRate {
   pool?: PoolAccess;
   exclusiveAreas?: string;
   sharedAreas?: string;
+  video?: string;
+  videoPoster?: string;
   active?: boolean;
 }
 
@@ -285,15 +298,21 @@ export function normalizeUnits(
       reviewNote = `${reviewNote ? reviewNote + " " : ""}Another rate on this property has the same label. Both are kept so the conflict is visible.`;
     }
 
-    // Defaults: a whole-property unit is the whole house, so it inherits the
-    // property's own capacity. A room unit is deliberately left null rather than
-    // inheriting the property total, because showing a property-wide guest count
-    // against a single room is exactly the bug this model exists to prevent.
+    /*
+     * Defaults: a whole-property unit is the whole house, so its limit IS the
+     * property's capacity — it must not carry a separate, staler figure. Rows
+     * written before the capacity rule stored `maxGuests: 4` on the whole-house
+     * rate of an eight-guest property, and checkout refused five guests because
+     * of it. A room unit is still left null rather than inheriting the property
+     * total, because showing a property-wide guest count against one room is
+     * exactly the confusion this model exists to prevent.
+     */
     const maxGuests =
-      typeof entry.maxGuests === "number"
-        ? entry.maxGuests
-        : kind === "whole_property"
-          ? (fallback?.guests ?? null)
+      kind === "whole_property"
+        ? (fallback?.guests ??
+          (typeof entry.maxGuests === "number" ? entry.maxGuests : null))
+        : typeof entry.maxGuests === "number"
+          ? entry.maxGuests
           : null;
 
     return {
@@ -321,6 +340,11 @@ export function normalizeUnits(
       pool: entry.pool ?? null,
       exclusiveAreas: entry.exclusiveAreas,
       sharedAreas: entry.sharedAreas,
+      video: typeof entry.video === "string" && entry.video ? entry.video : undefined,
+      videoPoster:
+        typeof entry.videoPoster === "string" && entry.videoPoster
+          ? entry.videoPoster
+          : undefined,
       active: entry.active !== false,
       needsReview,
       reviewNote,
@@ -346,6 +370,8 @@ export function normalizeUnits(
       pool: "shared",
       exclusiveAreas: undefined,
       sharedAreas: undefined,
+      video: undefined,
+      videoPoster: undefined,
       active: true,
       needsReview: false,
       reviewNote: undefined,

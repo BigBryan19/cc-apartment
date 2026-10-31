@@ -105,7 +105,7 @@ your honeymoon package.
 **Target:** Lakeside Estate Accra · Lakeside Estate apartment
 **Intent:** specific, low volume, very high conversion.
 **Outline:** the estate itself · security and gated access · distance to the
-airport and to central Accra · shopping · the pool and gym · your Lakeside
+airport and to central Accra · shopping · the pool terrace · your Lakeside
 property.
 
 ### 6. `Furnished vs unfurnished: what a short let actually includes in Ghana`

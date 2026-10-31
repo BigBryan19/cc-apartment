@@ -17,6 +17,8 @@
 //   • Birthday   — from GHS 5,000, unchanged.
 //   • Massage    — no approved price, so the card says "Enquire for pricing"
 //                  and never invents a figure.
+//   • Private    — no approved price yet either. A chef is arranged per stay and
+//     chef         is NOT part of the room rate, which the card states plainly.
 //
 //   The two priced services are also present in app/lib/extras.ts so that a
 //   guest who adds them at checkout is charged the same amount the card
@@ -27,7 +29,7 @@
 import { nightsBetween } from "./dates";
 import { whatsappLink } from "./contact";
 
-export type ServiceId = "honeymoon" | "birthday" | "car-rental" | "massage";
+export type ServiceId = "honeymoon" | "birthday" | "car-rental" | "massage" | "private-chef";
 
 /** How the advertised figure is applied. */
 export type ServicePriceBasis = "per_stay" | "per_day";
@@ -181,11 +183,41 @@ const MASSAGE: ServiceDefinition = {
   ),
 };
 
+/**
+ * Private chef.
+ *
+ * Unpriced on purpose: nothing has been approved for menus or per-head cost, so
+ * the card says "Enquire for pricing" and the WhatsApp message asks for both.
+ * The photograph is the open kitchen at Aburi Mountain Retreat — a real Cosy
+ * Crest room, not a stock chef scene, and the note under the price states that a
+ * chef is arranged separately rather than included, so no one books expecting it
+ * to be part of the room rate.
+ */
+const PRIVATE_CHEF: ServiceDefinition = {
+  id: "private-chef",
+  name: "Private Chef",
+  tagline: "Dining in",
+  description:
+    "Enjoy a personalised dining experience with a private chef during your stay. Enquire about menus and availability.",
+  image: "/Aburi4.jpeg",
+  imageAlt: "The open kitchen at Aburi Mountain Retreat, where a private chef cooks",
+  // No approved price: the card must not imply one.
+  price: null,
+  priceLabel: "Enquire for pricing",
+  priceNote:
+    "Arranged per stay and not included in the room rate. Tell us your dates and we confirm menus, availability and cost.",
+  ctaLabel: "Enquire on WhatsApp",
+  href: whatsappLink(
+    "Hello Cosy Crest — I'd like to ask about a Private Chef during my stay. Please send me menus, availability and pricing.",
+  ),
+};
+
 export const SERVICES: ServiceDefinition[] = [
   HONEYMOON,
   BIRTHDAY,
   CAR_RENTAL_SERVICE,
   MASSAGE,
+  PRIVATE_CHEF,
 ];
 
 export function getService(id: ServiceId): ServiceDefinition {

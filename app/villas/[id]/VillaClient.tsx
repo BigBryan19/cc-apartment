@@ -217,10 +217,31 @@ export default function VillaClient({
    * files only — each villa currently has four photographs and one walkthrough —
    * and the lightbox covers all of them.
    */
+  /*
+   * The chosen room's own clip, when it has one.
+   *
+   * The walkthrough covers the whole property; a studio clip covers the studio.
+   * It sits after the walkthrough and before the photographs, and appears only
+   * while that room is selected — so footage is never shown against a room it
+   * was not filmed in.
+   */
+  const unitClip: { type: "video"; src: string; poster?: string; title: string }[] =
+    selectedUnit?.video
+      ? [
+          {
+            type: "video" as const,
+            src: selectedUnit.video,
+            poster: selectedUnit.videoPoster ?? villa.images[0],
+            title: `${selectedUnit.name} at ${villa.title}`,
+          },
+        ]
+      : [];
+
   const media: { type: "photo" | "video"; src: string; poster?: string; title: string }[] = [
     ...(villa.video
       ? [{ type: "video" as const, src: villa.video, poster: villa.images[0], title: `${villa.title} walkthrough` }]
       : []),
+    ...unitClip,
     ...villa.images.map((src, index) => ({
       type: "photo" as const,
       src,
@@ -228,7 +249,13 @@ export default function VillaClient({
     })),
   ];
 
-  const lightboxItem = lightboxIndex !== null ? media[lightboxIndex] : null;
+  // `media` grows or shrinks when the selected room changes, so an index taken
+  // before that change can point past the end. Clamp rather than render nothing.
+  const safeLightboxIndex =
+    lightboxIndex !== null && media.length > 0
+      ? Math.min(lightboxIndex, media.length - 1)
+      : null;
+  const lightboxItem = safeLightboxIndex !== null ? media[safeLightboxIndex] : null;
 
   const stepLightbox = (delta: number) => {
     setLightboxIndex((current) => {
@@ -420,10 +447,12 @@ export default function VillaClient({
                 </div>
               </div>
 
-              {/* Walkthrough video. Present for every property; if a future
-                  listing has none, the section is omitted rather than showing
-                  an empty player. */}
-              {villa.video && (
+              {/* Walkthrough. Two players at most: the property tour, and the
+                  chosen room's own clip when it has one. A listing with neither
+                  omits the section rather than showing an empty player — Adenta
+                  currently has no walkthrough, and says so by omission instead
+                  of borrowing another property's footage. */}
+              {(villa.video || selectedUnit?.video) && (
                 <div className="mt-10 border-t border-[var(--color-line-soft)] pt-8">
                   <h2 className="text-xl font-semibold tracking-tight">
                     Walkthrough
@@ -431,16 +460,36 @@ export default function VillaClient({
                   <p className="mt-1 text-sm text-[var(--color-muted)]">
                     A short tour of the apartment before you book.
                   </p>
-                  <video
-                    src={villa.video}
-                    poster={villa.images[0]}
-                    controls
-                    playsInline
-                    preload="metadata"
-                    className="mt-4 w-full rounded-2xl bg-black"
-                  >
-                    Your browser does not support embedded video.
-                  </video>
+                  {villa.video && (
+                    <video
+                      src={villa.video}
+                      poster={villa.images[0]}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="mt-4 w-full rounded-2xl bg-black"
+                    >
+                      Your browser does not support embedded video.
+                    </video>
+                  )}
+                  {selectedUnit?.video && (
+                    <figure className="mt-6">
+                      <video
+                        key={selectedUnit.video}
+                        src={selectedUnit.video}
+                        poster={selectedUnit.videoPoster ?? villa.images[0]}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="w-full rounded-2xl bg-black"
+                      >
+                        Your browser does not support embedded video.
+                      </video>
+                      <figcaption className="mt-2 text-xs text-[var(--color-muted)]">
+                        {selectedUnit.name} at {villa.title} — filmed in this room.
+                      </figcaption>
+                    </figure>
+                  )}
                 </div>
               )}
 
@@ -726,7 +775,7 @@ export default function VillaClient({
               />
             )}
             <p className="mt-3 text-center text-[10px] uppercase tracking-[0.14em] text-white/50">
-              {lightboxIndex !== null ? lightboxIndex + 1 : 1} / {media.length}
+              {(safeLightboxIndex ?? 0) + 1} / {media.length}
             </p>
           </div>
         </div>

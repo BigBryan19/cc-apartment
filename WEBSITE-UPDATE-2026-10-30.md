@@ -169,7 +169,13 @@ the exact bucket name to create; adding by path or URL keeps working.
 |---|---|---|---|---|
 | **Lakeside Estate** (id 1) | 4 — `Lake2` courtyard, `Lake4` living room, `Lake3` pool terrace, `Lake1` games room | ✅ `lakeside.mp4` (autoplay muted, poster fallback) | ✅ controls + lightbox | No bedroom, no bathroom, no kitchen |
 | **Aburi Mountain Retreat** (id 2) | 4 — `Aburi1` bedroom, `Aburi2` living room, `Aburi3` bar, `Aburi4` kitchen | ✅ `aburi.mp4` | ✅ controls + lightbox | No bathroom, no exterior |
-| **Adenta Serenity** (id 3) | 4 — `Adenta1` exterior, `Adenta2` pool, `Adenta3` living/dining, `Adenta4` bedroom | ✅ `adenta.mp4` | ✅ controls + lightbox | No bathroom, no kitchen |
+| **Adenta Serenity** (id 3) | 4 — `Adenta1` exterior, `Adenta2` pool, `Adenta3` living/dining, `Adenta4` bedroom | ❌ no walkthrough (asset missing) | ❌ none — falls back to photographs | No bathroom, no kitchen, **no video** |
+
+> **Corrected 1 November 2026.** The clip listed above as the Adenta walkthrough
+> was the Aburi studio: the same blue carpet, wardrobe and butterfly canvas, and
+> the same room appears inside `aburi.mp4` at 55–75s. It has been renamed
+> `aburi-studio.mp4` and now sits on the Aburi studio rate. Adenta has no
+> walkthrough of its own, and that gap is reported rather than filled.
 
 **Why the previews stopped working:** commit `a8af45f` ("drop 56 MB of unused
 assets") deleted `aburi.mp4`, `adenta.mp4` and `lakeside.mp4` from `public/`.

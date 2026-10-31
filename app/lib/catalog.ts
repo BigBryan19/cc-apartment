@@ -41,6 +41,7 @@
 // ---------------------------------------------------------------------------
 
 import { normalizeUnits, type StoredRate } from "./rates";
+import { approvedCapacity } from "./capacity";
 import type { VillaProps } from "../components/villas/types";
 
 /** A row from the `villas` table, as PostgREST returns it. */
@@ -79,7 +80,7 @@ function toStringArray(value: unknown): string[] {
  */
 const BUNDLED_MEDIA: Record<
   number,
-  { image: string; images: string[]; video: string }
+  { image: string; images: string[]; video?: string }
 > = {
   1: {
     image: "/Lake2.jpg",
@@ -91,12 +92,45 @@ const BUNDLED_MEDIA: Record<
     images: ["/Aburi1.jpeg", "/Aburi2.jpeg", "/Aburi3.jpeg", "/Aburi4.jpeg"],
     video: "/aburi.mp4",
   },
+  /*
+   * Adenta has NO walkthrough of its own.
+   *
+   * The clip that used to sit here (`/adenta.mp4`) is the Aburi studio: same
+   * blue carpet, same dark wardrobe, same butterfly canvas, and the same room
+   * appears inside `/aburi.mp4` at 55–75s. It has been renamed
+   * `/aburi-studio.mp4` and attached to the Aburi studio rate.
+   *
+   * Adenta therefore has no `video` at all. That is the honest state: the asset
+   * is missing, so it is reported as missing and the card falls back to its
+   * photographs. Filling the gap with another property's footage would
+   * misrepresent the room a guest is booking.
+   */
   3: {
     image: "/Adenta1.jpg",
     images: ["/Adenta1.jpg", "/Adenta2.jpg", "/Adenta3.jpg", "/Adenta4.jpg"],
-    video: "/adenta.mp4",
   },
 };
+
+/**
+ * Clips proven, by frame comparison, to belong to a different property.
+ *
+ * A database row can still point at one of these after the file has been
+ * reassigned — the row is only corrected when the migration runs. Screening the
+ * path here means the wrong footage cannot reappear on a public page in the
+ * meantime, and the property simply shows its photographs.
+ */
+const MISASSIGNED_VIDEO: Record<number, string[]> = {
+  // `/adenta.mp4` was the Aburi studio. It is now `/aburi-studio.mp4`, held by
+  // the Aburi studio rate.
+  3: ["/adenta.mp4", "/aburi-studio.mp4"],
+};
+
+function resolveVideo(row: VillaRow, bundledVideo: string | undefined): string | undefined {
+  const stored = typeof row.video === "string" ? row.video.trim() : "";
+  const rejected = MISASSIGNED_VIDEO[row.id] ?? [];
+  if (stored && !rejected.includes(stored)) return stored;
+  return bundledVideo;
+}
 
 function toCoordinates(value: unknown, fallbackId: number): { lat: number; lng: number } {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -121,7 +155,17 @@ export function toVillaProps(row: VillaRow): VillaProps {
   const storedImages = toStringArray(row.images);
   const images = storedImages.length ? storedImages : (bundled?.images ?? []);
   const image = row.image ?? images[0] ?? bundled?.image ?? "";
-  const video = row.video ?? bundled?.video ?? undefined;
+  const video = resolveVideo(row, bundled?.video);
+
+  /*
+   * Occupancy is derived from the bedroom count, not from `row.guests`.
+   *
+   * Every production row said 4 guests, four-bedroom houses included, and that
+   * figure reached the cards, the filters and the whole-apartment rate's limit.
+   * See app/lib/capacity.ts.
+   */
+  const bedrooms = Number(row.bedrooms ?? 0);
+  const guests = approvedCapacity(bedrooms, row.guests ?? null);
 
   /*
    * A production row that predates `rates` (or was seeded with an empty array)
@@ -137,8 +181,9 @@ export function toVillaProps(row: VillaRow): VillaProps {
 
   const units = normalizeUnits(ratesForRow, {
     price: row.price ?? null,
-    guests: row.guests ?? null,
-    bedrooms: row.bedrooms ?? null,
+    // The corrected figure, so a whole-apartment rate inherits the real limit.
+    guests: guests || null,
+    bedrooms: bedrooms || null,
     bathrooms: row.bathrooms ?? null,
   });
 
@@ -151,8 +196,8 @@ export function toVillaProps(row: VillaRow): VillaProps {
     title: row.title ?? "",
     location: row.location ?? "",
     coordinates: toCoordinates(row.coordinates, row.id),
-    guests: Number(row.guests ?? 0),
-    bedrooms: Number(row.bedrooms ?? 0),
+    guests,
+    bedrooms,
     hasPool: Boolean(row.has_pool),
     bathrooms: Number(row.bathrooms ?? 0),
     description: row.description ?? "",
@@ -212,7 +257,7 @@ const BUNDLED_ROWS: VillaRow[] = [
     location: "Greater Accra • Lakeside",
     coordinates: { lat: 5.672737022781674, lng: -0.15226067413187414 },
     price: 1500,
-    guests: 4,
+    guests: 6,
     bedrooms: 3,
     bathrooms: 4,
     has_pool: true,
@@ -239,7 +284,7 @@ const BUNDLED_ROWS: VillaRow[] = [
     location: "Eastern Region • Aburi",
     coordinates: { lat: 5.843870554138503, lng: -0.17225994962774632 },
     price: 600,
-    guests: 4,
+    guests: 8,
     bedrooms: 4,
     bathrooms: 5,
     has_pool: true,
@@ -251,7 +296,15 @@ const BUNDLED_ROWS: VillaRow[] = [
     amenities: ABURI_AMENITIES,
     rates: [
       { option: "Single bedroom", amount: 600, priceBasis: "per_night" },
-      { option: "Studio", amount: 800, priceBasis: "per_night" },
+      // The studio is the room shown in `/aburi-studio.mp4`. The clip was
+      // previously served to guests as "Adenta Serenity walkthrough".
+      {
+        option: "Studio",
+        amount: 800,
+        priceBasis: "per_night",
+        video: "/aburi-studio.mp4",
+        videoPoster: "/aburi-studio-poster.jpg",
+      },
       { option: "One bedroom", amount: 1200, priceBasis: "per_night" },
       { option: "Two bedrooms", amount: 2000, priceBasis: "per_night" },
       { option: "Whole apartment (4 bedrooms)", amount: 3500, priceBasis: "per_night" },
@@ -266,13 +319,13 @@ const BUNDLED_ROWS: VillaRow[] = [
     location: "Greater Accra • Adenta",
     coordinates: { lat: 5.712737022781674, lng: -0.16226067413187414 },
     price: 1500,
-    guests: 4,
+    guests: 8,
     bedrooms: 4,
     bathrooms: 5,
     has_pool: true,
     image: "/Adenta1.jpg",
     images: ["/Adenta1.jpg", "/Adenta2.jpg", "/Adenta3.jpg", "/Adenta4.jpg"],
-    video: "/adenta.mp4",
+    // No walkthrough exists for this property. See BUNDLED_MEDIA[3].
     description:
       "Located in the heart of Adenta, this premium apartment combines luxury, comfort, and entertainment with modern furnishings and a grand piano.",
     amenities: ADENTA_AMENITIES,
