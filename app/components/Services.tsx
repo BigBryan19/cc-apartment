@@ -13,11 +13,48 @@
 
 "use client";
 
-import React from "react";
-import { ArrowRight, MessageCircle } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { ArrowRight, MessageCircle, Play } from "lucide-react";
 import { SERVICES } from "../lib/services";
 import { whatsappLink } from "../lib/contact";
 import CarRentalCalculator from "./services/CarRentalCalculator";
+
+/**
+ * A muted, looping preview that only becomes visible once the browser is
+ * actually decoding frames. If autoplay is refused — low-power mode, data
+ * saver, some iOS settings — `playing` stays false and the poster photograph
+ * underneath simply remains. No audio, ever.
+ */
+function ServicePreview({ src, label }: { src: string; label: string }) {
+  const ref = useRef<HTMLVideoElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const attempt = element.play();
+    if (attempt && typeof attempt.catch === "function") {
+      attempt.catch(() => setPlaying(false));
+    }
+  }, []);
+
+  return (
+    <video
+      ref={ref}
+      src={src}
+      poster={undefined}
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      aria-label={label}
+      onPlaying={() => setPlaying(true)}
+      className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
+        playing ? "opacity-100" : "opacity-0"
+      }`}
+    />
+  );
+}
 
 interface ServicesProps {
   /** Tighter vertical rhythm when embedded on /packages. */
@@ -62,12 +99,22 @@ const Services: React.FC<ServicesProps> = ({
                 className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--color-line-soft)] bg-white transition-shadow duration-300 hover:shadow-[var(--shadow-card)]"
               >
                 <div className="relative aspect-[4/3] overflow-hidden bg-[var(--color-canvas)]">
+                  {/* The still is always painted first. A clip, when the service
+                      has one, fades in over it once it is genuinely playing, so
+                      a blocked autoplay leaves a photograph rather than a frozen
+                      first frame. Never any audio. */}
                   <img
                     src={service.image}
                     alt={service.imageAlt}
                     loading="lazy"
                     className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                   />
+                  {service.video && <ServicePreview src={service.video} label={service.imageAlt} />}
+                  {service.video && (
+                    <span className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white backdrop-blur-sm">
+                      <Play size={10} className="fill-white" aria-hidden="true" /> Video
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex flex-1 flex-col p-6">

@@ -47,6 +47,12 @@ export interface ServiceDefinition {
   description: string;
   image: string;
   imageAlt: string;
+  /**
+   * Short clip shown instead of the still, as the card's first view.
+   * Muted, looped and inline; the still stays as its poster so the card is never
+   * blank while the clip buffers or when autoplay is refused.
+   */
+  video?: string;
   /** Null means "enquire for pricing" — never a placeholder number. */
   price: ServicePrice | null;
   /** How the price is printed on the card and everywhere else. */
@@ -124,8 +130,9 @@ const BIRTHDAY: ServiceDefinition = {
   tagline: "Room setup or hosted party",
   description:
     "An overnight stay with the room dressed for a birthday, or a hosted celebration with invited guests at one of our properties.",
-  image: "/Adenta3.jpg",
-  imageAlt: "Living and dining space prepared for a celebration at Cosy Crest",
+  image: "/media/birthday-service.jpg",
+  imageAlt: "Birthday table dressed in pink with place settings and a cake",
+  video: "/media/birthday-table.mp4",
   price: { amount: 5000, basis: "per_stay", from: true },
   priceLabel: priceLabelFor({ amount: 5000, basis: "per_stay", from: true }),
   priceNote: "Starting price. A hosted party with guests is quoted per event.",
@@ -159,8 +166,9 @@ const MASSAGE: ServiceDefinition = {
   tagline: "In-suite treatments",
   description:
     "A therapist comes to your apartment for a relaxation or deep-tissue massage. Available for individuals and couples.",
-  image: "/massage-service.jpg",
-  imageAlt: "Massage treatment bed prepared with a singing bowl and oils",
+  image: "/media/massage-service.jpg",
+  imageAlt: "Massage table laid with towels beside the pool",
+  video: "/media/massage-pergola.mp4",
   // No approved price: the card must not imply one.
   price: null,
   priceLabel: "Enquire for pricing",

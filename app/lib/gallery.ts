@@ -66,11 +66,11 @@ export const GALLERY_EMPTY_MESSAGE: Record<GalleryFilter, string> = {
   stays:
     "Photographs and videos of our apartments are being added. Ask us and we will send the latest.",
   birthdays:
-    "We have not published photographs of a birthday setup yet. Ask us for recent examples before you book.",
+    "Birthday setups are shown above. Tell us the date and we will confirm what we can stage for it.",
   couples:
-    "We have not published photographs of a honeymoon setup yet. Ask us and we will send what we have.",
+    "We have no honeymoon-setup photographs published yet. Ask us and we will send what we have before you book.",
   other:
-    "Photographs from guest experiences have not been published yet. Ask us and we will share recent ones.",
+    "Guest shoots, treatments and outings are shown above. Ask us and we will send more from recent bookings.",
 };
 
 function photo(
@@ -113,6 +113,37 @@ function video(
   };
 }
 
+
+/**
+ * Photo in an explicit category.
+ *
+ * The original `photo()`/`video()` helpers pin everything to "stays", which was
+ * correct when the gallery only held apartments. Setups, treatments and guest
+ * shoots need their own tab, so these take the category as an argument.
+ */
+function albumPhoto(
+  id: string,
+  src: string,
+  category: GalleryCategory,
+  title: string,
+  caption: string,
+  sortOrder: number,
+): GalleryItem {
+  return { id, type: "photo", src, category, title, caption, sortOrder };
+}
+
+function albumVideo(
+  id: string,
+  src: string,
+  poster: string,
+  category: GalleryCategory,
+  title: string,
+  caption: string,
+  sortOrder: number,
+): GalleryItem {
+  return { id, type: "video", src, poster, category, title, caption, sortOrder };
+}
+
 /**
  * Bundled fallback gallery — 12 photographs and 3 walkthrough videos, all real.
  * Ordering interleaves a video per property so the section never opens on a
@@ -136,7 +167,163 @@ export const DEFAULT_GALLERY: GalleryItem[] = [
   photo("adenta-2", "/Adenta2.jpg", 3, "Pool", "The pool and pergola seating.", 130),
   photo("adenta-3", "/Adenta3.jpg", 3, "Living & dining", "Open living and dining area.", 140),
   photo("adenta-4", "/Adenta4.jpg", 3, "Bedroom", "A prepared bedroom at Adenta Serenity.", 150),
+
+  // ---- Birthday setups (supplied 30 October 2026) -------------------------
+  albumPhoto(
+    "bday-room",
+    "/media/birthday-room.jpg",
+    "birthdays",
+    "Birthday room setup",
+    "The bedroom dressed with balloons and a birthday message before arrival.",
+    200,
+  ),
+  albumVideo(
+    "bday-table",
+    "/media/birthday-table.mp4",
+    "/media/birthday-table-poster.jpg",
+    "birthdays",
+    "Birthday table",
+    "Pink linen, place settings and a cake for a hosted celebration.",
+    210,
+  ),
+  albumVideo(
+    "bday-party",
+    "/media/birthday-party.mp4",
+    "/media/birthday-party-poster.jpg",
+    "birthdays",
+    "Birthday party",
+    "Guests seated for a birthday dinner at the apartment.",
+    220,
+  ),
+  albumVideo(
+    "bday-cake",
+    "/media/birthday-cake.mp4",
+    "/media/birthday-cake-poster.jpg",
+    "birthdays",
+    "Birthday cake",
+    "Cake and candles laid out in the kitchen.",
+    230,
+  ),
+
+  // ---- Massage ------------------------------------------------------------
+  albumVideo(
+    "massage-pergola",
+    "/media/massage-pergola.mp4",
+    "/media/massage-pergola-poster.jpg",
+    "other",
+    "Massage under the pergola",
+    "A treatment table set up beside the pool.",
+    240,
+  ),
+  albumVideo(
+    "massage-poolside",
+    "/media/massage-poolside.mp4",
+    "/media/massage-poolside-poster.jpg",
+    "other",
+    "Poolside massage",
+    "Towels and towels-down preparation on the pool terrace.",
+    250,
+  ),
+  albumVideo(
+    "massage-pool",
+    "/media/massage-pool.mp4",
+    "/media/massage-pool-poster.jpg",
+    "other",
+    "Massage by the pool",
+    "The treatment area overlooking the water.",
+    260,
+  ),
+
+  // ---- Graduation shoot (a real guest booking) ----------------------------
+  albumPhoto(
+    "grad-lounge",
+    "/media/graduation-lounge.jpg",
+    "other",
+    "Graduation portraits",
+    "A graduation shoot in the apartment's living space.",
+    270,
+  ),
+  albumPhoto(
+    "grad-dress",
+    "/media/graduation-blue-dress.jpg",
+    "other",
+    "Graduation portraits",
+    "Traditional dress and sash, photographed indoors.",
+    280,
+  ),
+  albumPhoto(
+    "grad-sash",
+    "/media/graduation-sash.jpg",
+    "other",
+    "Graduation portraits",
+    "Seated portrait with the graduation sash.",
+    290,
+  ),
+  albumPhoto(
+    "grad-piano",
+    "/media/graduation-piano.jpg",
+    "other",
+    "Graduation portraits",
+    "Portrait at the piano.",
+    300,
+  ),
+  albumPhoto(
+    "grad-suit",
+    "/media/graduation-suit.jpg",
+    "other",
+    "Graduation portraits",
+    "Portrait on the glass staircase.",
+    310,
+  ),
+  albumVideo(
+    "grad-stairs",
+    "/media/graduation-stairs.mp4",
+    "/media/graduation-stairs-poster.jpg",
+    "other",
+    "Graduation film",
+    "A short clip from a graduation shoot.",
+    320,
+  ),
+  albumVideo(
+    "grad-gown",
+    "/media/graduation-gown.mp4",
+    "/media/graduation-gown-poster.jpg",
+    "other",
+    "Graduation film",
+    "Cap and gown in the apartment.",
+    330,
+  ),
+  albumVideo(
+    "grad-portrait",
+    "/media/graduation-portrait.mp4",
+    "/media/graduation-portrait-poster.jpg",
+    "other",
+    "Graduation film",
+    "A longer portrait session around the property.",
+    340,
+  ),
+
+  // ---- Other --------------------------------------------------------------
+  albumVideo(
+    "travel-road",
+    "/media/travel-road.mp4",
+    "/media/travel-road-poster.jpg",
+    "other",
+    "On the road to Aburi",
+    "The drive up to the Eastern Region.",
+    350,
+  ),
+  albumVideo(
+    "games-lounge",
+    "/media/games-lounge.mp4",
+    "/media/games-lounge-poster.jpg",
+    "stays",
+    "Games lounge",
+    "The pool table and pergola by the pool.",
+    360,
+  ),
 ];
+
 
 /** Stable ordering for both the bundled list and database rows. */
 export function sortGallery(items: GalleryItem[]): GalleryItem[] {
