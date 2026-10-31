@@ -581,3 +581,51 @@ export function bookableUnits(units: AccommodationUnit[]): AccommodationUnit[] {
       (unit.priceBasis !== "monthly" || isMonthlyPolicyConfigured()),
   );
 }
+
+/**
+ * Match the room a guest chose on the property page to this property's own list.
+ *
+ * WHY NOT JUST THE ID
+ *
+ *   The property page and the checkout each build their unit list from a
+ *   different source (bundled catalogue vs. database row), and the id is derived
+ *   from the room's label. When the two labels differ by so much as a word, the
+ *   ids differ too — and a plain `find(byId) ?? units[0]` then quietly prices the
+ *   cheapest room instead of the one the guest picked.
+ *
+ *   So: id first, then the normalised name, and if neither matches, `null`.
+ *   Returning null makes the caller ask again; it must never fall back to a
+ *   different room, because that is a wrong charge, not a cosmetic bug.
+ */
+export function resolveUnit(
+  units: AccommodationUnit[],
+  requestedId: string | null | undefined,
+  requestedName: string | null | undefined,
+): AccommodationUnit | null {
+  if (!units.length) return null;
+
+  const id = (requestedId ?? "").trim();
+  const name = (requestedName ?? "").trim();
+
+  // Nothing requested: the first room is a fair default.
+  if (!id && !name) return units[0] ?? null;
+
+  if (id) {
+    const byId = units.find((unit) => unit.id === id);
+    if (byId) return byId;
+  }
+
+  if (name) {
+    const wanted = name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const byName = units.find(
+      (unit) => unit.name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === wanted,
+    );
+    if (byName) return byName;
+
+    // Last resort: the id form of the name (both are slug-derived).
+    const bySlug = units.find((unit) => unit.id === unitIdFromLabel(name));
+    if (bySlug) return bySlug;
+  }
+
+  return null;
+}

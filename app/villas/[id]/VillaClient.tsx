@@ -34,6 +34,7 @@ import { priceUnit } from "../../lib/quote";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 import { formatPrice, getAmenityIcon } from "../../components/villas/utils";
+import type { VillaProps } from "../../components/villas/types";
 import StayDateFields from "../../components/booking/StayDateFields";
 import { useVillaAvailability } from "../../lib/availability";
 import { validateStay } from "../../lib/dates";
@@ -93,13 +94,22 @@ const AVAILABLE_PACKAGES = [
 
 export default function VillaClient({
   params,
+  villa: loadedVilla,
 }: {
   params: Promise<{ id: string }>;
+  /**
+   * Resolved on the server from the same row the checkout prices, so the figure
+   * shown here is the figure that will be charged. `null` means the property does
+   * not exist.
+   */
+  villa: VillaProps | null;
 }) {
   const unwrappedParams = use(params);
   const router = useRouter();
   const villaId = parseInt(unwrappedParams.id);
-  const villa = villasData.find((v) => v.id === villaId);
+  // Server-resolved property. The bundled copy is only a safety net for a
+  // deployment where the server could not reach the database.
+  const villa = loadedVilla ?? villasData.find((v) => v.id === villaId) ?? null;
 
   const availability = useVillaAvailability(
     Number.isNaN(villaId) ? null : villaId,
@@ -186,6 +196,9 @@ export default function VillaClient({
     const query = new URLSearchParams({
       villaId: villa.id.toString(),
       unitId: selectedUnitId,
+      // Sent as well as the id: the checkout prices the database row, whose
+      // generated ids can differ from this page's. The name is the bridge.
+      unitName: selectedUnit?.name ?? "",
       currency,
       checkIn: checkInDate,
       checkOut: checkOutDate,

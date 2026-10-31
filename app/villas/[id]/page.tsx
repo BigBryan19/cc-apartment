@@ -1,14 +1,68 @@
 // app/villas/[id]/page.tsx
 import type { Metadata } from "next";
-import { bundledVillas as villasData } from "../../lib/catalog";
+import { createClient } from "@supabase/supabase-js";
+import { bundledVillas as villasData, toVillaProps } from "../../lib/catalog";
+import type { VillaProps } from "../../components/villas/types";
 import VillaClient from "./VillaClient";
 import JsonLd from "../../components/JsonLd";
 import { SITE, breadcrumbJsonLd, villaJsonLd } from "../../lib/seo";
+
+/**
+ * Rebuild each property page at most once a minute.
+ *
+ * The page now reads the property from the database rather than only from the
+ * bundled catalogue, so an owner who changes a rate in admin sees it on the
+ * public page shortly afterwards instead of waiting for a deploy.
+ */
+export const revalidate = 60;
 
 export function generateStaticParams() {
   return villasData.map((villa) => ({
     id: villa.id.toString(),
   }));
+}
+
+/**
+ * Resolve a property from the database, falling back to the bundled catalogue.
+ *
+ * WHY THIS EXISTS
+ *
+ *   The detail page used to read ONLY the bundled `villasData`, while the
+ *   checkout read the database. Whenever the two disagreed, the guest saw one
+ *   price on the property page and was charged another at payment — which is
+ *   exactly the "everything becomes 600" report: the checkout could not match
+ *   the chosen rate against the database's own rate list and fell back to the
+ *   first (cheapest) row.
+ *
+ *   Both screens now resolve through `toVillaProps` on the same row.
+ *
+ * Uses the anon key: `villas` is public-read, and the service-role key must never
+ * be pulled into a page render.
+ */
+async function loadVilla(id: number): Promise<VillaProps | null> {
+  const bundled = villasData.find((villa) => villa.id === id) ?? null;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) return bundled;
+
+  try {
+    const supabase = createClient(url, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await supabase
+      .from("villas")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error || !data) return bundled;
+    return toVillaProps(data as never);
+  } catch {
+    // A database hiccup must not take the property page down; the bundled copy
+    // is the same property, just possibly older rates.
+    return bundled;
+  }
 }
 
 /**
@@ -24,7 +78,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const villa = villasData.find((v) => v.id === Number(id));
+  const villa = await loadVilla(Number(id));
 
   if (!villa) {
     return {
@@ -77,7 +131,7 @@ export default async function VillaDetailsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const villa = villasData.find((v) => v.id === Number(id));
+  const villa = await loadVilla(Number(id));
 
   return (
     <>
@@ -93,7 +147,7 @@ export default async function VillaDetailsPage({
           ]}
         />
       )}
-      <VillaClient params={params} />
+      <VillaClient params={params} villa={villa} />
     </>
   );
 }

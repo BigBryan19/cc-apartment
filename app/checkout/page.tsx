@@ -17,6 +17,7 @@ import { buildQuote, type ExtraInput } from "../lib/quote";
 import {
   isEnquiryOnly,
   priceBasisSuffix,
+  resolveUnit,
   unitCapacityLabel,
 } from "../lib/rates";
 import { accommodationOnlyNotice } from "../lib/status";
@@ -55,8 +56,16 @@ const CheckoutContent = () => {
   const searchParams = useSearchParams();
 
   const [villa, setVilla] = useState<VillaProps | null>(null);
-  /** The chosen accommodation unit id. Its price is derived, never stored. */
+  /**
+   * The room the guest picked on the property page.
+   *
+   * Held as id *and* name: the property page and the checkout can generate
+   * different ids for the same room (one resolves the bundled catalogue, the
+   * other the database row), and matching on the id alone silently fell back to
+   * the cheapest room — which is why every booking arrived at ₵600.
+   */
   const [selectedUnitId, setSelectedUnitId] = useState<string>("");
+  const [selectedUnitName, setSelectedUnitName] = useState<string>("");
   /** Overnight occupancy. Drives capacity checks and per-person charging. */
   const [guests, setGuests] = useState<number>(2);
   const [currency, setCurrency] = useState<"GHS" | "USD">("GHS");
@@ -149,6 +158,8 @@ const CheckoutContent = () => {
   /* eslint-disable react-hooks/set-state-in-effect -- URL-derived form seed; see comment above */
   useEffect(() => {
     const rate = searchParams.get("unitId") || searchParams.get("rate");
+    setSelectedUnitId(rate ?? "");
+    setSelectedUnitName(searchParams.get("unitName") ?? "");
     const curr = searchParams.get("currency");
     const checkInParam = searchParams.get("checkIn");
     const checkOutParam = searchParams.get("checkOut");
@@ -224,8 +235,7 @@ const CheckoutContent = () => {
     [checkInDate, checkOutDate],
   );
 
-  const selectedUnit =
-    villa?.units.find((entry) => entry.id === selectedUnitId) ?? villa?.units[0] ?? null;
+  const selectedUnit = resolveUnit(villa?.units ?? [], selectedUnitId, selectedUnitName);
 
   const extraInputs: ExtraInput[] = useMemo(
     () =>
@@ -332,7 +342,7 @@ const CheckoutContent = () => {
           // Identifiers and inputs only — no amount, no nights, no total. The
           // server resolves and prices from its own records (app/lib/pricing.ts)
           // and ignores anything money-shaped in this body.
-          unitId: selectedUnitId,
+          unitId: selectedUnit?.id ?? selectedUnitId,
           guests,
           checkIn: checkInDate,
           checkOut: checkOutDate,
@@ -783,7 +793,9 @@ const CheckoutContent = () => {
 
               <button
                 type="submit"
-                disabled={loading || Boolean(stayError) || totalNights === 0}
+                disabled={
+                  loading || Boolean(stayError) || totalNights === 0 || !selectedUnit
+                }
                 className="btn-accent flex w-full items-center justify-center gap-2 rounded-xl py-4 text-sm"
               >
                 {loading ? (
@@ -849,6 +861,37 @@ const CheckoutContent = () => {
                   )}
                 </div>
               </div>
+
+              {/* The chosen room could not be matched to this property's current
+                  rate list. Rather than quietly charging a different room — the
+                  behaviour that produced the ₵600 totals — the guest picks again
+                  here and every figure recalculates from that choice. */}
+              {villa && !selectedUnit && (
+                <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm font-medium text-amber-900">
+                    That room is no longer available at this price.
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-amber-800">
+                    Pick the room you want below — the total updates straight away.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {villa.units.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedUnitId(option.id);
+                          setSelectedUnitName(option.name);
+                        }}
+                        className="rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:border-amber-500"
+                      >
+                        {option.name} — {formatPrice(option.amount, currency)}
+                        {priceBasisSuffix(option.priceBasis)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Occupancy is an input, not an assumption: it drives the
                   capacity check and any per-person charge. */}

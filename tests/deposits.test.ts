@@ -22,6 +22,7 @@ import {
   resolveDue,
 } from "../app/lib/deposit";
 import { carRentalDays, carRentalTotal, HONEYMOON_FROM, CAR_RENTAL } from "../app/lib/services";
+import { normalizeUnits, resolveUnit } from "../app/lib/rates";
 
 let passed = 0;
 let failed = 0;
@@ -148,6 +149,28 @@ check(
 check("R5", "a zero-day rental costs nothing", carRentalTotal(0) === 0);
 check("R6", "the day rate is the approved one", CAR_RENTAL.dayRate === 1000);
 check("R7", "the honeymoon starting price is the approved one", HONEYMOON_FROM === 3500);
+
+// --- 7. Room matching ------------------------------------------------------
+//
+// The bug this pins down: the property page and the checkout derive unit ids
+// from different labels, so a strict id match failed and the code fell back to
+// units[0] — quietly charging the cheapest room for every booking.
+const aburiRooms = normalizeUnits(
+  [
+    { option: "Single bedroom", amount: 600, priceBasis: "per_night" },
+    { option: "Whole apartment (4 bedrooms)", amount: 3500, priceBasis: "per_night" },
+    { option: "Special Party Rate", amount: 5000, priceBasis: "per_stay" },
+  ],
+  { guests: 4 },
+);
+
+const special = aburiRooms.find((unit) => unit.name === "Special Party Rate")!;
+check("D7", "an id that exists is honoured", resolveUnit(aburiRooms, special.id, null)?.name === "Special Party Rate");
+check("D7", "a stale id still resolves through the name", resolveUnit(aburiRooms, "some-old-id", "Special Party Rate")?.name === "Special Party Rate");
+check("D7", "name matching ignores punctuation and case", resolveUnit(aburiRooms, "", "special  party rate")?.name === "Special Party Rate");
+check("D7", "an unmatched choice returns null rather than another room", resolveUnit(aburiRooms, "gone", "Garden suite") === null);
+check("D7", "no request at all still defaults to the first room", resolveUnit(aburiRooms, "", "")?.name === "Single bedroom");
+check("D7", "the default is NOT used when a choice was made", resolveUnit(aburiRooms, "gone", "Garden suite")?.amount !== 600);
 
 console.log("\n" + "-".repeat(60));
 console.log(`  ${passed} passed, ${failed} failed`);

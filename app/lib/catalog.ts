@@ -123,7 +123,19 @@ export function toVillaProps(row: VillaRow): VillaProps {
   const image = row.image ?? images[0] ?? bundled?.image ?? "";
   const video = row.video ?? bundled?.video ?? undefined;
 
-  const units = normalizeUnits(row.rates as StoredRate[] | undefined | null, {
+  /*
+   * A production row that predates `rates` (or was seeded with an empty array)
+   * would otherwise collapse to a single room derived from `price`. That is how
+   * a six-rate property suddenly shows one price, so an empty column falls back
+   * to this property's bundled rate list — same property, never another's.
+   */
+  const storedRates = Array.isArray(row.rates) ? (row.rates as StoredRate[]) : [];
+  const ratesForRow = storedRates.length
+    ? storedRates
+    : (BUNDLED_ROWS.find((entry) => entry.id === row.id)?.rates as StoredRate[] | undefined) ??
+      storedRates;
+
+  const units = normalizeUnits(ratesForRow, {
     price: row.price ?? null,
     guests: row.guests ?? null,
     bedrooms: row.bedrooms ?? null,
