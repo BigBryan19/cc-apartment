@@ -166,9 +166,11 @@ const MASSAGE: ServiceDefinition = {
   tagline: "In-suite treatments",
   description:
     "A therapist comes to your apartment for a relaxation or deep-tissue massage. Available for individuals and couples.",
-  image: "/media/massage-service.jpg",
+  // The pool setup: treatment table laid with towels, water directly behind.
+  // Poster is a frame from the same clip, so the still and the video match.
+  image: "/media/massage-pool-poster.jpg",
   imageAlt: "Massage table laid with towels beside the pool",
-  video: "/media/massage-pergola.mp4",
+  video: "/media/massage-pool.mp4",
   // No approved price: the card must not imply one.
   price: null,
   priceLabel: "Enquire for pricing",
