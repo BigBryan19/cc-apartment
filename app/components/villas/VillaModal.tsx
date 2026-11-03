@@ -49,8 +49,6 @@ const EXTRA_ICONS: Record<string, typeof Heart> = {
   "honeymoon-setup": Heart,
   "birthday-decoration": Gift,
   "car-rental": CarFront,
-  "airport-pickup": CarFront,
-  "extra-bed": BedDouble,
 };
 
 const VillaModal: React.FC<VillaModalProps> = ({

@@ -807,7 +807,6 @@ export default function VillaClient({
                   <div className="mt-3 flex flex-wrap gap-2">
                     {ADD_ONS.map((extra) => {
                       const isSelected = selectedPackages.includes(extra.id);
-                      const amount = addOnAmount(extra, totalNights);
                       return (
                         <button
                           key={extra.id}
@@ -820,16 +819,13 @@ export default function VillaClient({
                           }`}
                         >
                           {isSelected ? <Check size={13} /> : <Plus size={13} />}
+                          {/*
+                            Name only. The price belongs in the summary below,
+                            where it is itemised against the actual stay length;
+                            a figure in the pill competed with the room rate for
+                            attention and read as part of it.
+                          */}
                           {extra.name.replace(" — Hyundai Tucson", "")}
-                          <span className={isSelected ? "opacity-75" : "text-[var(--color-faint)]"}>
-                            {/* The daily rate, not the total for a stay that has
-                                no dates yet — that read as a free rental. */}
-                            {amount === null
-                              ? "· quote"
-                              : extra.priceBasis === "per_day"
-                                ? `· ${formatPrice(extra.amount ?? 0, currency)}/day`
-                                : `· ${formatPrice(extra.amount ?? 0, currency)}`}
-                          </span>
                         </button>
                       );
                     })}

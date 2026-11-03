@@ -9,6 +9,10 @@
 //     Honeymoon room setup  GHS 3,500 per stay   (matches the service card)
 //     Car rental            GHS 1,000 per day    (Hyundai Tucson)
 //
+//   Airport pickup and the extra bed were withdrawn by the owner on 3 November
+//   2026 and are not offered anywhere — not on the property page, not in the
+//   checkout add-on list, not in a quote.
+//
 //   Everything else stays `requiresQuote: true` with `amount: null`, so the
 //   pricing engine lists it as an explicit unpriced line, excludes it from the
 //   payable amount, and the occasion track stays `requested` rather than
@@ -56,16 +60,6 @@ export const EXTRAS: ExtraDefinition[] = [
     note: "Charged per rental day.",
   },
   {
-    id: "airport-pickup",
-    name: "Airport pickup",
-    summary: "Collection from Kotoka International Airport.",
-    amount: null,
-    priceBasis: "per_stay",
-    requiresQuote: true,
-    active: true,
-    note: "Priced by vehicle and arrival time.",
-  },
-  {
     id: "honeymoon-setup",
     name: "Honeymoon room setup",
     summary: "The room staged before you arrive.",
@@ -106,16 +100,6 @@ export const EXTRAS: ExtraDefinition[] = [
     categories: ["birthday"],
     active: true,
     note: "The published starting price per stay. Theme and staging are agreed first.",
-  },
-  {
-    id: "extra-bed",
-    name: "Extra bed",
-    summary: "An additional bed in the unit.",
-    amount: null,
-    priceBasis: "per_stay",
-    requiresQuote: true,
-    active: true,
-    note: "Subject to the unit's approved maximum occupancy.",
   },
 ];
 
