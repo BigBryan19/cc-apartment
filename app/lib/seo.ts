@@ -87,7 +87,10 @@ export function organizationJsonLd() {
     description: SITE.description,
     telephone: SITE.phoneE164,
     email: SITE.email,
-    priceRange: "GH₵600 - GH₵3,500 per night",
+    // Real nightly span across the three properties: Aburi's single room at 600
+    // up to Adenta's entire house at 4,000. It was 600–3,500, which stopped being
+    // true once Adenta was repriced.
+    priceRange: "GH₵600 - GH₵4,000 per night",
     currenciesAccepted: SITE.currency,
     paymentAccepted: "Card, Mobile Money",
     image: absoluteUrl("/og-cover.jpg"),
