@@ -1,7 +1,7 @@
 // app/admin/login/page.tsx
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, AlertTriangle, Lock } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
@@ -35,6 +35,28 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  /**
+   * Whether this deployment has an administrator at all.
+   *
+   * Without it, a correct password lands back here with no explanation, which
+   * reads as a broken login. Reported by /api/admin/status.
+   */
+  const [allowlistConfigured, setAllowlistConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/status")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setAllowlistConfigured(Boolean(data.adminAllowlistConfigured));
+      })
+      .catch(() => {
+        if (!cancelled) setAllowlistConfigured(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const configured = isSupabaseConfigured();
 
@@ -96,6 +118,20 @@ function LoginForm() {
             Cosy Crest management
           </p>
         </div>
+
+        {allowlistConfigured === false && (
+          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
+            <p className="font-semibold">No administrator is configured on this deployment.</p>
+            <p className="mt-1">
+              Signing in cannot succeed until one exists. In Vercel, add{" "}
+              <code className="font-mono text-xs">ADMIN_EMAILS</code> with the email address you
+              sign in with (comma-separate several), then redeploy — environment
+              changes only take effect on a new deployment. Alternatively set{" "}
+              <code className="font-mono text-xs">app_metadata.role = &quot;admin&quot;</code> on the
+              user in Supabase → Authentication → Users.
+            </p>
+          </div>
+        )}
 
         {rejectedNotAdmin && (
           <div className="mb-5 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
