@@ -21,7 +21,6 @@ import {
   resolveUnit,
   unitCapacityLabel,
 } from "../lib/rates";
-import { accommodationOnlyNotice } from "../lib/status";
 import { EXTRAS, EXTRAS_BY_ID } from "../lib/extras";
 import { VillaProps } from "../components/villas/types";
 import StayDateFields from "../components/booking/StayDateFields";
@@ -1097,12 +1096,6 @@ const CheckoutContent = () => {
                     );
                   })}
                 </div>
-                {selectedPackages.length > 0 && (
-                  <p className="border-t border-slate-100 px-4 py-2 text-[11px] text-slate-500">
-                    Unpriced add-ons are a request: they are confirmed with you and are
-                    not part of the amount charged now.
-                  </p>
-                )}
               </div>
 
               {selectedPackages.length > 0 && (
@@ -1145,21 +1138,6 @@ const CheckoutContent = () => {
                     ))}
                   </ul>
                 </div>
-              )}
-
-              {/*
-                Required before payment whenever the occasion is not yet priced
-                and approved. Without it a guest pays a room-only amount and
-                reasonably assumes their celebration is included.
-              */}
-              {accommodationOnlyNotice(
-                selectedPackages.length > 0 ? "requested" : "none",
-              ) && (
-                <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-900">
-                  {accommodationOnlyNotice(
-                    selectedPackages.length > 0 ? "requested" : "none",
-                  )}
-                </p>
               )}
 
               {quote && quote.unpricedItems.length > 0 && (
