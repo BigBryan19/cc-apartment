@@ -822,11 +822,13 @@ export default function VillaClient({
                           {isSelected ? <Check size={13} /> : <Plus size={13} />}
                           {extra.name.replace(" — Hyundai Tucson", "")}
                           <span className={isSelected ? "opacity-75" : "text-[var(--color-faint)]"}>
+                            {/* The daily rate, not the total for a stay that has
+                                no dates yet — that read as a free rental. */}
                             {amount === null
                               ? "· quote"
-                              : `· ${formatPrice(amount, currency)}${
-                                  extra.priceBasis === "per_day" ? "/day" : ""
-                                }`}
+                              : extra.priceBasis === "per_day"
+                                ? `· ${formatPrice(extra.amount ?? 0, currency)}/day`
+                                : `· ${formatPrice(extra.amount ?? 0, currency)}`}
                           </span>
                         </button>
                       );
