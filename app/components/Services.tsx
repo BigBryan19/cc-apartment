@@ -9,17 +9,24 @@
 // come from app/lib/services.ts — the same file the booking engine's extras
 // read, so a card can never advertise a figure the checkout will not charge.
 //
-// Every card's action is a WhatsApp enquiry prefilled with the service name.
-// Nothing here takes a payment: these are arrangements that a person confirms.
+// A card with a price can be added to a stay; an unpriced one is a WhatsApp
+// enquiry. Which of the two applies, the price itself and whether the card is
+// shown at all are controlled by the owner in Admin → Services, falling back to
+// the approved figures in app/lib/services.ts.
 // ---------------------------------------------------------------------------
 
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
 import { ArrowRight, MessageCircle, Play } from "lucide-react";
-import { SERVICES } from "../lib/services";
+import {
+  applyServiceSettings,
+  defaultServiceSettings,
+  toServiceSetting,
+  type ServiceSetting,
+} from "../lib/service-settings";
+import { createClient, isSupabaseConfigured } from "../utils/supabase";
 import { whatsappLink } from "../lib/contact";
-import CarRentalCalculator from "./services/CarRentalCalculator";
 
 /**
  * A muted, looping preview that only becomes visible once the browser is
@@ -61,14 +68,39 @@ function ServicePreview({ src, label }: { src: string; label: string }) {
 interface ServicesProps {
   /** Tighter vertical rhythm when embedded on /packages. */
   compact?: boolean;
-  /** Show the rental planner under the cards. */
+  /** Kept for callers; the rental planner was removed on 3 November 2026. */
   showRentalPlanner?: boolean;
 }
 
-const Services: React.FC<ServicesProps> = ({
-  compact = false,
-  showRentalPlanner = true,
-}) => {
+const Services: React.FC<ServicesProps> = ({ compact = false }) => {
+  /**
+   * Settings start as the approved defaults so the section renders correctly on
+   * a fresh clone or before the table exists, then take the owner's saved values
+   * when they are available.
+   */
+  const [settings, setSettings] = useState<ServiceSetting[]>(defaultServiceSettings);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let cancelled = false;
+    const supabase = createClient();
+    supabase
+      .from("service_settings")
+      .select("service_id, amount, active, cta")
+      .then(({ data, error }) => {
+        if (cancelled || error || !data?.length) return;
+        const parsed = (data as Record<string, unknown>[])
+          .map(toServiceSetting)
+          .filter((entry): entry is ServiceSetting => entry !== null);
+        if (parsed.length) setSettings(parsed);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const services = applyServiceSettings(settings);
+
   return (
     <section
       id="services"
@@ -88,12 +120,11 @@ const Services: React.FC<ServicesProps> = ({
         </div>
 
         <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          {SERVICES.map((service) => {
+          {services.map((service) => {
             // The rental card scrolls to the planner; it needs dates, which the
             // card itself has no room for.
-            const isRental = service.id === "car-rental";
-            const href = isRental && showRentalPlanner ? "#car-rental-planner" : service.href;
-            const external = !(isRental && showRentalPlanner);
+            const href = service.href;
+            const external = service.href.startsWith("http");
 
             return (
               <article
@@ -152,15 +183,13 @@ const Services: React.FC<ServicesProps> = ({
                     ) : (
                       <ArrowRight size={15} aria-hidden="true" />
                     )}
-                    {isRental && showRentalPlanner ? "Check dates" : service.ctaLabel}
+                    {service.ctaLabel}
                   </a>
                 </div>
               </article>
             );
           })}
         </div>
-
-        {showRentalPlanner && <CarRentalCalculator />}
 
         <div className="mt-10 flex flex-col items-start justify-between gap-5 rounded-2xl bg-[var(--color-ink)] px-7 py-8 sm:flex-row sm:items-center md:px-10">
           <div>

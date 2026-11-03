@@ -13,6 +13,7 @@ import {
   LogOut,
   FileText,
   Images,
+  Sparkles,
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "../utils/supabase";
 
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { name: "Bookings", href: "/admin/bookings", icon: CalendarCheck },
   { name: "Create Invoice", href: "/admin/invoice", icon: FileText },
   { name: "Gallery", href: "/admin/gallery", icon: Images },
+  { name: "Services", href: "/admin/services", icon: Sparkles },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
 

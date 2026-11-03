@@ -106,10 +106,6 @@ const Regions: React.FC<{
           ))}
         </div>
 
-        <p className="mt-4 text-[11px] leading-relaxed text-[var(--color-faint)]">
-          Photographs show places in each region, not the apartments. Choosing a
-          region filters the stays below to that region.
-        </p>
       </div>
     </section>
   );
