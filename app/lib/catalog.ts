@@ -171,6 +171,14 @@ const BUNDLED_UNIT_CLIPS: Record<number, Record<string, { video: string; poster:
  * path here means the wrong footage cannot reappear on a public page in the
  * meantime, and the property simply shows its photographs.
  */
+/**
+ * Photographs that belong to a property but may not be in its stored `images`
+ * array yet. Appended, never substituted.
+ */
+const SUPPLEMENTAL_IMAGES: Record<number, string[]> = {
+  3: Array.from({ length: 17 }, (_, index) => `/media/adenta/adenta-${String(index + 1).padStart(2, "0")}.jpg`),
+};
+
 const MISASSIGNED_VIDEO: Record<number, string[]> = {
   // `/adenta.mp4` was the Aburi studio. It is now `/aburi-studio.mp4`, held by
   // the Aburi studio rate.
@@ -182,6 +190,26 @@ function resolveVideo(row: VillaRow, bundledVideo: string | undefined): string |
   const rejected = MISASSIGNED_VIDEO[row.id] ?? [];
   if (stored && !rejected.includes(stored)) return stored;
   return bundledVideo;
+}
+
+/**
+ * The headline figure: the stored one when it is still a real nightly rate,
+ * otherwise the cheapest bookable nightly rate (test rooms and per-stay rates
+ * excluded, because neither is a nightly accommodation price).
+ */
+function advertisedPrice(stored: number | null, units: ReturnType<typeof normalizeUnits>): number {
+  const nightly = units
+    .filter(
+      (unit) =>
+        unit.active &&
+        unit.priceBasis === "per_night" &&
+        unit.amount > 0 &&
+        !unit.name.toLowerCase().includes("test"),
+    )
+    .map((unit) => unit.amount)
+    .sort((a, b) => a - b);
+  if (stored !== null && nightly.includes(stored)) return stored;
+  return nightly[0] ?? Number(stored ?? 0);
 }
 
 function toCoordinates(value: unknown, fallbackId: number): { lat: number; lng: number } {
@@ -205,7 +233,18 @@ function toCoordinates(value: unknown, fallbackId: number): { lat: number; lng: 
 export function toVillaProps(row: VillaRow): VillaProps {
   const bundled = BUNDLED_MEDIA[row.id];
   const storedImages = toStringArray(row.images);
-  const images = storedImages.length ? storedImages : (bundled?.images ?? []);
+  /*
+   * Photographs added after the row was written are appended rather than
+   * orphaned. A production row only lists the four files it was seeded with, so
+   * the seventeen Adenta photographs supplied in November would never appear;
+   * they belong to this property, so they are merged in and de-duplicated.
+   */
+  const supplemental = SUPPLEMENTAL_IMAGES[row.id] ?? [];
+  const mergedImages = [...storedImages];
+  for (const src of supplemental) {
+    if (!mergedImages.includes(src)) mergedImages.push(src);
+  }
+  const images = mergedImages.length ? mergedImages : (bundled?.images ?? []);
   const image = row.image ?? images[0] ?? bundled?.image ?? "";
   const video = resolveVideo(row, bundled?.video);
 
@@ -262,7 +301,10 @@ export function toVillaProps(row: VillaRow): VillaProps {
     image,
     images: images.length ? images : image ? [image] : [],
     video,
-    price: Number(row.price ?? 0),
+    // A stale headline (Adenta's row still said 600) is replaced by the cheapest
+    // real nightly rate, so SEO and the card never advertise a price the
+    // property does not sell.
+    price: advertisedPrice(row.price ?? null, units),
     title: row.title ?? "",
     location: row.location ?? "",
     coordinates: toCoordinates(row.coordinates, row.id),
