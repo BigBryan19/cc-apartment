@@ -107,7 +107,29 @@ const BUNDLED_MEDIA: Record<
    */
   3: {
     image: "/Adenta1.jpg",
-    images: ["/Adenta1.jpg", "/Adenta2.jpg", "/Adenta3.jpg", "/Adenta4.jpg"],
+    images: [
+      "/Adenta1.jpg",
+      "/Adenta2.jpg",
+      "/Adenta3.jpg",
+      "/Adenta4.jpg",
+      "/media/adenta/adenta-01.jpg",
+      "/media/adenta/adenta-02.jpg",
+      "/media/adenta/adenta-03.jpg",
+      "/media/adenta/adenta-04.jpg",
+      "/media/adenta/adenta-05.jpg",
+      "/media/adenta/adenta-06.jpg",
+      "/media/adenta/adenta-07.jpg",
+      "/media/adenta/adenta-08.jpg",
+      "/media/adenta/adenta-09.jpg",
+      "/media/adenta/adenta-10.jpg",
+      "/media/adenta/adenta-11.jpg",
+      "/media/adenta/adenta-12.jpg",
+      "/media/adenta/adenta-13.jpg",
+      "/media/adenta/adenta-14.jpg",
+      "/media/adenta/adenta-15.jpg",
+      "/media/adenta/adenta-16.jpg",
+      "/media/adenta/adenta-17.jpg",
+    ],
   },
 };
 
@@ -278,7 +300,8 @@ const BUNDLED_ROWS: VillaRow[] = [
     title: "Lakeside Estate",
     location: "Greater Accra • Lakeside",
     coordinates: { lat: 5.672737022781674, lng: -0.15226067413187414 },
-    price: 1500,
+    // Headline rate for the three-bedroom apartment.
+    price: 3500,
     guests: 6,
     bedrooms: 3,
     bathrooms: 4,
@@ -289,13 +312,15 @@ const BUNDLED_ROWS: VillaRow[] = [
     images: ["/Lake2.jpg", "/Lake4.jpg", "/Lake3.jpg", "/Lake1.jpg"],
     video: "/lakeside.mp4",
     description:
-      "A modern, stylishly designed apartment located in the serene environment of Lakeside Estate, offering premium comfort and a relaxing atmosphere.",
+      "A three-bedroom apartment in the serene surroundings of Lakeside Estate, with a private pool, a games room and a marble-floored living area. The whole apartment sleeps six.",
     amenities: LAKESIDE_AMENITIES,
     rates: [
       { option: "One bedroom", amount: 1500, priceBasis: "per_night" },
       { option: "Two bedrooms", amount: 2000, priceBasis: "per_night" },
       { option: "Whole apartment (3 bedrooms)", amount: 3500, priceBasis: "per_night" },
-      { option: "Monthly Rate (Whole apartment)", amount: 36000, priceBasis: "monthly" },
+      // No published monthly figure: the card and the booking summary ask the
+      // guest to enquire instead, and a stay is never priced monthly by accident.
+      { option: "Monthly Rate (Whole apartment)", amount: null, priceBasis: "monthly" },
       { option: "Special Party Rate", amount: 5000, priceBasis: "per_stay" },
       { option: "Test Room", amount: 1, priceBasis: "per_stay", maxGuests: 60 },
     ],
@@ -330,7 +355,7 @@ const BUNDLED_ROWS: VillaRow[] = [
       { option: "One bedroom", amount: 1200, priceBasis: "per_night" },
       { option: "Two bedrooms", amount: 2000, priceBasis: "per_night" },
       { option: "Whole apartment (4 bedrooms)", amount: 3500, priceBasis: "per_night" },
-      { option: "Monthly Rate (Whole apartment)", amount: 30000, priceBasis: "monthly" },
+      { option: "Monthly Rate (Whole apartment)", amount: null, priceBasis: "monthly" },
       { option: "Special Party Rate", amount: 5000, priceBasis: "per_stay" },
       { option: "Test Room", amount: 1, priceBasis: "per_stay", maxGuests: 60 },
     ],
@@ -340,23 +365,53 @@ const BUNDLED_ROWS: VillaRow[] = [
     title: "Adenta Serenity",
     location: "Greater Accra • Adenta",
     coordinates: { lat: 5.712737022781674, lng: -0.16226067413187414 },
-    price: 1500,
+    price: 2000,
     guests: 8,
     bedrooms: 4,
     bathrooms: 5,
     has_pool: true,
     image: "/Adenta1.jpg",
-    images: ["/Adenta1.jpg", "/Adenta2.jpg", "/Adenta3.jpg", "/Adenta4.jpg"],
-    // No walkthrough exists for this property. See BUNDLED_MEDIA[3].
+    images: [
+      "/Adenta1.jpg",
+      "/Adenta2.jpg",
+      "/Adenta3.jpg",
+      "/Adenta4.jpg",
+      // Supplied 3 November 2026 — all photographed at Adenta Serenity.
+      "/media/adenta/adenta-01.jpg",
+      "/media/adenta/adenta-02.jpg",
+      "/media/adenta/adenta-03.jpg",
+      "/media/adenta/adenta-04.jpg",
+      "/media/adenta/adenta-05.jpg",
+      "/media/adenta/adenta-06.jpg",
+      "/media/adenta/adenta-07.jpg",
+      "/media/adenta/adenta-08.jpg",
+      "/media/adenta/adenta-09.jpg",
+      "/media/adenta/adenta-10.jpg",
+      "/media/adenta/adenta-11.jpg",
+      "/media/adenta/adenta-12.jpg",
+      "/media/adenta/adenta-13.jpg",
+      "/media/adenta/adenta-14.jpg",
+      "/media/adenta/adenta-15.jpg",
+      "/media/adenta/adenta-16.jpg",
+      "/media/adenta/adenta-17.jpg",
+    ],
+    // No walkthrough exists for this property yet: `adenta.mov` has not been
+    // added to the repository. See BUNDLED_MEDIA[3].
     description:
-      "Located in the heart of Adenta, this premium apartment combines luxury, comfort, and entertainment with modern furnishings and a grand piano.",
+      "A four-bedroom house in Adenta with a private pool, a grand piano and a games lounge. The whole house sleeps eight; single and double-bedroom options are available on weeknights.",
     amenities: ADENTA_AMENITIES,
+    /*
+     * Adenta has no studio and no GHS 600 room. Those two rows were copied from
+     * Aburi and priced a room that does not exist here. The approved figures are
+     * the three below.
+     */
     rates: [
-      { option: "One bedroom", amount: 1500, priceBasis: "per_night" },
-      { option: "Two bedrooms", amount: 2000, priceBasis: "per_night" },
-      { option: "Whole apartment (4 bedrooms)", amount: 3500, priceBasis: "per_night" },
-      { option: "Monthly Rate (Whole apartment)", amount: 42000, priceBasis: "monthly" },
-      { option: "Special Party Rate", amount: 5000, priceBasis: "per_stay" },
+      { option: "One bedroom", amount: 2000, priceBasis: "per_night", maxGuests: 2 },
+      { option: "Two bedrooms", amount: 2500, priceBasis: "per_night", maxGuests: 4 },
+      { option: "Whole apartment (4 bedrooms)", amount: 4000, priceBasis: "per_night" },
+      { option: "Monthly Rate (Whole apartment)", amount: null, priceBasis: "monthly" },
+      // Parties cost more at Adenta than elsewhere — the approved exception.
+      { option: "Special Party Rate", amount: 6000, priceBasis: "per_stay" },
       { option: "Test Room", amount: 1, priceBasis: "per_stay", maxGuests: 60 },
     ],
   },

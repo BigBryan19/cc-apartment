@@ -30,6 +30,7 @@ import {
   unitCapacityLabel,
   unitFacilityLabels,
 } from "../../lib/rates";
+import { WEEKEND_RESTRICTION_MESSAGE, weekendAllowsUnit } from "../../lib/weekend";
 import { priceUnit } from "../../lib/quote";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
@@ -116,6 +117,12 @@ export default function VillaClient({
   );
 
   const [currency, setCurrency] = useState<"GHS" | "USD">("GHS");
+  /*
+   * How many people are coming. Held here rather than only on the checkout so a
+   * room that cannot take the group is visibly refused on the property page —
+   * the point at which the guest is choosing.
+   */
+  const [guests, setGuests] = useState<number>(2);
   const [selectedUnitId, setSelectedUnitId] = useState<string>("");
   const [checkInDate, setCheckInDate] = useState<string>("");
   const [checkOutDate, setCheckOutDate] = useState<string>("");
@@ -138,7 +145,9 @@ export default function VillaClient({
   /* eslint-disable react-hooks/set-state-in-effect -- initial selection from a loaded prop; see comment above */
   useEffect(() => {
     if (!villa || !villa.units.length) return;
-    const sellable = villa.units.find((entry) => !isEnquiryOnly(entry));
+    const fits = (entry: (typeof villa.units)[number]) =>
+      entry.maxGuests === null || entry.maxGuests >= guests;
+    const sellable = villa.units.find((entry) => !isEnquiryOnly(entry) && fits(entry));
     setSelectedUnitId((sellable ?? villa.units[0]).id);
   }, [villa]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -173,7 +182,7 @@ export default function VillaClient({
   // Priced with the same function the server uses, so the property page and the
   // charge agree. A refusal here means the unit is not sellable online.
   const unitPrice = selectedUnit
-    ? priceUnit(selectedUnit, totalNights, villa.guests)
+    ? priceUnit(selectedUnit, totalNights, guests)
     : ({ ok: false } as const);
 
   const selectedUnitAmount = unitPrice.ok ? unitPrice.amount : 0;
@@ -199,6 +208,7 @@ export default function VillaClient({
       // Sent as well as the id: the checkout prices the database row, whose
       // generated ids can differ from this page's. The name is the bridge.
       unitName: selectedUnit?.name ?? "",
+      guests: String(guests),
       currency,
       checkIn: checkInDate,
       checkOut: checkOutDate,
@@ -504,16 +514,31 @@ export default function VillaClient({
                     const enquiryOnly = isEnquiryOnly(unit);
                     const capacity = unitCapacityLabel(unit);
                     const facilities = unitFacilityLabels(unit);
+                    // Too small for this group.
+                    const tooSmall =
+                      unit.maxGuests !== null && guests > unit.maxGuests;
+                    // Not bookable for these dates (weekend rule at Adenta).
+                    const weekendBlocked = !weekendAllowsUnit(
+                      villa.id,
+                      unit,
+                      checkInDate,
+                      checkOutDate,
+                    );
+                    const unavailable = tooSmall || weekendBlocked;
 
                     return (
                       <div key={unit.id}>
                         <button
                           type="button"
-                          onClick={() => setSelectedUnitId(unit.id)}
+                          onClick={() => !unavailable && setSelectedUnitId(unit.id)}
+                          disabled={unavailable}
+                          aria-describedby={unavailable ? `why-${unit.id}` : undefined}
                           className={`group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border p-3 text-left transition-all ${
-                            isSelected
-                              ? "border-[var(--color-ink)] bg-white shadow-[var(--shadow-card)]"
-                              : "border-[var(--color-line-soft)] bg-white hover:border-[var(--color-line)]"
+                            unavailable
+                              ? "cursor-not-allowed border-[var(--color-line-soft)] bg-[var(--color-canvas)] opacity-60"
+                              : isSelected
+                                ? "border-[var(--color-ink)] bg-white shadow-[var(--shadow-card)]"
+                                : "border-[var(--color-line-soft)] bg-white hover:border-[var(--color-line)]"
                           }`}
                         >
                           <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-[var(--color-canvas)]">
@@ -533,6 +558,22 @@ export default function VillaClient({
                                   {capacity}
                                 </span>
                               )}
+                              {tooSmall && (
+                                <span
+                                  id={`why-${unit.id}`}
+                                  className="mt-1 block text-xs font-medium text-amber-700"
+                                >
+                                  Too small for {guests} guests
+                                </span>
+                              )}
+                              {!tooSmall && weekendBlocked && (
+                                <span
+                                  id={`why-${unit.id}`}
+                                  className="mt-1 block text-xs font-medium text-amber-700"
+                                >
+                                  {WEEKEND_RESTRICTION_MESSAGE}
+                                </span>
+                              )}
                               {facilities.length > 0 && (
                                 <span className="mt-1 block text-xs text-[var(--color-faint)]">
                                   {facilities.join(" · ")}
@@ -542,7 +583,9 @@ export default function VillaClient({
                             <div className="shrink-0 text-right">
                               {enquiryOnly ? (
                                 <span className="text-xs font-medium text-[var(--color-muted)]">
-                                  Enquire
+                                  {unit.priceBasis === "monthly"
+                                    ? "Enquire for monthly rates"
+                                    : "Enquire"}
                                 </span>
                               ) : (
                                 <div className="flex flex-col items-end">
@@ -624,6 +667,60 @@ export default function VillaClient({
                   />
                 </div>
 
+                {/* Guests. Drives which rooms are offered and what they cost. */}
+                <div className="mt-4 rounded-xl border border-[var(--color-line)] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <label
+                        htmlFor="villa-guests"
+                        className="block text-sm font-medium text-[var(--color-ink)]"
+                      >
+                        Guests
+                      </label>
+                      <span className="mt-0.5 block text-xs text-[var(--color-muted)]">
+                        This home sleeps up to {villa.guests}. Rooms that cannot
+                        take your group are greyed out.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        aria-label="Fewer guests"
+                        onClick={() => setGuests((value) => Math.max(1, value - 1))}
+                        className="h-8 w-8 rounded-full border border-[var(--color-line)] text-sm font-semibold"
+                      >
+                        −
+                      </button>
+                      <input
+                        id="villa-guests"
+                        type="number"
+                        min={1}
+                        max={Math.max(villa.guests, 1)}
+                        value={guests}
+                        onChange={(event) =>
+                          setGuests(
+                            Math.min(
+                              Math.max(villa.guests, 1),
+                              Math.max(1, Number(event.target.value) || 1),
+                            ),
+                          )
+                        }
+                        className="w-14 rounded-lg border border-[var(--color-line)] px-2 py-1 text-center text-sm"
+                      />
+                      <button
+                        type="button"
+                        aria-label="More guests"
+                        onClick={() =>
+                          setGuests((value) => Math.min(Math.max(villa.guests, 1), value + 1))
+                        }
+                        className="h-8 w-8 rounded-full border border-[var(--color-line)] text-sm font-semibold"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Packages */}
                 <div className="mt-5">
                   <span className="eyebrow">Add to your stay</span>
@@ -687,7 +784,11 @@ export default function VillaClient({
                     !checkInDate ||
                     !checkOutDate ||
                     totalNights === 0 ||
-                    Boolean(stayError)
+                    Boolean(stayError) ||
+                    (selectedUnit?.maxGuests !== null &&
+                      selectedUnit !== null &&
+                      guests > (selectedUnit.maxGuests as number)) ||
+                    !weekendAllowsUnit(villa.id, selectedUnit ?? { kind: "room" }, checkInDate, checkOutDate)
                   }
                   className="btn-accent mt-5 w-full rounded-xl py-4 text-sm"
                 >

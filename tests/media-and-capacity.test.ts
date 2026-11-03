@@ -19,6 +19,7 @@ import { normalizeUnits } from "../app/lib/rates";
 import { maxPropertyOccupancy, priceUnit } from "../app/lib/quote";
 import { SERVICES } from "../app/lib/services";
 import { DEFAULT_GALLERY } from "../app/lib/gallery";
+import { stayIncludesWeekendNight, weekendAllowsUnit } from "../app/lib/weekend";
 
 let passed = 0;
 let failed = 0;
@@ -231,7 +232,46 @@ check(
   );
 }
 
-// --- 3. Services -----------------------------------------------------------
+// --- 3. Adenta rates, monthly and weekend ---------------------------------
+
+console.log("\n=== Adenta and weekends ===\n");
+
+{
+  const adenta = bundledVillaById(3)!;
+  const byId = (needle: string) => adenta.units.find((unit) => unit.id.includes(needle));
+  check("A1", "1 bedroom is GHS 2,000", byId("one-bedroom")?.amount === 2000, String(byId("one-bedroom")?.amount));
+  check("A2", "2 bedrooms are GHS 2,500", byId("two-bedrooms")?.amount === 2500);
+  check("A3", "the entire house is GHS 4,000", byId("whole-apartment")?.amount === 4000);
+  check("A4", "there is no studio", !adenta.units.some((unit) => unit.id.includes("studio")));
+  check("A5", "there is no GHS 600 room", !adenta.units.some((unit) => unit.amount === 600));
+  check("A6", "the Adenta party rate is GHS 6,000", adenta.units.find((u) => u.name.includes("Party"))?.amount === 6000);
+  check("A7", "no villa prices a monthly stay", bundledVillas.every((villa) => villa.units.every((unit) => unit.priceBasis !== "monthly" || unit.amount === 0 || unit.amount === null)));
+  const lakeside = bundledVillaById(1)!;
+  check("A8", "Lakeside is the three-bedroom at 3,500", lakeside.bedrooms === 3 && lakeside.price === 3500 && lakeside.guests === 6);
+}
+
+{
+  // 2026-11-06 is a Friday, 2026-11-07 a Saturday, 2026-11-09 a Monday.
+  const adenta = bundledVillaById(3)!;
+  const oneBed = adenta.units.find((unit) => unit.id === "one-bedroom")!;
+  const whole = adenta.units.find((unit) => unit.kind === "whole_property")!;
+
+  check("W1", "a Friday night counts as a weekend night", stayIncludesWeekendNight("2026-11-06", "2026-11-08"));
+  check("W2", "a Monday-to-Wednesday stay does not", !stayIncludesWeekendNight("2026-11-09", "2026-11-11"));
+  check(
+    "W3",
+    "a weekday arrival that reaches Friday is still restricted",
+    !weekendAllowsUnit(3, oneBed, "2026-11-04", "2026-11-07"),
+  );
+  check("W4", "the whole house is always allowed", weekendAllowsUnit(3, whole, "2026-11-06", "2026-11-08"));
+  check("W5", "weeknights still allow a partial house", weekendAllowsUnit(3, oneBed, "2026-11-09", "2026-11-11"));
+
+  const lakeside = bundledVillaById(1)!;
+  const lakeRoom = lakeside.units.find((unit) => unit.id === "one-bedroom")!;
+  check("W6", "the rule applies to Adenta only", weekendAllowsUnit(1, lakeRoom, "2026-11-06", "2026-11-08"));
+}
+
+// --- 4. Services -----------------------------------------------------------
 
 console.log("\n=== Services ===\n");
 

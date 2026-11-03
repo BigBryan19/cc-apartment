@@ -279,7 +279,7 @@ export default function SettingsPage() {
                             setDraft({ ...draft, percent: event.target.value })
                           }
                           inputMode="decimal"
-                          placeholder="30"
+                          placeholder="20"
                           className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-slate-900"
                         />
                       </label>

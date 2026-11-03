@@ -17,7 +17,7 @@ import { Quote } from "lucide-react";
 import GuideShell from "../components/guides/GuideShell";
 import JsonLd from "../components/JsonLd";
 import { SITE, SITE_URL, breadcrumbJsonLd } from "../lib/seo";
-import { PACKAGES } from "../lib/packages";
+import { PACKAGES, PARTY_PACKAGE_PRICE, PARTY_PACKAGE_PRICE_BY_PROPERTY } from "../lib/packages";
 import PackagesClient from "./PackagesClient";
 import Services from "../components/Services";
 
@@ -100,6 +100,14 @@ export default function PackagesPage() {
               Celebrations and gatherings
             </h2>
           </div>
+
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--color-muted)]">
+            Party and birthday packages are GHS{" "}
+            {PARTY_PACKAGE_PRICE.toLocaleString("en-GH")}; at Adenta Serenity they
+            are GHS {PARTY_PACKAGE_PRICE_BY_PROPERTY[3].toLocaleString("en-GH")}.
+            Honeymoons and ordinary stays are priced separately and these figures
+            do not apply to them.
+          </p>
 
           <PackagesClient />
 

@@ -4,12 +4,12 @@
 //
 // THE RULE (set by the business)
 //
-//   A guest can reserve with a part payment of **30% or more** of the booking
+//   A guest can reserve with a part payment of **20% or more** of the booking
 //   total, and the remainder is settled before arrival. So the deposit is not a
-//   single fixed number — it is a guest-chosen share with a floor of 30%.
+//   single fixed number — it is a guest-chosen share with a floor of 20%.
 //
 //   The owner can raise the floor (or turn part payment off) in Admin →
-//   Settings. The floor is never allowed below the approved 30%, and a choice of
+//   Settings. The floor is never allowed below the approved 20%, and a choice of
 //   100% is simply "pay in full".
 //
 // WHO DECIDES THE MONEY
@@ -22,7 +22,7 @@
 import { addDaysToKey } from "./dates";
 
 /** The approved minimum share for a part payment. */
-export const MIN_DEPOSIT_PERCENT = 30;
+export const MIN_DEPOSIT_PERCENT = 20;
 
 export type DepositMode = "percent" | "fixed";
 export type PaymentPlan = "full" | "deposit";
@@ -35,7 +35,7 @@ export interface DepositPolicy {
    * `minPercent`. "fixed" pins the deposit to one amount.
    */
   mode: DepositMode;
-  /** The smallest share a guest may pay to reserve. Never below 30. */
+  /** The smallest share a guest may pay to reserve. Never below 20. */
   minPercent: number;
   /** Only used when `mode` is "fixed". */
   fixedAmount: number | null;
@@ -46,7 +46,7 @@ export interface DepositPolicy {
 }
 
 /**
- * The policy in force when nothing has been configured: part payment at 30%,
+ * The policy in force when nothing has been configured: part payment at 20%,
  * because the business has approved that floor.
  */
 export const DEFAULT_DEPOSIT_POLICY: DepositPolicy = {
@@ -95,8 +95,8 @@ function toFinite(value: unknown): number | null {
 /**
  * Coerce a stored value into a policy.
  *
- * Anything unusable falls back to the default 30% policy rather than to a
- * made-up number, and a floor below 30 is raised to 30 — the business rule is
+ * Anything unusable falls back to the default 20% policy rather than to a
+ * made-up number, and a floor below 20 is raised to 20 — the business rule is
  * not something a stored row should be able to undercut.
  */
 export function parseDepositPolicy(raw: unknown): DepositPolicy {

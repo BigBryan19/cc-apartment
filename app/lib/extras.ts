@@ -87,6 +87,16 @@ export const EXTRAS: ExtraDefinition[] = [
     note: "Priced by treatment and number of guests — confirmed before you book.",
   },
   {
+    id: "private-chef",
+    name: "Private Chef",
+    summary: "A chef cooking in the apartment during your stay.",
+    amount: null,
+    priceBasis: "per_stay",
+    requiresQuote: true,
+    active: true,
+    note: "Price to be confirmed. Menus, dates and cost are agreed before you arrive.",
+  },
+  {
     id: "birthday-decoration",
     name: "Birthday decoration",
     summary: "The room prepared for a birthday.",

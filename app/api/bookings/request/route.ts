@@ -28,6 +28,7 @@ import {
   createServiceClient,
   isServiceRoleConfigured,
 } from "@/app/lib/supabase-server";
+import { WEEKEND_RESTRICTION_MESSAGE, weekendAllowsUnit } from "../../../lib/weekend";
 import { validateStay, isValidDateKey, type DateRange } from "@/app/lib/dates";
 // From tables.ts, NOT from lib/availability — that module is "use client" and
 // would hand this route handler a client reference instead of the table name,
@@ -146,6 +147,17 @@ export async function POST(request: Request) {
     packageId: resolvedPackageId,
     packageName,
   } = pricing.priced;
+
+  /*
+   * Weekend rule, enforced server-side.
+   *
+   * A partial-house booking at a restricted property cannot include a Friday or
+   * Saturday night. The UI refuses it too, but a request that bypasses the UI
+   * must not be able to slip a one-bedroom weekend stay through.
+   */
+  if (!weekendAllowsUnit(villaId, unit, checkIn, checkOut)) {
+    return badRequest(WEEKEND_RESTRICTION_MESSAGE, 409);
+  }
 
   // Re-check availability server-side. The client already does this, but a
   // request that bypasses the UI must not be able to double-book a night.

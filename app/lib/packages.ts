@@ -523,3 +523,30 @@ export const CATEGORY_LABELS: Record<PackageCategory, string> = {
   birthday: "Birthday Celebration",
   private_gathering: "Private Gathering",
 };
+
+// ---------------------------------------------------------------------------
+// Party and birthday pricing.
+//
+// Approved by the owner on 3 November 2026: GHS 5,000 for a party or birthday
+// package, except Adenta Serenity at GHS 6,000. These figures apply to party and
+// birthday products only — never to a honeymoon, and never to an ordinary
+// accommodation booking, which is priced from the property's own rate list.
+//
+// Inclusions are deliberately not listed here: nothing beyond the service cards
+// has been approved, and inventing inclusions would put a promise in front of a
+// guest that the business has not made.
+// ---------------------------------------------------------------------------
+
+export const PARTY_PACKAGE_PRICE = 5000;
+
+/** Property-level exceptions to the party price. */
+export const PARTY_PACKAGE_PRICE_BY_PROPERTY: Readonly<Record<number, number>> = {
+  3: 6000, // Adenta Serenity
+};
+
+export function partyPriceFor(villaId?: number | null): number {
+  if (typeof villaId === "number" && PARTY_PACKAGE_PRICE_BY_PROPERTY[villaId]) {
+    return PARTY_PACKAGE_PRICE_BY_PROPERTY[villaId];
+  }
+  return PARTY_PACKAGE_PRICE;
+}

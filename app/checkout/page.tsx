@@ -21,7 +21,7 @@ import {
   unitCapacityLabel,
 } from "../lib/rates";
 import { accommodationOnlyNotice } from "../lib/status";
-import { EXTRAS_BY_ID } from "../lib/extras";
+import { EXTRAS, EXTRAS_BY_ID } from "../lib/extras";
 import { VillaProps } from "../components/villas/types";
 import StayDateFields from "../components/booking/StayDateFields";
 import { useVillaAvailability } from "../lib/availability";
@@ -218,6 +218,12 @@ const CheckoutContent = () => {
 
     if (rate) setSelectedUnitId(rate);
     if (curr === "USD" || curr === "GHS") setCurrency(curr);
+    // Carried from the property page so the guest count the room was chosen for
+    // is the count the quote and the request use.
+    const guestsParam = Number(searchParams.get("guests"));
+    if (Number.isFinite(guestsParam) && guestsParam >= 1) {
+      setGuests(Math.min(60, Math.floor(guestsParam)));
+    }
     if (checkInParam) setCheckInDate(checkInParam);
     if (checkOutParam) setCheckOutDate(checkOutParam);
     if (packagesParam)
@@ -237,6 +243,17 @@ const CheckoutContent = () => {
 
   const selectedUnit = resolveUnit(villa?.units ?? [], selectedUnitId, selectedUnitName);
 
+  /**
+   * Rental days for the car. Defaults to the length of the stay, because that is
+   * what most guests want, but the guest can hire it for fewer days. Clamped
+   * server-side as well; this only keeps the field honest.
+   */
+  const [rentalDays, setRentalDays] = useState<string>("");
+  const rentalDayCount = Math.min(
+    90,
+    Math.max(1, Number(rentalDays) || totalNights || 1),
+  );
+
   const extraInputs: ExtraInput[] = useMemo(
     () =>
       selectedPackages
@@ -250,8 +267,11 @@ const CheckoutContent = () => {
           name: extra.name,
           amount: extra.requiresQuote ? null : extra.amount,
           priceBasis: extra.priceBasis,
+          // A rental is charged per day held, and the guest chooses those days.
+          quantity:
+            extra.priceBasis === "per_day" ? rentalDayCount : undefined,
         })),
-    [selectedPackages],
+    [selectedPackages, rentalDayCount],
   );
 
   const quoteResult = useMemo(() => {
@@ -978,6 +998,77 @@ const CheckoutContent = () => {
                   {quoteRefusal}
                 </p>
               )}
+
+              {/*
+                Add-ons can be added here, not only on the property page, so the
+                massage and the private chef are selectable inside the booking
+                journey. A priced add-on is charged; an unpriced one is carried
+                as a request and never enters the payable total.
+              */}
+              <div className="mb-6 rounded-xl border border-slate-200 p-4">
+                <span className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-900">
+                  <Gift size={14} className="text-blue-500" /> Add something to your stay
+                </span>
+                <div className="space-y-2">
+                  {EXTRAS.filter((extra) => extra.active).map((extra) => {
+                    const checked = selectedPackages.includes(extra.id);
+                    return (
+                      <div key={extra.id} className="rounded-lg bg-slate-50 px-3 py-2">
+                        <label className="flex cursor-pointer items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setSelectedPackages((prev) =>
+                                prev.includes(extra.id)
+                                  ? prev.filter((id) => id !== extra.id)
+                                  : [...prev, extra.id],
+                              )
+                            }
+                            className="mt-0.5 h-4 w-4"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex flex-wrap items-baseline justify-between gap-2">
+                              <span className="text-sm font-medium text-slate-900">{extra.name}</span>
+                              <span className="text-xs font-semibold text-slate-700">
+                                {extra.amount === null
+                                  ? "Price to be confirmed"
+                                  : `GHS ${extra.amount.toLocaleString("en-GH")}${
+                                      extra.priceBasis === "per_day"
+                                        ? " / day"
+                                        : " / stay"
+                                    }`}
+                              </span>
+                            </span>
+                            <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
+                              {extra.note ?? extra.summary}
+                            </span>
+                          </span>
+                        </label>
+                        {checked && extra.priceBasis === "per_day" && (
+                          <div className="mt-2 flex items-center gap-2 pl-7">
+                            <label className="text-[11px] font-medium text-slate-600" htmlFor="rental-days">
+                              Rental days
+                            </label>
+                            <input
+                              id="rental-days"
+                              type="number"
+                              min={1}
+                              max={90}
+                              value={rentalDays || String(totalNights || 1)}
+                              onChange={(event) => setRentalDays(event.target.value)}
+                              className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                            />
+                            <span className="text-[11px] text-slate-500">
+                              = GHS {((extra.amount ?? 0) * rentalDayCount).toLocaleString("en-GH")}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
               {selectedPackages.length > 0 && (
                 <div className="mb-6 pb-6 border-b border-slate-100">

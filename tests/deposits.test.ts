@@ -38,15 +38,15 @@ function check(id: string, label: string, condition: boolean, detail?: string) {
 }
 
 const defaultPolicy = parseDepositPolicy(undefined);
-const percent30 = parseDepositPolicy({ mode: "percent", percent: 30 });
+const percent30 = parseDepositPolicy({ mode: "percent", percent: 20 });
 const fixed1000 = parseDepositPolicy({ mode: "fixed", fixedAmount: 1000 });
 
 // --- 1. Unconfigured -------------------------------------------------------
 check("D1", "no policy means no deposit", !isDepositConfigured(NO_DEPOSIT_POLICY));
 check(
   "D1",
-  "the default policy offers part payment at 30%",
-  defaultPolicy.minPercent === 30 && defaultPolicy.enabled,
+  "the default policy offers part payment at 20%",
+  defaultPolicy.minPercent === 20 && defaultPolicy.enabled,
 );
 check(
   "D1",
@@ -63,13 +63,13 @@ check(
 // --- 2. Percentage ---------------------------------------------------------
 check(
   "D2",
-  "30% of 3,500 is 1,050",
-  depositAmountFor(3500, percent30) === 1050,
+  "20% of 3,500 is 700",
+  depositAmountFor(3500, percent30) === 700,
   String(depositAmountFor(3500, percent30)),
 );
 const percentDue = resolveDue(3500, percent30, "deposit");
-check("D2", "…due now is the deposit", percentDue.dueNow === 1050);
-check("D2", "…balance is the remainder", percentDue.balance === 2450);
+check("D2", "…due now is the deposit", percentDue.dueNow === 700);
+check("D2", "…balance is the remainder", percentDue.balance === 2800);
 check("D2", "…and the two add back to the total", percentDue.dueNow + percentDue.balance === 3500);
 
 // --- 3. Fixed --------------------------------------------------------------
@@ -92,16 +92,16 @@ check(
       .deposit === 0,
 );
 
-// --- 5. The 30% floor is not negotiable ----------------------------------
+// --- 5. The 20% floor is not negotiable ----------------------------------
 check(
   "D5",
-  "a stored floor below 30% is raised to 30%",
-  parseDepositPolicy({ mode: "percent", percent: 10 }).minPercent === 30,
+  "a stored floor below 20% is raised to 20%",
+  parseDepositPolicy({ mode: "percent", percent: 10 }).minPercent === 20,
 );
 check(
   "D5",
-  "a guest choosing 10% is charged 30%",
-  clampPercent(10, percent30) === 30,
+  "a guest choosing 10% is charged 20%",
+  clampPercent(10, percent30) === 20,
 );
 check(
   "D5",
