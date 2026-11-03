@@ -1,5 +1,7 @@
 import React from "react";
 import { ArrowUpRight } from "lucide-react";
+import DestinationSlideshow from "./DestinationSlideshow";
+import { EASTERN_REGION_PHOTOS } from "../lib/destinations";
 
 /**
  * Destinations.
@@ -9,19 +11,21 @@ import { ArrowUpRight } from "lucide-react";
  * They are now our own photographs: the Aburi apartment for the Eastern Region
  * and the Adenta exterior for Greater Accra.
  *
- * These are property photographs, not regional landscapes, so the section says
- * so rather than implying the image is the destination. A dedicated photograph
- * of the Aburi hills is still needed — see the handover notes — but a real
- * apartment beats a foreign landscape that misrepresents where a guest is going.
+ * The Eastern Region card now rotates through photographs of the places guests
+ * ask about — ATV trails, the waterfall, the gardens, the craft village — each
+ * captioned with its name. The Greater Accra card is still an apartment
+ * photograph until the owner supplies that region's places.
  */
 const REGIONS = [
   {
     id: "eastern",
     title: "Eastern Region",
     subtitle: "Aburi, near Aburi Girls School",
-    image: "/Aburi2.jpeg",
-    alt: "Living room at our Aburi Mountain Retreat in the Eastern Region",
+    image: EASTERN_REGION_PHOTOS[0].src,
+    alt: EASTERN_REGION_PHOTOS[0].alt,
     caption: "Aburi Mountain Retreat",
+    /** Rotating places, Eastern Region only. */
+    photos: EASTERN_REGION_PHOTOS,
   },
   {
     id: "accra",
@@ -55,12 +59,16 @@ const Regions: React.FC = () => {
               href="#villas"
               className="group relative block h-[380px] overflow-hidden rounded-2xl md:h-[440px]"
             >
-              <img
-                src={region.image}
-                alt={region.alt}
-                loading="lazy"
-                className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-              />
+              {region.photos ? (
+                <DestinationSlideshow photos={region.photos} title={region.title} />
+              ) : (
+                <img
+                  src={region.image}
+                  alt={region.alt}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
               <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-6 md:p-7">
@@ -82,7 +90,8 @@ const Regions: React.FC = () => {
         </div>
 
         <p className="mt-4 text-[11px] leading-relaxed text-[var(--color-faint)]">
-          Both photographs show our own apartments in each region.
+          Eastern Region photographs show places near Aburi, not the apartment.
+          Greater Accra shows our Adenta apartment.
         </p>
       </div>
     </section>
