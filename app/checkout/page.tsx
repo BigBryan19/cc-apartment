@@ -1116,18 +1116,31 @@ const CheckoutContent = () => {
                         key={pkg}
                         className="text-sm text-slate-600 flex justify-between items-center gap-3 bg-slate-50 p-2 rounded-lg"
                       >
-                        <span className="truncate">{pkg}</span>
-                        {/*
-                          Was "Quote pending", which sat in the totals panel and
-                          read as though it were included in the amount below. It
-                          is now an explicit exclusion.
-                        */}
-                        <span className="shrink-0 text-right text-xs font-medium text-amber-700">
-                          Quoted separately
-                          <span className="block text-[10px] font-normal text-slate-500">
-                            not in the total
-                          </span>
+                        <span className="truncate">
+                          {EXTRAS_BY_ID[pkg]?.name ?? pkg}
                         </span>
+                        {/*
+                          A priced add-on is charged and says so; only an unpriced
+                          one is a request. Labelling both "quoted separately" made
+                          a priced car rental look as though it were excluded.
+                        */}
+                        {EXTRAS_BY_ID[pkg] && !EXTRAS_BY_ID[pkg].requiresQuote ? (
+                          <span className="shrink-0 text-right text-xs font-semibold text-slate-900">
+                            {EXTRAS_BY_ID[pkg].priceBasis === "per_day"
+                              ? `GHS ${(EXTRAS_BY_ID[pkg].amount ?? 0).toLocaleString("en-GH")} × ${rentalDayCount} day${rentalDayCount === 1 ? "" : "s"}`
+                              : `GHS ${(EXTRAS_BY_ID[pkg].amount ?? 0).toLocaleString("en-GH")}`}
+                            <span className="block text-[10px] font-normal text-slate-500">
+                              in the total
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-right text-xs font-medium text-amber-700">
+                            Price to be confirmed
+                            <span className="block text-[10px] font-normal text-slate-500">
+                              not in the total
+                            </span>
+                          </span>
+                        )}
                       </li>
                     ))}
                   </ul>
