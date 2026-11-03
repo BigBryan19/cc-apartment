@@ -89,17 +89,18 @@ const VillaCard: React.FC<VillaCardProps> = ({
           </span>
         )}
 
-        {/* Pool badge — a real attribute, not decoration */}
-        {data.hasPool && (
-          <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-[var(--color-ink)] backdrop-blur-sm">
-            Pool
-          </span>
-        )}
-
-        {/* Video affordance */}
+        {/*
+          One badge, and it says what the media is.
+          
+          "Pool" sat here until 3 November 2026; every property has a pool, so a
+          badge that is always the same tells a guest nothing, while the video
+          preview is the thing they may not notice. It now reads "Tour" and only
+          appears when there is a walkthrough to watch — the play icon below is
+          gone, because it repeated the same word twice on one card.
+        */}
         {data.video && (
-          <span className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-            <Play size={11} fill="currentColor" /> Tour
+          <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-[var(--color-ink)] backdrop-blur-sm">
+            <Play size={11} fill="currentColor" aria-hidden="true" /> Tour
           </span>
         )}
 
