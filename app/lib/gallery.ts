@@ -169,6 +169,7 @@ export const DEFAULT_GALLERY: GalleryItem[] = [
    * a real one is supplied.
    */
   video("aburi-studio-video", "/aburi-studio.mp4", "/aburi-studio-poster.jpg", 2, "Aburi Studio", 65),
+  video("adenta-video", "/adenta-tour.mp4", "/adenta-tour-poster.jpg", 3, "Adenta Serenity walkthrough", 110),
   photo("adenta-1", "/Adenta1.jpg", 3, "Exterior", "The front elevation at Adenta Serenity.", 120),
   photo("adenta-2", "/Adenta2.jpg", 3, "Pool", "The pool and pergola seating.", 130),
   photo("adenta-3", "/Adenta3.jpg", 3, "Living & dining", "Open living and dining area.", 140),

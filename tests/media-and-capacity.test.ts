@@ -155,8 +155,8 @@ console.log("\n=== Media ownership ===\n");
 
 check(
   "M1",
-  "Adenta does not serve the Aburi studio clip",
-  !bundledVillaById(3)?.video,
+  "Adenta serves its own walkthrough, not the Aburi studio",
+  bundledVillaById(3)?.video === "/adenta-tour.mp4",
   String(bundledVillaById(3)?.video),
 );
 check(
@@ -164,7 +164,7 @@ check(
   "a stale Adenta row pointing at the studio clip is refused",
   toVillaProps(
     villaRow({ id: 3, title: "Adenta Serenity", bedrooms: 4, video: "/adenta.mp4" }) as never,
-  ).video === undefined,
+  ).video === "/adenta-tour.mp4",
 );
 check(
   "M3",

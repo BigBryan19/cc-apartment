@@ -144,6 +144,10 @@ const BUNDLED_MEDIA: Record<
       "/media/adenta/adenta-16.jpg",
       "/media/adenta/adenta-17.jpg",
     ],
+    // Supplied 3 November 2026 by the owner, and verified frame by frame against
+    // the Adenta photographs: the same cream sofas, the same framed portraits on
+    // the staircase wall, the same charcoal facade. This is Adenta's own tour.
+    video: "/adenta-tour.mp4",
   },
 };
 
@@ -463,8 +467,9 @@ const BUNDLED_ROWS: VillaRow[] = [
       "/media/adenta/adenta-16.jpg",
       "/media/adenta/adenta-17.jpg",
     ],
-    // No walkthrough exists for this property yet: `adenta.mov` has not been
-    // added to the repository. See BUNDLED_MEDIA[3].
+    // Adenta's own walkthrough, supplied 3 November 2026. The clip previously
+    // served here was the Aburi studio — see MISASSIGNED_VIDEO.
+    video: "/adenta-tour.mp4",
     description:
       "A four-bedroom house in Adenta with a private pool, a grand piano and a games lounge. The whole house sleeps eight; single and double-bedroom options are available on weeknights.",
     amenities: ADENTA_AMENITIES,
