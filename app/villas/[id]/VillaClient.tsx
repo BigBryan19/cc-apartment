@@ -378,8 +378,18 @@ export default function VillaClient({
             </button>
           </div>
 
+          {/*
+            Thumbnails live in a fixed-height window and scroll inside it.
+
+            With twenty-one photographs on Adenta the grid pushed everything —
+            rates, videos, the booking panel — far below the fold. A capped frame
+            keeps the whole set available without the page growing with it. The
+            grid still uses the full width, and the frame gets a visible edge so
+            it reads as scrollable rather than cut off.
+          */}
           {media.length > 1 && (
-            <div className="mt-2 grid grid-cols-4 gap-2">
+            <div className="mt-2 max-h-[228px] overflow-y-auto overscroll-contain rounded-xl border border-[var(--color-line-soft)] bg-[var(--color-canvas)]/40 p-2 [scrollbar-width:thin]">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {media.slice(1).map((item, i) => (
                 <button
                   key={item.src + i}
@@ -400,6 +410,7 @@ export default function VillaClient({
                   )}
                 </button>
               ))}
+              </div>
             </div>
           )}
 
@@ -409,7 +420,7 @@ export default function VillaClient({
               className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)]"
             >
               <Images size={14} aria-hidden="true" />
-              All {villa.images.length} photos
+              View all {media.length} photos and video
               {villa.video ? " & the walkthrough video" : ""}
             </button>
           )}
