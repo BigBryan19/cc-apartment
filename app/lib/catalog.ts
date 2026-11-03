@@ -44,6 +44,20 @@ import { normalizeUnits, type StoredRate } from "./rates";
 import { approvedCapacity } from "./capacity";
 import type { VillaProps } from "../components/villas/types";
 
+/**
+ * Signals that a stored rate list predates a correction and must not be sold.
+ * Keyed by property id; a true result falls back to the approved list.
+ */
+const STALE_RATE_TESTS: Record<number, (rates: StoredRate[]) => boolean> = {
+  // Adenta: no studio exists there, and nothing is sold at GHS 600.
+  3: (rates) =>
+    rates.some((rate) => {
+      const label = String((rate as { option?: unknown }).option ?? "");
+      const amount = Number((rate as { amount?: unknown }).amount ?? 0);
+      return /studio/i.test(label) || (amount > 0 && amount === 600);
+    }),
+};
+
 /** A row from the `villas` table, as PostgREST returns it. */
 export interface VillaRow {
   id: number;
@@ -212,10 +226,22 @@ export function toVillaProps(row: VillaRow): VillaProps {
    * to this property's bundled rate list — same property, never another's.
    */
   const storedRates = Array.isArray(row.rates) ? (row.rates as StoredRate[]) : [];
-  const ratesForRow = storedRates.length
-    ? storedRates
-    : (BUNDLED_ROWS.find((entry) => entry.id === row.id)?.rates as StoredRate[] | undefined) ??
-      storedRates;
+  /*
+   * A stored rate list that contains something this property cannot sell is
+   * stale, not a price decision.
+   *
+   * Adenta's rows still carried "Studio — 600" copied from Aburi. It prices a
+   * room that does not exist in that house, so the whole stored list is
+   * distrusted and the property's approved list is used instead. As soon as the
+   * row no longer contains those entries — via Admin → Properties or the
+   * migration — the stored list takes over again.
+   */
+  const staleRates = STALE_RATE_TESTS[row.id]?.(storedRates) ?? false;
+  const ratesForRow =
+    storedRates.length && !staleRates
+      ? storedRates
+      : (BUNDLED_ROWS.find((entry) => entry.id === row.id)?.rates as StoredRate[] | undefined) ??
+        storedRates;
 
   const units = normalizeUnits(ratesForRow, {
     price: row.price ?? null,

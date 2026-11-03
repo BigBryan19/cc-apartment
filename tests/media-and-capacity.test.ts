@@ -271,6 +271,31 @@ console.log("\n=== Adenta and weekends ===\n");
   check("W6", "the rule applies to Adenta only", weekendAllowsUnit(1, lakeRoom, "2026-11-06", "2026-11-08"));
 }
 
+// A production row still carrying the copied Studio row must not sell it.
+{
+  const stale = toVillaProps({
+    id: 3,
+    title: "Adenta Serenity",
+    location: "Greater Accra • Adenta",
+    price: 600,
+    guests: 4,
+    bedrooms: 4,
+    bathrooms: 5,
+    has_pool: true,
+    image: "/Adenta1.jpg",
+    images: ["/Adenta1.jpg"],
+    amenities: [],
+    coordinates: { lat: 5.7, lng: -0.16 },
+    rates: [
+      { option: "Single bedroom", amount: 600, priceBasis: "per_night" },
+      { option: "Studio", amount: 800, priceBasis: "per_night" },
+      { option: "Whole apartment (4 bedrooms)", amount: 3500, priceBasis: "per_night" },
+    ],
+  } as never);
+  check("A9", "a stale Adenta rate list is not sold", !stale.units.some((unit) => unit.amount === 600));
+  check("A10", "the approved list replaces it", stale.units.some((unit) => unit.amount === 2000));
+}
+
 // --- 4. Services -----------------------------------------------------------
 
 console.log("\n=== Services ===\n");
