@@ -14,7 +14,8 @@
 --   services Admin -> Services needs public.service_settings
 -- ---------------------------------------------------------------------------
 
-begin;
+-- Not run inside one transaction: each block commits on its own, so a
+-- statement that fails does not discard the work already done.
 
 -- ===== 2026-10-09-packages-inventory-and-quotes.sql =====
 -- ===========================================================================
@@ -527,11 +528,13 @@ alter table public.activity_log           enable row level security;
 
 -- Published package definitions are public marketing content. Drafts are not.
 drop policy if exists packages_public_read on public.packages;
+drop policy if exists "packages_public_read" on public.packages;
 create policy packages_public_read
   on public.packages for select
   using (status = 'published' or public.is_admin());
 
 drop policy if exists packages_admin_write on public.packages;
+drop policy if exists "packages_admin_write" on public.packages;
 create policy packages_admin_write
   on public.packages for all
   to authenticated
@@ -540,6 +543,7 @@ create policy packages_admin_write
 -- Extras of a published package are public. The EXISTS keeps a draft's extras
 -- private.
 drop policy if exists package_extras_public_read on public.package_extras;
+drop policy if exists "package_extras_public_read" on public.package_extras;
 create policy package_extras_public_read
   on public.package_extras for select
   using (
@@ -551,6 +555,7 @@ create policy package_extras_public_read
   );
 
 drop policy if exists package_extras_admin_write on public.package_extras;
+drop policy if exists "package_extras_admin_write" on public.package_extras;
 create policy package_extras_admin_write
   on public.package_extras for all
   to authenticated
@@ -569,7 +574,8 @@ begin
   ] loop
     execute format('drop policy if exists %I_admin_all on public.%I', t, t);
     execute format(
-      'create policy %I_admin_all on public.%I for all to authenticated using (public.is_admin()) with check (public.is_admin())',
+      'drop policy if exists "%I_admin_all" on public.;
+create policy %I_admin_all on public.%I for all to authenticated using (public.is_admin()) with check (public.is_admin())',
       t, t
     );
   end loop;
@@ -708,12 +714,14 @@ create policy "villa_media_admin_write"
   to authenticated
   with check (bucket_id = 'villa-media');
 
+drop policy if exists "villa_media_admin_update" on storage.objects;
 create policy "villa_media_admin_update"
   on storage.objects for update
   to authenticated
   using (bucket_id = 'villa-media')
   with check (bucket_id = 'villa-media');
 
+drop policy if exists "villa_media_admin_delete" on storage.objects;
 create policy "villa_media_admin_delete"
   on storage.objects for delete
   to authenticated
@@ -1031,4 +1039,3 @@ insert into public.service_settings (service_id, amount, active, cta) values
   ('private-chef', null, true, 'enquire')
 on conflict (service_id) do nothing;
 
-commit;
