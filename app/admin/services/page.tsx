@@ -2,22 +2,21 @@
 // ---------------------------------------------------------------------------
 // Owner control for the Experiences & services cards.
 //
-// Each row here is one card on the public site. The owner sets three things:
+// Three cards to a row on a desktop, two on a tablet, one on a phone. Each card
+// shows its photograph and the two settings that change day to day — price and
+// button — with the wording and image inside "Wording & photo" so the page stays
+// short.
 //
-//   • whether the card is shown;
-//   • its price (leave blank for "Enquire for pricing");
-//   • whether the button books the service with a stay or opens a WhatsApp
-//     enquiry.
-//
-// Saved rows live in `service_settings` and are read by the services section and
-// by the booking add-on list, so the card and the charge cannot disagree. With no
-// row saved, the approved figures in app/lib/services.ts apply.
+// Saved rows live in `service_settings` and are read by both the public services
+// section and the booking add-on list, so the card and the charge cannot
+// disagree. With no row saved, the approved figures in app/lib/services.ts apply.
 // ---------------------------------------------------------------------------
 
 "use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { ChevronDown, ImagePlus } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 import { SERVICES } from "../../lib/services";
 import {
@@ -26,12 +25,16 @@ import {
   type ServiceSetting,
 } from "../../lib/service-settings";
 
+const BUCKET = "villa-media";
+
 export default function AdminServicesPage() {
   const [rows, setRows] = useState<ServiceSetting[]>(defaultServiceSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -39,19 +42,18 @@ export default function AdminServicesPage() {
       return;
     }
     const supabase = createClient();
+    // `*` rather than a column list: naming a column that does not exist makes
+    // the whole read fail, and the page then claims the table is missing.
     supabase
       .from("service_settings")
-      .select("service_id, amount, active, cta, title, description, image, image_alt")
+      .select("*")
       .then(({ data, error: readError }) => {
         if (readError) {
-          setError(
-            "Could not read service_settings. Run the migration in supabase/migrations first.",
-          );
+          setError(`Could not read service_settings: ${readError.message}`);
         } else if (data?.length) {
           const saved = (data as Record<string, unknown>[])
             .map(toServiceSetting)
             .filter((entry): entry is ServiceSetting => entry !== null);
-          // Merge: a card with no saved row keeps its approved default.
           setRows((current) =>
             current.map((row) => saved.find((entry) => entry.serviceId === row.serviceId) ?? row),
           );
@@ -64,6 +66,26 @@ export default function AdminServicesPage() {
     setRows((current) =>
       current.map((row) => (row.serviceId === serviceId ? { ...row, ...patch } : row)),
     );
+
+  const upload = async (serviceId: string, file: File) => {
+    setUploading(serviceId);
+    setError(null);
+    const supabase = createClient();
+    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `services/${serviceId}-${Date.now()}.${extension}`;
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file, { cacheControl: "31536000" });
+    setUploading(null);
+
+    if (uploadError) {
+      setError(`Upload failed: ${uploadError.message}`);
+      return;
+    }
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    update(serviceId, { image: data.publicUrl });
+    setMessage("Photograph uploaded. Press Save changes to publish it.");
+  };
 
   const save = async () => {
     if (!isSupabaseConfigured()) {
@@ -90,34 +112,65 @@ export default function AdminServicesPage() {
       { onConflict: "service_id" },
     );
 
-    setSaving(false);
     if (writeError) {
+      /*
+       * A column that does not exist yet would reject the whole row. Price,
+       * button and visibility are the settings that matter most, so they are
+       * saved on their own and the missing copy columns are reported plainly.
+       */
+      if (/column|schema cache/i.test(writeError.message)) {
+        const { error: retryError } = await supabase.from("service_settings").upsert(
+          rows.map((row) => ({
+            service_id: row.serviceId,
+            amount: row.amount,
+            active: row.active,
+            cta: row.cta,
+            updated_at: new Date().toISOString(),
+          })),
+          { onConflict: "service_id" },
+        );
+        setSaving(false);
+        if (retryError) {
+          setError(retryError.message);
+          return;
+        }
+        setMessage(
+          "Saved price, button and visibility. The wording and photo fields need the four extra columns — run supabase/FIX-service-settings.sql.",
+        );
+        return;
+      }
+      setSaving(false);
       setError(writeError.message);
       return;
     }
+    setSaving(false);
     setMessage("Saved. The services section updates on the next load.");
   };
 
   return (
-    <div className="mx-auto max-w-4xl p-6 md:p-8">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Services</h1>
-      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
-        These are the cards under &ldquo;Experiences &amp; services&rdquo;. A card with a
-        price can be added to a stay; one without a price asks the guest to enquire.
-        Leave the price blank to show &ldquo;Enquire for pricing&rdquo;.
-      </p>
-
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <button
-          onClick={save}
-          disabled={saving || loading}
-          className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save changes"}
-        </button>
-        <Link href="/admin" className="text-sm font-medium text-slate-500 underline">
-          Back to dashboard
-        </Link>
+    <div className="mx-auto max-w-6xl">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
+            Services
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+            The cards under &ldquo;Experiences &amp; services&rdquo;. A price makes a card
+            bookable; leave it blank to show &ldquo;Enquire for pricing&rdquo;.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link href="/admin" className="text-sm font-medium text-slate-500 hover:text-slate-900">
+            Back
+          </Link>
+          <button
+            onClick={save}
+            disabled={saving || loading}
+            className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -131,137 +184,145 @@ export default function AdminServicesPage() {
         </p>
       )}
 
-      <div className="mt-6 space-y-3">
+      <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {rows.map((row) => {
           const service = SERVICES.find((entry) => entry.id === row.serviceId);
+          const image = row.image ?? service?.image;
+          const isOpen = open[row.serviceId] ?? false;
+
           return (
             <div
               key={row.serviceId}
-              className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 p-4 sm:grid-cols-12 sm:items-center"
+              className={`flex flex-col overflow-hidden rounded-2xl border bg-white shadow-[var(--shadow-raise)] transition-opacity ${
+                row.active
+                  ? "border-[var(--color-line-soft)]"
+                  : "border-dashed border-slate-300 opacity-60"
+              }`}
             >
-              <div className="sm:col-span-4">
-                <p className="text-sm font-semibold text-slate-900">
-                  {service?.name ?? row.serviceId}
-                </p>
-                <p className="text-xs text-slate-500">{service?.tagline}</p>
-              </div>
-
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 sm:col-span-3">
-                Price (GHS)
-                <input
-                  value={row.amount === null ? "" : String(row.amount)}
-                  onChange={(event) =>
-                    update(row.serviceId, {
-                      amount: event.target.value.trim() === "" ? null : Number(event.target.value),
-                    })
-                  }
-                  inputMode="decimal"
-                  placeholder="Blank = enquire"
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-                />
-              </label>
-
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 sm:col-span-3">
-                Button
-                <select
-                  value={row.cta}
-                  onChange={(event) =>
-                    update(row.serviceId, { cta: event.target.value as ServiceSetting["cta"] })
-                  }
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-                >
-                  <option value="book">Add to a stay</option>
-                  <option value="enquire">WhatsApp enquiry</option>
-                </select>
-              </label>
-
-              <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
-                <input
-                  type="checkbox"
-                  checked={row.active}
-                  onChange={(event) => update(row.serviceId, { active: event.target.checked })}
-                  className="h-4 w-4"
-                />
-                Shown
-              </label>
-
-              {/* Copy and photograph. Blank keeps the approved wording. */}
-              <div className="grid grid-cols-1 gap-3 sm:col-span-12 sm:grid-cols-12 sm:border-t sm:border-slate-100 sm:pt-3">
-                <div className="sm:col-span-4">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    Card title
-                    <input
-                      value={row.title ?? ""}
-                      onChange={(event) =>
-                        update(row.serviceId, { title: event.target.value.trim() || null })
-                      }
-                      placeholder={service?.name}
-                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-                    />
-                  </label>
-                </div>
-                <div className="sm:col-span-8">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    Description
-                    <textarea
-                      value={row.description ?? ""}
-                      onChange={(event) =>
-                        update(row.serviceId, { description: event.target.value.trim() || null })
-                      }
-                      placeholder={service?.description}
-                      rows={2}
-                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-                    />
-                  </label>
-                </div>
-                <div className="sm:col-span-8">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    Photograph path or URL
-                    <input
-                      value={row.image ?? ""}
-                      onChange={(event) =>
-                        update(row.serviceId, { image: event.target.value.trim() || null })
-                      }
-                      placeholder={service?.image}
-                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-                    />
-                  </label>
+              <div className="relative h-40 w-full overflow-hidden bg-slate-100">
+                {image ? (
+                  <img src={image} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-slate-400">
+                    <ImagePlus size={22} />
+                  </div>
+                )}
+                <label className="absolute bottom-2 right-2 cursor-pointer rounded-lg bg-black/60 px-2.5 py-1.5 text-[11px] font-semibold text-white backdrop-blur-sm">
+                  {uploading === row.serviceId ? "Uploading…" : "Replace photo"}
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={async (event) => {
+                    className="hidden"
+                    onChange={(event) => {
                       const file = event.target.files?.[0];
                       event.target.value = "";
-                      if (!file) return;
-                      const supabase = createClient();
-                      const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-                      const path = `services/${row.serviceId}-${Date.now()}.${extension}`;
-                      const { error: uploadError } = await supabase.storage
-                        .from("villa-media")
-                        .upload(path, file, { cacheControl: "31536000" });
-                      if (uploadError) {
-                        setError(`Upload failed: ${uploadError.message}`);
-                        return;
-                      }
-                      const { data } = supabase.storage.from("villa-media").getPublicUrl(path);
-                      update(row.serviceId, { image: data.publicUrl });
-                      setMessage("Photograph uploaded — press Save changes to publish it.");
+                      if (file) void upload(row.serviceId, file);
                     }}
-                    className="mt-2 block w-full cursor-pointer rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-white"
                   />
-                </div>
-                <div className="sm:col-span-4">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    Current
-                  </span>
-                  {(row.image ?? service?.image) && (
-                    <img
-                      src={row.image ?? service?.image}
-                      alt=""
-                      className="mt-1 h-24 w-full rounded-lg object-cover"
+                </label>
+              </div>
+
+              <div className="flex flex-1 flex-col p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="truncate text-sm font-semibold text-slate-900">
+                      {row.title ?? service?.name ?? row.serviceId}
+                    </h2>
+                    <p className="truncate text-xs text-slate-500">{service?.tagline}</p>
+                  </div>
+                  <label className="flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={row.active}
+                      onChange={(event) => update(row.serviceId, { active: event.target.checked })}
+                      className="h-3.5 w-3.5"
                     />
-                  )}
+                    Shown
+                  </label>
                 </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Price (GHS)
+                    <input
+                      value={row.amount === null ? "" : String(row.amount)}
+                      onChange={(event) =>
+                        update(row.serviceId, {
+                          amount:
+                            event.target.value.trim() === "" ? null : Number(event.target.value),
+                        })
+                      }
+                      inputMode="decimal"
+                      placeholder="Enquire"
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-normal normal-case tracking-normal text-slate-900"
+                    />
+                  </label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Button
+                    <select
+                      value={row.cta}
+                      onChange={(event) =>
+                        update(row.serviceId, { cta: event.target.value as ServiceSetting["cta"] })
+                      }
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-normal normal-case tracking-normal text-slate-900"
+                    >
+                      <option value="book">Book</option>
+                      <option value="enquire">Enquire</option>
+                    </select>
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setOpen((current) => ({ ...current, [row.serviceId]: !isOpen }))}
+                  aria-expanded={isOpen}
+                  className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-600"
+                >
+                  Wording &amp; photo
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {isOpen && (
+                  <div className="mt-3 space-y-3">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Card title
+                      <input
+                        value={row.title ?? ""}
+                        onChange={(event) =>
+                          update(row.serviceId, { title: event.target.value.trim() || null })
+                        }
+                        placeholder={service?.name}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-normal normal-case tracking-normal text-slate-900"
+                      />
+                    </label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Description
+                      <textarea
+                        value={row.description ?? ""}
+                        onChange={(event) =>
+                          update(row.serviceId, { description: event.target.value.trim() || null })
+                        }
+                        placeholder={service?.description}
+                        rows={3}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-normal normal-case tracking-normal text-slate-900"
+                      />
+                    </label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Photograph path or URL
+                      <input
+                        value={row.image ?? ""}
+                        onChange={(event) =>
+                          update(row.serviceId, { image: event.target.value.trim() || null })
+                        }
+                        placeholder={service?.image}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-normal normal-case tracking-normal text-slate-900"
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -269,8 +330,8 @@ export default function AdminServicesPage() {
       </div>
 
       <p className="mt-6 text-xs leading-relaxed text-slate-500">
-        Saving needs the <code className="font-mono">service_settings</code> table.
-        If saving fails, run the migration in{" "}
+        Saving needs the <code className="font-mono">service_settings</code> table and its four
+        copy columns. If saving fails, run{" "}
         <code className="font-mono">supabase/migrations/2026-11-03-services.sql</code>.
       </p>
     </div>
