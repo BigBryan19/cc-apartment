@@ -25,10 +25,14 @@ import {
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 import { GALLERY_TABLE } from "../../lib/tables";
+
+/** Same bucket the property editor writes to. */
+const GALLERY_BUCKET = "villa-media";
 import {
   GALLERY_CATEGORY_LABELS,
   sortGallery,
   toGalleryItem,
+  DEFAULT_GALLERY,
   type GalleryCategory,
   type GalleryItem,
 } from "../../lib/gallery";
@@ -95,6 +99,82 @@ export default function AdminGalleryPage() {
     () => (items.length ? Math.max(...items.map((item) => item.sortOrder)) + 10 : 10),
     [items],
   );
+
+  /**
+   * Upload straight from the computer.
+   *
+   * The file goes to the same Storage bucket the property editor uses, and the
+   * public URL it returns is put into the form — so the owner can check the
+   * title, category and caption before saving the row.
+   */
+  const [uploading, setUploading] = useState(false);
+  const uploadFile = async (file: File) => {
+    if (!configured) {
+      setMessage({ text: "Supabase is not configured, so uploads cannot be stored.", type: "error" });
+      return;
+    }
+    setUploading(true);
+    setMessage({ text: "", type: "" });
+
+    const supabase = createClient();
+    const isVideo = file.type.startsWith("video/");
+    const extension = file.name.split(".").pop()?.toLowerCase() || (isVideo ? "mp4" : "jpg");
+    const path = `gallery/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(GALLERY_BUCKET)
+      .upload(path, file, { cacheControl: "31536000", upsert: false });
+
+    setUploading(false);
+
+    if (uploadError) {
+      setMessage({
+        text: `Upload failed: ${uploadError.message}. The storage bucket "${GALLERY_BUCKET}" must exist — run supabase/RUN-2026-11-03.sql.`,
+        type: "error",
+      });
+      return;
+    }
+
+    const { data } = supabase.storage.from(GALLERY_BUCKET).getPublicUrl(path);
+    setDraft((current) => ({
+      ...current,
+      type: isVideo ? "video" : "photo",
+      src: data.publicUrl,
+      title: current.title || file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
+    }));
+    setMessage({ text: `${file.name} uploaded. Add a title, then save it to the gallery.`, type: "success" });
+  };
+
+  /**
+   * The public gallery falls back to the media bundled in app/lib/gallery.ts, so
+   * the table looks empty even though the site shows photographs. Seeding copies
+   * that list in, which is what makes it editable here.
+   */
+  const seedFromBundle = async () => {
+    if (!configured) return;
+    setSaving(true);
+    const { error } = await createClient()
+      .from(GALLERY_TABLE)
+      .insert(
+        DEFAULT_GALLERY.map((item) => ({
+          type: item.type,
+          src: item.src,
+          poster: item.poster ?? null,
+          title: item.title,
+          caption: item.caption ?? null,
+          category: item.category,
+          villa_id: item.villaId ?? null,
+          sort_order: item.sortOrder,
+        })),
+      );
+    setSaving(false);
+    if (error) {
+      setMessage({ text: error.message, type: "error" });
+      return;
+    }
+    setMessage({ text: "Bundled media copied into the gallery.", type: "success" });
+    load();
+  };
 
   const addItem = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -338,10 +418,20 @@ export default function AdminGalleryPage() {
         </div>
 
         {items.length === 0 ? (
-          <p className="px-6 py-10 text-center text-sm text-slate-500">
-            Nothing in the gallery table yet. Until media is added here, the public
-            gallery shows the bundled photographs and videos.
-          </p>
+          <div className="px-6 py-10 text-center">
+            <p className="text-sm text-slate-500">
+              Nothing in the gallery table yet. Until media is added here, the public
+              gallery shows the bundled photographs and videos.
+            </p>
+            <button
+              type="button"
+              onClick={() => void seedFromBundle()}
+              disabled={saving}
+              className="mt-4 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 disabled:opacity-50"
+            >
+              Copy the {DEFAULT_GALLERY.length} bundled items in
+            </button>
+          </div>
         ) : (
           <ul className="divide-y divide-slate-100">
             {items.map((item, index) => (
