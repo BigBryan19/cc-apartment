@@ -29,6 +29,8 @@ import {
 } from "../../lib/rates";
 import { WEEKEND_RESTRICTION_MESSAGE, weekendAllowsUnit } from "../../lib/weekend";
 import { EXTRAS } from "../../lib/extras";
+import { whatsappLink } from "../../lib/contact";
+import { absoluteUrl } from "../../lib/seo";
 import { priceUnit } from "../../lib/quote";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
@@ -211,6 +213,30 @@ export default function VillaClient({
     0,
   );
   const computedTotalPrice = selectedUnitAmount;
+
+  /*
+   * A rate that cannot be sold online (monthly, or quotation-only) has no
+   * checkout to go to. Sending a guest there produced a dead end, so the button
+   * becomes a WhatsApp enquiry carrying the property, the rate, the dates, the
+   * party size and a link to the property's own photograph.
+   *
+   * WhatsApp cannot pre-attach an image through a link; the photo URL is in the
+   * message so it arrives as a preview the guest can forward as-is.
+   */
+  const enquiryOnlySelection = selectedUnit ? isEnquiryOnly(selectedUnit) : false;
+  const enquiryMessage = selectedUnit
+    ? [
+        `Hello Cosy Crest — I'd like to enquire about the ${selectedUnit.name} at ${villa.title}.`,
+        checkInDate && checkOutDate
+          ? `Dates: ${checkInDate} to ${checkOutDate} (${totalNights} night${totalNights === 1 ? "" : "s"}).`
+          : "Dates: still deciding — please advise what is available.",
+        `Guests: ${guests}.`,
+        selectedUnit.priceBasis === "monthly"
+          ? "Please send your monthly rates and the terms (minimum stay, notice, deposit)."
+          : "Please send availability and pricing.",
+        `Property photo: ${absoluteUrl(villa.images[0] ?? villa.image)}`,
+      ].join(" ")
+    : "";
 
   const stayError =
     checkInDate && checkOutDate
@@ -881,27 +907,40 @@ export default function VillaClient({
                   </p>
                 )}
 
-                <button
-                  onClick={handleCheckoutBooking}
-                  disabled={
-                    !checkInDate ||
-                    !checkOutDate ||
-                    totalNights === 0 ||
-                    Boolean(stayError) ||
-                    (selectedUnit?.maxGuests !== null &&
-                      selectedUnit !== null &&
-                      guests > (selectedUnit.maxGuests as number)) ||
-                    !weekendAllowsUnit(villa.id, selectedUnit ?? { kind: "room" }, checkInDate, checkOutDate)
-                  }
-                  className="btn-accent mt-5 w-full rounded-xl py-4 text-sm"
-                >
-                  {!checkInDate || !checkOutDate
-                    ? "Select dates to book"
-                    : "Reserve now"}
-                </button>
+                {enquiryOnlySelection ? (
+                  <a
+                    href={whatsappLink(enquiryMessage)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-accent mt-5 flex w-full items-center justify-center gap-2 rounded-xl py-4 text-sm"
+                  >
+                    Enquire about {selectedUnit?.priceBasis === "monthly" ? "monthly rates" : "this rate"} on WhatsApp
+                  </a>
+                ) : (
+                  <button
+                    onClick={handleCheckoutBooking}
+                    disabled={
+                      !checkInDate ||
+                      !checkOutDate ||
+                      totalNights === 0 ||
+                      Boolean(stayError) ||
+                      (selectedUnit?.maxGuests !== null &&
+                        selectedUnit !== null &&
+                        guests > (selectedUnit.maxGuests as number)) ||
+                      !weekendAllowsUnit(villa.id, selectedUnit ?? { kind: "room" }, checkInDate, checkOutDate)
+                    }
+                    className="btn-accent mt-5 w-full rounded-xl py-4 text-sm"
+                  >
+                    {!checkInDate || !checkOutDate
+                      ? "Select dates to book"
+                      : "Reserve now"}
+                  </button>
+                )}
 
                 <p className="mt-3 text-center text-xs text-[var(--color-muted)]">
-                  You won&apos;t be charged until the next step.
+                  {enquiryOnlySelection
+                    ? "Opens WhatsApp with your details filled in — nothing is booked or charged until we reply."
+                    : "You won't be charged until the next step."}
                 </p>
               </div>
             </div>
