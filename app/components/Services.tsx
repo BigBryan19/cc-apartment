@@ -86,7 +86,7 @@ const Services: React.FC<ServicesProps> = ({ compact = false }) => {
     const supabase = createClient();
     supabase
       .from("service_settings")
-      .select("service_id, amount, active, cta")
+      .select("service_id, amount, active, cta, title, description, image, image_alt")
       .then(({ data, error }) => {
         if (cancelled || error || !data?.length) return;
         const parsed = (data as Record<string, unknown>[])

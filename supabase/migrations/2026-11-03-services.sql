@@ -18,6 +18,12 @@ create table if not exists public.service_settings (
   updated_at timestamptz not null default now()
 );
 
+-- Card copy and photograph, added after the first version of this table.
+alter table public.service_settings add column if not exists title text;
+alter table public.service_settings add column if not exists description text;
+alter table public.service_settings add column if not exists image text;
+alter table public.service_settings add column if not exists image_alt text;
+
 comment on table public.service_settings is
   'Per-card settings for the experiences & services section, edited at /admin/services.';
 

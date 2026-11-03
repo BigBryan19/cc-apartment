@@ -41,7 +41,7 @@ export default function AdminServicesPage() {
     const supabase = createClient();
     supabase
       .from("service_settings")
-      .select("service_id, amount, active, cta")
+      .select("service_id, amount, active, cta, title, description, image, image_alt")
       .then(({ data, error: readError }) => {
         if (readError) {
           setError(
@@ -81,6 +81,10 @@ export default function AdminServicesPage() {
         amount: row.amount,
         active: row.active,
         cta: row.cta,
+        title: row.title,
+        description: row.description,
+        image: row.image,
+        image_alt: row.imageAlt,
         updated_at: new Date().toISOString(),
       })),
       { onConflict: "service_id" },
@@ -180,6 +184,85 @@ export default function AdminServicesPage() {
                 />
                 Shown
               </label>
+
+              {/* Copy and photograph. Blank keeps the approved wording. */}
+              <div className="grid grid-cols-1 gap-3 sm:col-span-12 sm:grid-cols-12 sm:border-t sm:border-slate-100 sm:pt-3">
+                <div className="sm:col-span-4">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Card title
+                    <input
+                      value={row.title ?? ""}
+                      onChange={(event) =>
+                        update(row.serviceId, { title: event.target.value.trim() || null })
+                      }
+                      placeholder={service?.name}
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
+                    />
+                  </label>
+                </div>
+                <div className="sm:col-span-8">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Description
+                    <textarea
+                      value={row.description ?? ""}
+                      onChange={(event) =>
+                        update(row.serviceId, { description: event.target.value.trim() || null })
+                      }
+                      placeholder={service?.description}
+                      rows={2}
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
+                    />
+                  </label>
+                </div>
+                <div className="sm:col-span-8">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Photograph path or URL
+                    <input
+                      value={row.image ?? ""}
+                      onChange={(event) =>
+                        update(row.serviceId, { image: event.target.value.trim() || null })
+                      }
+                      placeholder={service?.image}
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
+                    />
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (!file) return;
+                      const supabase = createClient();
+                      const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+                      const path = `services/${row.serviceId}-${Date.now()}.${extension}`;
+                      const { error: uploadError } = await supabase.storage
+                        .from("villa-media")
+                        .upload(path, file, { cacheControl: "31536000" });
+                      if (uploadError) {
+                        setError(`Upload failed: ${uploadError.message}`);
+                        return;
+                      }
+                      const { data } = supabase.storage.from("villa-media").getPublicUrl(path);
+                      update(row.serviceId, { image: data.publicUrl });
+                      setMessage("Photograph uploaded — press Save changes to publish it.");
+                    }}
+                    className="mt-2 block w-full cursor-pointer rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-white"
+                  />
+                </div>
+                <div className="sm:col-span-4">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Current
+                  </span>
+                  {(row.image ?? service?.image) && (
+                    <img
+                      src={row.image ?? service?.image}
+                      alt=""
+                      className="mt-1 h-24 w-full rounded-lg object-cover"
+                    />
+                  )}
+                </div>
+              </div>
             </div>
           );
         })}

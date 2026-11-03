@@ -1018,6 +1018,11 @@ create policy "authenticated can write service settings"
 
 -- Seed the approved figures, so Admin → Services opens with real values rather
 -- than blanks. These match app/lib/services.ts at the time of writing.
+alter table public.service_settings add column if not exists title text;
+alter table public.service_settings add column if not exists description text;
+alter table public.service_settings add column if not exists image text;
+alter table public.service_settings add column if not exists image_alt text;
+
 insert into public.service_settings (service_id, amount, active, cta) values
   ('honeymoon', 3500, true, 'book'),
   ('birthday', 5000, true, 'book'),

@@ -28,6 +28,11 @@ export interface ServiceSetting {
   amount: number | null;
   active: boolean;
   cta: ServiceCta;
+  /** Card copy and photograph. Null keeps the approved wording in services.ts. */
+  title: string | null;
+  description: string | null;
+  image: string | null;
+  imageAlt: string | null;
 }
 
 /** What applies before the owner has saved anything. */
@@ -38,6 +43,10 @@ export function defaultServiceSettings(): ServiceSetting[] {
     active: true,
     // A priced service can be added to a stay; an unpriced one cannot.
     cta: service.price === null ? "enquire" : "book",
+    title: null,
+    description: null,
+    image: null,
+    imageAlt: null,
   }));
 }
 
@@ -48,11 +57,18 @@ export function toServiceSetting(row: Record<string, unknown>): ServiceSetting |
     typeof row.amount === "number" && Number.isFinite(row.amount) && row.amount > 0
       ? row.amount
       : null;
+  const text = (value: unknown) =>
+    typeof value === "string" && value.trim() ? value.trim() : null;
+
   return {
     serviceId,
     amount,
     active: row.active !== false,
     cta: row.cta === "book" ? "book" : "enquire",
+    title: text(row.title),
+    description: text(row.description),
+    image: text(row.image),
+    imageAlt: text(row.image_alt),
   };
 }
 
@@ -82,6 +98,11 @@ export function applyServiceSettings(settings: ServiceSetting[]): ServiceDefinit
 
     return {
       ...service,
+      // Copy and photograph: the saved value wins, otherwise the approved text.
+      name: setting.title ?? service.name,
+      description: setting.description ?? service.description,
+      image: setting.image ?? service.image,
+      imageAlt: setting.imageAlt ?? service.imageAlt,
       price: priced ? { amount, basis, from: service.price?.from ?? true } : null,
       priceLabel: priced
         ? `${formatServiceAmount(amount)} ${basis === "per_day" ? "per day" : "per stay"}`

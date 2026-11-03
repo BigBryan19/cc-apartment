@@ -115,8 +115,8 @@ const HONEYMOON: ServiceDefinition = {
   description:
     "The apartment prepared before you arrive — soft lighting, dressed bed and a quiet, private setting for two.",
   // A Cosy Crest bedroom, not a stock exterior: the setup happens in this room.
-  image: "/Adenta4.jpg",
-  imageAlt: "Prepared bedroom suite at Cosy Crest",
+  image: "/media/services/honeymoon.jpg",
+  imageAlt: "A couple sharing a glass of wine at a candlelit table",
   price: { amount: HONEYMOON_FROM, basis: "per_stay", from: true },
   priceLabel: priceLabelFor({ amount: HONEYMOON_FROM, basis: "per_stay", from: true }),
   priceNote: "Starting price per stay. The final figure depends on the property and the setup you choose.",
@@ -151,7 +151,7 @@ const CAR_RENTAL_SERVICE: ServiceDefinition = {
   description:
     "A Hyundai Tucson with a driver available for the length of your stay — airport runs, meetings or a day out of the city.",
   // Freely licensed photograph of the actual model offered.
-  image: "/car-rental-tucson.jpg",
+  image: "/media/services/car-rental.jpg",
   imageAlt: `${CAR_RENTAL.vehicle} available for rental`,
   price: { amount: CAR_RENTAL.dayRate, basis: "per_day", from: false },
   priceLabel: priceLabelFor({ amount: CAR_RENTAL.dayRate, basis: "per_day", from: false }),
@@ -199,8 +199,8 @@ const PRIVATE_CHEF: ServiceDefinition = {
   tagline: "Dining in",
   description:
     "Enjoy a personalised dining experience with a private chef during your stay. Enquire about menus and availability.",
-  image: "/Aburi4.jpeg",
-  imageAlt: "The open kitchen at Aburi Mountain Retreat, where a private chef cooks",
+  image: "/media/services/private-chef.jpg",
+  imageAlt: "A private chef plating a meal in the apartment kitchen",
   // No approved price: the card must not imply one.
   price: null,
   priceLabel: "Enquire for pricing",
