@@ -38,6 +38,13 @@ export interface VillaProps {
 
 export interface SearchFilters {
   location: string;
+  /**
+   * Region filter, set by the destination cards ("Eastern Region",
+   * "Greater Accra"). Kept separate from `location` so the city dropdown in the
+   * hero keeps working: its options are Aburi, Lakeside and Adenta, none of which
+   * is a region name.
+   */
+  region?: string;
   guests: number;
   maxPrice: number;
   checkIn?: string;

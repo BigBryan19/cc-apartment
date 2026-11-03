@@ -1,7 +1,7 @@
 import React from "react";
 import { ArrowUpRight } from "lucide-react";
 import DestinationSlideshow from "./DestinationSlideshow";
-import { EASTERN_REGION_PHOTOS } from "../lib/destinations";
+import { EASTERN_REGION_PHOTOS, GREATER_ACCRA_PHOTOS } from "../lib/destinations";
 
 /**
  * Destinations.
@@ -31,13 +31,19 @@ const REGIONS = [
     id: "accra",
     title: "Greater Accra",
     subtitle: "Lakeside Estate & Adenta",
-    image: "/Adenta1.jpg",
-    alt: "The exterior of Adenta Serenity in Greater Accra",
-    caption: "Adenta Serenity",
+    image: GREATER_ACCRA_PHOTOS[0].src,
+    alt: GREATER_ACCRA_PHOTOS[0].alt,
+    caption: "Lakeside Estate & Adenta Serenity",
+    photos: GREATER_ACCRA_PHOTOS,
   },
 ];
 
-const Regions: React.FC = () => {
+const Regions: React.FC<{
+  /** Narrows the apartment grid to this region. */
+  onSelectRegion?: (region: string) => void;
+  /** Region currently in force, so the chosen card can say so. */
+  activeRegion?: string;
+}> = ({ onSelectRegion, activeRegion }) => {
   return (
     <section className="section-y bg-white">
       <div className="shell">
@@ -57,7 +63,13 @@ const Regions: React.FC = () => {
             <a
               key={region.id}
               href="#villas"
-              className="group relative block h-[380px] overflow-hidden rounded-2xl md:h-[440px]"
+              onClick={() => onSelectRegion?.(region.title)}
+              aria-label={`Show apartments in ${region.title}`}
+              className={`group relative block h-[380px] overflow-hidden rounded-2xl ring-2 transition-shadow md:h-[440px] ${
+                activeRegion === region.title
+                  ? "ring-[var(--color-ink)]"
+                  : "ring-transparent"
+              }`}
             >
               {region.photos ? (
                 <DestinationSlideshow photos={region.photos} title={region.title} />
@@ -81,8 +93,13 @@ const Regions: React.FC = () => {
                     {region.caption}
                   </p>
                 </div>
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-md transition-colors group-hover:bg-white group-hover:text-[var(--color-ink)]">
-                  <ArrowUpRight size={18} />
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="hidden rounded-full bg-white/15 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-white backdrop-blur-md sm:block">
+                    {activeRegion === region.title ? "Showing" : "See stays"}
+                  </span>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-md transition-colors group-hover:bg-white group-hover:text-[var(--color-ink)]">
+                    <ArrowUpRight size={18} />
+                  </span>
                 </span>
               </div>
             </a>
@@ -90,8 +107,8 @@ const Regions: React.FC = () => {
         </div>
 
         <p className="mt-4 text-[11px] leading-relaxed text-[var(--color-faint)]">
-          Eastern Region photographs show places near Aburi, not the apartment.
-          Greater Accra shows our Adenta apartment.
+          Photographs show places in each region, not the apartments. Choosing a
+          region filters the stays below to that region.
         </p>
       </div>
     </section>

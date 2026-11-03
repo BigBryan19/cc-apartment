@@ -45,9 +45,26 @@ const App: React.FC = () => {
       <main>
         <AboutUs />
 
-        <Villas currency={currency} searchFilters={searchFilters} />
+        <Villas
+          currency={currency}
+          searchFilters={searchFilters}
+          onClearRegion={() => setSearchFilters((prev) => ({ ...prev, region: undefined }))}
+        />
 
-        <Regions />
+        <Regions
+          onSelectRegion={(region: string) => {
+            // Clicking a destination narrows the apartments to that region and
+            // clears any city filter that would contradict it. Clicking the
+            // highlighted card again clears the filter.
+            setSearchFilters((prev) => ({
+              ...prev,
+              region: prev.region === region ? undefined : region,
+              location: "",
+            }));
+            document.getElementById("villas")?.scrollIntoView({ behavior: "smooth" });
+          }}
+          activeRegion={searchFilters.region}
+        />
 
         <Specialties />
 

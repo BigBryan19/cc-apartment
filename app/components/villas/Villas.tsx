@@ -12,6 +12,7 @@ import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 import { bundledVillas, toVillaProps, type VillaRow } from "../../lib/catalog";
 import { fromNightlyPrice } from "../../lib/rates";
 import { maxPropertyOccupancy } from "../../lib/quote";
+import { locationRegion } from "../../lib/catalog";
 
 // Leaflet touches `window`, so the map is client-only.
 const VillaMapView = dynamic(() => import("./VillaMapView"), {
@@ -27,9 +28,11 @@ const VillaMapView = dynamic(() => import("./VillaMapView"), {
 interface VillasProps {
   currency: "GHS" | "USD";
   searchFilters: SearchFilters;
+  /** Clears the region chosen from the destination cards. */
+  onClearRegion?: () => void;
 }
 
-const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
+const Villas: React.FC<VillasProps> = ({ currency, searchFilters, onClearRegion }) => {
   const router = useRouter();
 
   const [villasData, setVillasData] = useState<VillaProps[]>([]);
@@ -99,6 +102,15 @@ const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
       const locationMatch = searchFilters.location
         ? villa.location.toLowerCase().includes(searchFilters.location.toLowerCase())
         : true;
+      /*
+       * Region filter, set by the destination cards. Matched against the part of
+       * `location` before the bullet — "Eastern Region • Aburi" is the Eastern
+       * Region — rather than by substring on the whole string, so a city name
+       * can never leak into a region comparison.
+       */
+      const regionMatch = searchFilters.region
+        ? locationRegion(villa.location).toLowerCase() === searchFilters.region.toLowerCase()
+        : true;
       // Occupancy is the largest approved unit on the property, not the
       // property's own headline figure — a 6-guest search must not match a
       // property whose only bookable unit takes 2.
@@ -112,12 +124,12 @@ const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
       if (currency === "USD") price = Math.round(price / EXCHANGE_RATE);
       const priceMatch = advertised === null ? false : price <= searchFilters.maxPrice;
 
-      return locationMatch && guestsMatch && priceMatch;
+      return locationMatch && regionMatch && guestsMatch && priceMatch;
     });
   }, [searchFilters, currency, villasData]);
 
   const hasActiveFilters =
-    Boolean(searchFilters.location) || searchFilters.maxPrice < 10000;
+    Boolean(searchFilters.location) || Boolean(searchFilters.region) || searchFilters.maxPrice < 10000;
 
   return (
     <section id="villas" className="section-y bg-white">
@@ -137,6 +149,22 @@ const Villas: React.FC<VillasProps> = ({ currency, searchFilters }) => {
                   : "Handpicked, fully serviced apartments across Greater Accra and the Eastern Region."}
             </p>
           </div>
+
+          {/* ---- Active region ---- */}
+          {searchFilters.region && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-[var(--color-muted)]">Showing stays in</span>
+              <button
+                type="button"
+                onClick={() => onClearRegion?.()}
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--color-ink)] bg-[var(--color-ink)] px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                {searchFilters.region}
+                <span aria-hidden="true">×</span>
+                <span className="sr-only">Clear the region filter</span>
+              </button>
+            </div>
+          )}
 
           {/* ---- View toggle ---- */}
           <div className="inline-flex shrink-0 self-start rounded-full border border-[var(--color-line)] p-1 md:self-auto">
