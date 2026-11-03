@@ -31,8 +31,14 @@ export const CONTACT = {
  * message arrives with the context attached. Nothing is ever sent automatically:
  * this only builds a URL the guest chooses to open.
  */
-export function whatsappLink(prefill?: string): string {
-  const base = `https://wa.me/${CONTACT.whatsappNumber}`;
+/**
+ * @param prefill  Message already written for the guest.
+ * @param number   Optional override, from Admin → Settings → Brand & appearance.
+ *                 Falls back to the approved business number.
+ */
+export function whatsappLink(prefill?: string, number?: string | null): string {
+  const digits = (number ?? "").replace(/\D/g, "");
+  const base = `https://wa.me/${digits.length >= 8 ? digits : CONTACT.whatsappNumber}`;
   if (!prefill?.trim()) return base;
   return `${base}?text=${encodeURIComponent(prefill.trim())}`;
 }

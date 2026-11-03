@@ -1006,6 +1006,7 @@ alter table public.service_settings add column if not exists title text;
 alter table public.service_settings add column if not exists description text;
 alter table public.service_settings add column if not exists image text;
 alter table public.service_settings add column if not exists image_alt text;
+alter table public.service_settings add column if not exists sort_order integer default 999;
 
 comment on table public.service_settings is
   'Per-card settings for the experiences & services section, edited at /admin/services.';

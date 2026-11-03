@@ -16,7 +16,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ImagePlus } from "lucide-react";
+import { ChevronDown, ImagePlus, Plus, Trash2 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 import { SERVICES } from "../../lib/services";
 import {
@@ -35,6 +35,8 @@ export default function AdminServicesPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
+  /** Ids removed in this session, deleted from the table when Save is pressed. */
+  const [removed, setRemoved] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -61,6 +63,31 @@ export default function AdminServicesPage() {
         setLoading(false);
       });
   }, []);
+
+  /** Adds a blank card. It is not saved until Save changes is pressed. */
+  const addService = () => {
+    const id = `custom-${Date.now().toString(36)}`;
+    setRows((current) => [
+      ...current,
+      {
+        serviceId: id,
+        amount: null,
+        active: true,
+        cta: "enquire",
+        title: "",
+        description: "",
+        image: null,
+        imageAlt: null,
+        sortOrder: (current.at(-1)?.sortOrder ?? 0) + 10,
+      },
+    ]);
+    setOpen((current) => ({ ...current, [id]: true }));
+  };
+
+  const removeService = (serviceId: string) => {
+    setRows((current) => current.filter((row) => row.serviceId !== serviceId));
+    setRemoved((current) => [...current, serviceId]);
+  };
 
   const update = (serviceId: string, patch: Partial<ServiceSetting>) =>
     setRows((current) =>
@@ -107,6 +134,7 @@ export default function AdminServicesPage() {
         description: row.description,
         image: row.image,
         image_alt: row.imageAlt,
+        sort_order: row.sortOrder,
         updated_at: new Date().toISOString(),
       })),
       { onConflict: "service_id" },
@@ -143,6 +171,11 @@ export default function AdminServicesPage() {
       setError(writeError.message);
       return;
     }
+    if (removed.length) {
+      await supabase.from("service_settings").delete().in("service_id", removed);
+      setRemoved([]);
+    }
+
     setSaving(false);
     setMessage("Saved. The services section updates on the next load.");
   };
@@ -163,6 +196,13 @@ export default function AdminServicesPage() {
           <Link href="/admin" className="text-sm font-medium text-slate-500 hover:text-slate-900">
             Back
           </Link>
+          <button
+            onClick={addService}
+            disabled={saving || loading}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm font-semibold text-slate-800 disabled:opacity-50"
+          >
+            <Plus size={15} /> Add service
+          </button>
           <button
             onClick={save}
             disabled={saving || loading}
@@ -271,6 +311,14 @@ export default function AdminServicesPage() {
                     </select>
                   </label>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => removeService(row.serviceId)}
+                  className="mt-2 flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 size={12} /> Remove
+                </button>
 
                 <button
                   type="button"

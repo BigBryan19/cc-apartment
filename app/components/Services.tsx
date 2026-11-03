@@ -26,6 +26,7 @@ import {
   type ServiceSetting,
 } from "../lib/service-settings";
 import { createClient, isSupabaseConfigured } from "../utils/supabase";
+import { useSiteTheme } from "./ThemeProvider";
 import { whatsappLink } from "../lib/contact";
 
 /**
@@ -99,7 +100,17 @@ const Services: React.FC<ServicesProps> = ({ compact = false }) => {
     };
   }, []);
 
-  const services = applyServiceSettings(settings);
+  const theme = useSiteTheme();
+
+  /*
+   * The enquiry number is set in Admin → Settings, so it is applied here too
+   * rather than baked into each service's stored link.
+   */
+  const services = applyServiceSettings(settings).map((service) =>
+    service.href.includes("wa.me/")
+      ? { ...service, href: service.href.replace(/wa\.me\/\d+/, `wa.me/${theme.whatsappNumber}`) }
+      : service,
+  );
 
   return (
     <section

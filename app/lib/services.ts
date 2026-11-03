@@ -29,7 +29,17 @@
 import { nightsBetween } from "./dates";
 import { whatsappLink } from "./contact";
 
-export type ServiceId = "honeymoon" | "birthday" | "car-rental" | "massage" | "private-chef";
+/**
+ * The approved services, plus any id the owner creates in Admin → Services.
+ * The union keeps autocomplete for the known five while allowing new ones.
+ */
+export type ServiceId =
+  | "honeymoon"
+  | "birthday"
+  | "car-rental"
+  | "massage"
+  | "private-chef"
+  | (string & {});
 
 /** How the advertised figure is applied. */
 export type ServicePriceBasis = "per_stay" | "per_day";

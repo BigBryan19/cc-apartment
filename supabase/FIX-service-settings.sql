@@ -24,6 +24,7 @@ alter table public.service_settings add column if not exists title text;
 alter table public.service_settings add column if not exists description text;
 alter table public.service_settings add column if not exists image text;
 alter table public.service_settings add column if not exists image_alt text;
+alter table public.service_settings add column if not exists sort_order integer default 999;
 
 -- The `cta` check constraint is added separately: adding it inline fails if the
 -- table already exists without it.

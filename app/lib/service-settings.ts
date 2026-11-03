@@ -19,6 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { SERVICES, type ServiceDefinition } from "./services";
+import { whatsappLink } from "./contact";
 
 export type ServiceCta = "book" | "enquire";
 
@@ -33,6 +34,8 @@ export interface ServiceSetting {
   description: string | null;
   image: string | null;
   imageAlt: string | null;
+  /** Order on the page; lower first. Custom services default to the end. */
+  sortOrder: number;
 }
 
 /** What applies before the owner has saved anything. */
@@ -47,6 +50,7 @@ export function defaultServiceSettings(): ServiceSetting[] {
     description: null,
     image: null,
     imageAlt: null,
+    sortOrder: SERVICES.findIndex((entry) => entry.id === service.id) * 10,
   }));
 }
 
@@ -69,6 +73,10 @@ export function toServiceSetting(row: Record<string, unknown>): ServiceSetting |
     description: text(row.description),
     image: text(row.image),
     imageAlt: text(row.image_alt),
+    sortOrder:
+      typeof row.sort_order === "number" && Number.isFinite(row.sort_order)
+        ? row.sort_order
+        : 999,
   };
 }
 
@@ -82,10 +90,38 @@ export function formatServiceAmount(amount: number): string {
  * Anything not overridden keeps its code-defined price and action, so a missing
  * row never blanks a card.
  */
+/** A service that exists only in the database, written by the owner. */
+function customService(setting: ServiceSetting): ServiceDefinition {
+  const priced = setting.amount !== null;
+  const name = setting.title ?? "New service";
+  const basis = "per_stay" as const;
+
+  return {
+    id: setting.serviceId,
+    name,
+    tagline: "Added by you",
+    description: setting.description ?? "Tell us what this service includes.",
+    image: setting.image ?? "/Lake2.jpg",
+    imageAlt: setting.imageAlt ?? name,
+    price: priced ? { amount: setting.amount as number, basis, from: true } : null,
+    priceLabel: priced
+      ? `${formatServiceAmount(setting.amount as number)} per stay`
+      : "Enquire for pricing",
+    priceNote: priced
+      ? "Charged with your stay once dates are chosen."
+      : "Arranged per stay and quoted before anything is charged.",
+    ctaLabel: priced && setting.cta === "book" ? "Add to your stay" : "Enquire on WhatsApp",
+    href: priced && setting.cta === "book"
+      ? "/#villas"
+      : whatsappLink(`Hello Cosy Crest — I'd like to ask about ${name}. Please send availability and pricing.`),
+  };
+}
+
 export function applyServiceSettings(settings: ServiceSetting[]): ServiceDefinition[] {
   const byId = new Map(settings.map((setting) => [setting.serviceId, setting]));
+  const known = new Set(SERVICES.map((service) => service.id));
 
-  return SERVICES.filter((service) => {
+  const fromCatalogue = SERVICES.filter((service) => {
     const setting = byId.get(service.id);
     return setting ? setting.active : true;
   }).map((service) => {
@@ -118,5 +154,16 @@ export function applyServiceSettings(settings: ServiceSetting[]): ServiceDefinit
           }
         : {}),
     };
+  });
+
+  // Anything saved that is not in the catalogue is a service the owner added.
+  const custom = settings
+    .filter((setting) => !known.has(setting.serviceId) && setting.active)
+    .map(customService);
+
+  return [...fromCatalogue, ...custom].sort((a, b) => {
+    const orderA = byId.get(a.id)?.sortOrder ?? 999;
+    const orderB = byId.get(b.id)?.sortOrder ?? 999;
+    return orderA - orderB;
   });
 }

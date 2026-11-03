@@ -30,6 +30,7 @@ import {
 import { WEEKEND_RESTRICTION_MESSAGE, weekendAllowsUnit } from "../../lib/weekend";
 import { EXTRAS } from "../../lib/extras";
 import { whatsappLink } from "../../lib/contact";
+import { useSiteTheme } from "../../components/ThemeProvider";
 import { absoluteUrl } from "../../lib/seo";
 import { priceUnit } from "../../lib/quote";
 import Navbar from "../../components/Navbar";
@@ -128,6 +129,8 @@ export default function VillaClient({
     Number.isNaN(villaId) ? null : villaId,
   );
 
+  // Labels and the enquiry number come from Admin → Settings.
+  const siteTheme = useSiteTheme();
   const [currency, setCurrency] = useState<"GHS" | "USD">("GHS");
   /*
    * How many people are coming. Held here rather than only on the checkout so a
@@ -909,12 +912,14 @@ export default function VillaClient({
 
                 {enquiryOnlySelection ? (
                   <a
-                    href={whatsappLink(enquiryMessage)}
+                    href={whatsappLink(enquiryMessage, siteTheme.whatsappNumber)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn-accent mt-5 flex w-full items-center justify-center gap-2 rounded-xl py-4 text-sm"
                   >
-                    Enquire about {selectedUnit?.priceBasis === "monthly" ? "monthly rates" : "this rate"} on WhatsApp
+                    {selectedUnit?.priceBasis === "monthly"
+                      ? "Enquire about monthly rates on WhatsApp"
+                      : siteTheme.enquiryCtaLabel}
                   </a>
                 ) : (
                   <button
@@ -933,7 +938,7 @@ export default function VillaClient({
                   >
                     {!checkInDate || !checkOutDate
                       ? "Select dates to book"
-                      : "Reserve now"}
+                      : siteTheme.primaryCtaLabel}
                   </button>
                 )}
 

@@ -3,7 +3,10 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import JsonLd from "./components/JsonLd";
+import { ThemeProvider } from "./components/ThemeProvider";
 import { SITE, SITE_URL, organizationJsonLd, websiteJsonLd } from "./lib/seo";
+import { DEFAULT_THEME, themeCss, toTheme } from "./lib/theme";
+import { createServerClient } from "./utils/supabase-server";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -111,20 +114,50 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
+/**
+ * The owner's palette, read on the server.
+ *
+ * Rendered as a style tag in <head> so the first paint already uses the chosen
+ * accent. A failed read falls back to the approved palette rather than leaving
+ * the page unstyled.
+ */
+async function loadTheme() {
+  try {
+    const supabase = createServerClient();
+    if (!supabase) return DEFAULT_THEME;
+    const { data } = await supabase
+      .from("site_settings")
+      .select("value")
+      .eq("key", "theme")
+      .maybeSingle();
+    return toTheme((data as { value?: unknown } | null)?.value);
+  } catch {
+    return DEFAULT_THEME;
+  }
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const theme = await loadTheme();
   return (
     <html lang="en">
+      <head>
+        <style
+          // Values are validated in app/lib/theme.ts: colours must be hex, text
+          // is length-capped, the phone number is digits only.
+          dangerouslySetInnerHTML={{ __html: themeCss(theme) }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased`}
       >
         {/* Site-wide structured data. Tells search and answer engines who the
             business is, where it operates and how it can be contacted. */}
         <JsonLd data={[organizationJsonLd(), websiteJsonLd()]} />
-        {children}
+        <ThemeProvider theme={theme}>{children}</ThemeProvider>
       </body>
     </html>
   );

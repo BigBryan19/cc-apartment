@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
-import { KeyRound, Loader2, ShieldCheck, Wallet } from "lucide-react";
+import { KeyRound, Loader2, Palette, ShieldCheck, Wallet } from "lucide-react";
 import { SETTINGS_TABLE } from "../../lib/tables";
 import {
   DEFAULT_DEPOSIT_POLICY,
@@ -14,6 +14,7 @@ import {
   type DepositMode,
   type DepositPolicy,
 } from "../../lib/deposit";
+import { DEFAULT_THEME, toTheme, type ThemeSettings } from "../../lib/theme";
 
 interface DraftPolicy {
   enabled: boolean;
@@ -23,6 +24,8 @@ interface DraftPolicy {
   balanceDueDays: string;
   instructions: string;
 }
+
+interface ThemeDraft extends ThemeSettings {}
 
 const EMPTY_DRAFT: DraftPolicy = {
   enabled: false,
@@ -57,6 +60,13 @@ export default function SettingsPage() {
   });
   const [policyLoading, setPolicyLoading] = useState(true);
   const [policySaving, setPolicySaving] = useState(false);
+  const [theme, setTheme] = useState<ThemeDraft>(DEFAULT_THEME);
+  const [themeSaving, setThemeSaving] = useState(false);
+  const [themeMessage, setThemeMessage] = useState<{ text: string; type: "success" | "error" | "" }>({
+    text: "",
+    type: "",
+  });
+
   const [policyMessage, setPolicyMessage] = useState({ text: "", type: "" });
 
   const configured = isSupabaseConfigured();
@@ -84,9 +94,44 @@ export default function SettingsPage() {
     setPolicyLoading(false);
   }, [configured]);
 
+  const loadTheme = useCallback(async () => {
+    if (!configured) return;
+    const { data } = await createClient()
+      .from(SETTINGS_TABLE)
+      .select("value")
+      .eq("key", "theme")
+      .maybeSingle();
+    if (data) setTheme(toTheme((data as { value?: unknown }).value));
+  }, [configured]);
+
   useEffect(() => {
     loadPolicy();
-  }, [loadPolicy]);
+    loadTheme();
+  }, [loadPolicy, loadTheme]);
+
+  const saveTheme = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!configured) {
+      setThemeMessage({ text: "Supabase is not configured.", type: "error" });
+      return;
+    }
+    setThemeSaving(true);
+    setThemeMessage({ text: "", type: "" });
+
+    const { error } = await createClient()
+      .from(SETTINGS_TABLE)
+      .upsert({ key: "theme", value: theme, updated_at: new Date().toISOString() });
+
+    setThemeSaving(false);
+    if (error) {
+      setThemeMessage({ text: error.message, type: "error" });
+      return;
+    }
+    setThemeMessage({
+      text: "Saved. Reload the public site to see the new palette.",
+      type: "success",
+    });
+  };
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -351,6 +396,125 @@ export default function SettingsPage() {
           )}
         </form>
       </div>
+
+      {/* ---------------- Brand & appearance ---------------- */}
+      <form
+        onSubmit={saveTheme}
+        className="bg-white rounded-2xl border border-[var(--color-line-soft)] shadow-[var(--shadow-raise)] overflow-hidden max-w-xl"
+      >
+        <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
+          <div className="w-10 h-10 bg-fuchsia-100 text-fuchsia-600 rounded-lg flex items-center justify-center">
+            <Palette size={20} />
+          </div>
+          <div>
+            <h2 className="font-serif text-lg text-slate-900">Brand &amp; appearance</h2>
+            <p className="text-xs text-slate-500">
+              Colours and wording that appear across the public site.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {themeMessage.text && (
+            <div
+              className={`p-3 rounded-lg text-sm ${
+                themeMessage.type === "error"
+                  ? "bg-red-50 text-red-700 border border-red-200"
+                  : "bg-green-50 text-green-700 border border-green-200"
+              }`}
+            >
+              {themeMessage.text}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+              Brand name
+            </label>
+            <input
+              value={theme.brandName}
+              onChange={(e) => setTheme({ ...theme, brandName: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
+            />
+          </div>
+
+          {(
+            [
+              ["accentColor", "Accent colour", "Buttons, links, highlights"],
+              ["accentDeep", "Accent, pressed", "Hover and active states"],
+              ["accentSoft", "Accent, tinted surfaces", "Badges and soft panels"],
+            ] as const
+          ).map(([key, label, hint]) => (
+            <div key={key}>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                {label}
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={theme[key]}
+                  onChange={(e) => setTheme({ ...theme, [key]: e.target.value })}
+                  className="h-11 w-14 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
+                  aria-label={label}
+                />
+                <input
+                  value={theme[key]}
+                  onChange={(e) => setTheme({ ...theme, [key]: e.target.value })}
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-mono text-sm"
+                />
+              </div>
+              <p className="mt-1 text-[11px] text-slate-500">{hint}</p>
+            </div>
+          ))}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Booking button label
+              </label>
+              <input
+                value={theme.primaryCtaLabel}
+                onChange={(e) => setTheme({ ...theme, primaryCtaLabel: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Enquiry button label
+              </label>
+              <input
+                value={theme.enquiryCtaLabel}
+                onChange={(e) => setTheme({ ...theme, enquiryCtaLabel: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+              WhatsApp number
+            </label>
+            <input
+              value={theme.whatsappNumber}
+              onChange={(e) => setTheme({ ...theme, whatsappNumber: e.target.value })}
+              placeholder="233540534870"
+              inputMode="numeric"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
+            />
+            <p className="mt-1 text-[11px] text-slate-500">
+              Digits only, with the country code. Used by every enquiry button.
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={themeSaving}
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-6 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {themeSaving ? <Loader2 size={16} className="animate-spin" /> : "Save appearance"}
+          </button>
+        </div>
+      </form>
 
       {/* ---------------- Password ---------------- */}
       <div className="bg-white rounded-2xl border border-[var(--color-line-soft)] shadow-[var(--shadow-raise)] overflow-hidden max-w-xl">
