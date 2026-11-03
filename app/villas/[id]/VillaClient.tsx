@@ -9,9 +9,6 @@ import {
   ChevronRight,
   MapPin,
   Check,
-  Heart,
-  Gift,
-  CarFront,
   Plus,
   Share2,
   Star,
@@ -31,6 +28,7 @@ import {
   unitFacilityLabels,
 } from "../../lib/rates";
 import { WEEKEND_RESTRICTION_MESSAGE, weekendAllowsUnit } from "../../lib/weekend";
+import { EXTRAS } from "../../lib/extras";
 import { priceUnit } from "../../lib/quote";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
@@ -87,11 +85,23 @@ const LOCATION_GUIDES: Record<
   ],
 };
 
-const AVAILABLE_PACKAGES = [
-  { id: "Honeymoon Setup", icon: Heart, label: "Honeymoon" },
-  { id: "Birthday Decoration", icon: Gift, label: "Birthday" },
-  { id: "Luxury Car Rental", icon: CarFront, label: "Car rental" },
-];
+/**
+ * Add-ons offered on the property page.
+ *
+ * Previously three hard-coded chips with display labels ("Luxury Car Rental")
+ * used as ids. The checkout looks extras up by catalogue id, so nothing matched,
+ * every add-on fell through as unpriced, and a priced car rental still showed
+ * "Quote pending". These are the catalogue entries themselves — same ids, same
+ * prices — so a priced add-on is charged and only an unpriced one is quoted.
+ */
+const ADD_ONS = EXTRAS.filter((extra) => extra.active);
+
+/** What one selected add-on costs for this stay, or null when unpriced. */
+function addOnAmount(extra: (typeof ADD_ONS)[number], nights: number): number | null {
+  if (extra.requiresQuote || extra.amount === null) return null;
+  if (extra.priceBasis === "per_day") return nights > 0 ? extra.amount * nights : 0;
+  return extra.amount;
+}
 
 export default function VillaClient({
   params,
@@ -186,6 +196,20 @@ export default function VillaClient({
     : ({ ok: false } as const);
 
   const selectedUnitAmount = unitPrice.ok ? unitPrice.amount : 0;
+
+  // Add-ons actually selected, with what each costs. Pricing lives in the same
+  // catalogue the checkout and the server use.
+  const selectedAddOns = ADD_ONS.filter((extra) => selectedPackages.includes(extra.id)).map(
+    (extra) => ({
+      id: extra.id,
+      name: extra.name,
+      amount: addOnAmount(extra, totalNights),
+    }),
+  );
+  const pricedAddOnTotal = selectedAddOns.reduce(
+    (sum, entry) => sum + (entry.amount ?? 0),
+    0,
+  );
   const computedTotalPrice = selectedUnitAmount;
 
   const stayError =
@@ -781,12 +805,14 @@ export default function VillaClient({
                 <div className="mt-5">
                   <span className="eyebrow">Add to your stay</span>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {AVAILABLE_PACKAGES.map((pkg) => {
-                      const isSelected = selectedPackages.includes(pkg.id);
+                    {ADD_ONS.map((extra) => {
+                      const isSelected = selectedPackages.includes(extra.id);
+                      const amount = addOnAmount(extra, totalNights);
                       return (
                         <button
-                          key={pkg.id}
-                          onClick={() => togglePackage(pkg.id)}
+                          key={extra.id}
+                          onClick={() => togglePackage(extra.id)}
+                          title={extra.summary}
                           className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-medium transition-colors ${
                             isSelected
                               ? "border-[var(--color-ink)] bg-[var(--color-ink)] text-white"
@@ -794,7 +820,14 @@ export default function VillaClient({
                           }`}
                         >
                           {isSelected ? <Check size={13} /> : <Plus size={13} />}
-                          {pkg.label}
+                          {extra.name.replace(" — Hyundai Tucson", "")}
+                          <span className={isSelected ? "opacity-75" : "text-[var(--color-faint)]"}>
+                            {amount === null
+                              ? "· quote"
+                              : `· ${formatPrice(amount, currency)}${
+                                  extra.priceBasis === "per_day" ? "/day" : ""
+                                }`}
+                          </span>
                         </button>
                       );
                     })}
@@ -815,16 +848,21 @@ export default function VillaClient({
                         {formatPrice(computedTotalPrice, currency)}
                       </dd>
                     </div>
-                    {selectedPackages.length > 0 && (
-                      <div className="flex justify-between text-[var(--color-muted)]">
-                        <dt>{selectedPackages.length} add-on(s)</dt>
-                        <dd>Quote pending</dd>
+                    {selectedAddOns.map((entry) => (
+                      <div key={entry.id} className="flex justify-between text-[var(--color-muted)]">
+                        <dt>{entry.name}</dt>
+                        <dd>{entry.amount === null ? "Quoted separately" : formatPrice(entry.amount, currency)}</dd>
                       </div>
-                    )}
+                    ))}
                     <div className="flex justify-between border-t border-[var(--color-line-soft)] pt-3 text-base font-semibold">
                       <dt>Total</dt>
-                      <dd>{formatPrice(computedTotalPrice, currency)}</dd>
+                      <dd>{formatPrice(computedTotalPrice + pricedAddOnTotal, currency)}</dd>
                     </div>
+                    {selectedAddOns.some((entry) => entry.amount === null) && (
+                      <p className="pt-1 text-[11px] leading-relaxed text-[var(--color-faint)]">
+                        Anything marked &quot;quoted separately&quot; is not in the total yet.
+                      </p>
+                    )}
                   </dl>
                 )}
 

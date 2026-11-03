@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
+  ChevronDown,
   ShieldCheck,
   MapPin,
   Loader2,
@@ -82,6 +83,12 @@ const CheckoutContent = () => {
   const [checkInDate, setCheckInDate] = useState<string>("");
   const [checkOutDate, setCheckOutDate] = useState<string>("");
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
+  /**
+   * Add-ons start collapsed. The list is long enough to push the payment panel
+   * below the fold, so it opens on request and the header carries the count of
+   * what is already in the booking.
+   */
+  const [addOnsOpen, setAddOnsOpen] = useState(false);
 
   /**
    * Deposit policy, resolved from the owner's settings. Starts unconfigured so
@@ -1005,11 +1012,33 @@ const CheckoutContent = () => {
                 journey. A priced add-on is charged; an unpriced one is carried
                 as a request and never enters the payable total.
               */}
-              <div className="mb-6 rounded-xl border border-slate-200 p-4">
-                <span className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-900">
-                  <Gift size={14} className="text-blue-500" /> Add something to your stay
-                </span>
-                <div className="space-y-2">
+              <div className="mb-6 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setAddOnsOpen((open) => !open)}
+                  aria-expanded={addOnsOpen}
+                  aria-controls="add-on-list"
+                  className="flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3.5 text-left"
+                >
+                  <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-900">
+                    <Gift size={14} className="text-blue-500" /> Add to your stay
+                  </span>
+                  <span className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                    {selectedPackages.length > 0
+                      ? `${selectedPackages.length} selected`
+                      : "Optional"}
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform ${addOnsOpen ? "rotate-180" : ""}`}
+                      aria-hidden="true"
+                    />
+                  </span>
+                </button>
+                <div
+                  id="add-on-list"
+                  hidden={!addOnsOpen}
+                  className="grid gap-2 border-t border-slate-100 p-4 sm:grid-cols-2"
+                >
                   {EXTRAS.filter((extra) => extra.active).map((extra) => {
                     const checked = selectedPackages.includes(extra.id);
                     return (
@@ -1068,6 +1097,12 @@ const CheckoutContent = () => {
                     );
                   })}
                 </div>
+                {selectedPackages.length > 0 && (
+                  <p className="border-t border-slate-100 px-4 py-2 text-[11px] text-slate-500">
+                    Unpriced add-ons are a request: they are confirmed with you and are
+                    not part of the amount charged now.
+                  </p>
+                )}
               </div>
 
               {selectedPackages.length > 0 && (
