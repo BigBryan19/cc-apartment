@@ -1,12 +1,12 @@
 -- RUN-2026-11-03.sql
 -- ---------------------------------------------------------------------------
--- One script to bring the database up to date.
+-- One script to bring the database up to date. Run it once in Supabase -> SQL
+-- editor. It is safe to run again: tables and columns use IF NOT EXISTS, every
+-- top-level policy is dropped before it is created, and constraints check
+-- pg_constraint first. Statements are not wrapped in one transaction, so a
+-- failure later cannot undo what already succeeded.
 --
--- Each block is the migration of that name, in the order they must run. Run the
--- whole file once in Supabase -> SQL editor. It is written to be re-runnable:
--- tables and columns use IF NOT EXISTS, policies are dropped before creation.
---
--- What it fixes, in the order the errors appeared on the admin screens:
+-- Fixes, in the order the admin screens complained:
 --   gallery  "Could not find the table 'public.gallery_media'"
 --   settings "Could not find the table 'public.site_settings'"
 --   villas   "The rating column is missing"
@@ -14,8 +14,6 @@
 --   services Admin -> Services needs public.service_settings
 -- ---------------------------------------------------------------------------
 
--- Not run inside one transaction: each block commits on its own, so a
--- statement that fails does not discard the work already done.
 
 -- ===== 2026-10-09-packages-inventory-and-quotes.sql =====
 -- ===========================================================================
@@ -574,8 +572,7 @@ begin
   ] loop
     execute format('drop policy if exists %I_admin_all on public.%I', t, t);
     execute format(
-      'drop policy if exists "%I_admin_all" on public.;
-create policy %I_admin_all on public.%I for all to authenticated using (public.is_admin()) with check (public.is_admin())',
+      'create policy %I_admin_all on public.%I for all to authenticated using (public.is_admin()) with check (public.is_admin())',
       t, t
     );
   end loop;
@@ -1004,6 +1001,12 @@ create table if not exists public.service_settings (
   updated_at timestamptz not null default now()
 );
 
+-- Card copy and photograph, added after the first version of this table.
+alter table public.service_settings add column if not exists title text;
+alter table public.service_settings add column if not exists description text;
+alter table public.service_settings add column if not exists image text;
+alter table public.service_settings add column if not exists image_alt text;
+
 comment on table public.service_settings is
   'Per-card settings for the experiences & services section, edited at /admin/services.';
 
@@ -1026,11 +1029,6 @@ create policy "authenticated can write service settings"
 
 -- Seed the approved figures, so Admin → Services opens with real values rather
 -- than blanks. These match app/lib/services.ts at the time of writing.
-alter table public.service_settings add column if not exists title text;
-alter table public.service_settings add column if not exists description text;
-alter table public.service_settings add column if not exists image text;
-alter table public.service_settings add column if not exists image_alt text;
-
 insert into public.service_settings (service_id, amount, active, cta) values
   ('honeymoon', 3500, true, 'book'),
   ('birthday', 5000, true, 'book'),
@@ -1039,3 +1037,18 @@ insert into public.service_settings (service_id, amount, active, cta) values
   ('private-chef', null, true, 'enquire')
 on conflict (service_id) do nothing;
 
+-- ---------------------------------------------------------------------------
+-- Confirmation. Running this file should end with three rows here, and the
+-- rating/services columns present. If a name is missing, that block failed.
+-- ---------------------------------------------------------------------------
+select table_name
+  from information_schema.tables
+ where table_schema = 'public'
+   and table_name in ('gallery_media', 'site_settings', 'service_settings')
+ order by table_name;
+
+select column_name
+  from information_schema.columns
+ where table_schema = 'public'
+   and table_name = 'villas'
+   and column_name = 'rating';
