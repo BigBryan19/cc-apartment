@@ -49,6 +49,23 @@ import type { VillaProps } from "../components/villas/types";
  * Keyed by property id; a true result falls back to the approved list.
  */
 const STALE_RATE_TESTS: Record<number, (rates: StoredRate[]) => boolean> = {
+  /*
+   * Lakeside: the stored list still says "Whole apartment (4 bedrooms)" at
+   * 36,000 — a monthly figure on a nightly row, on a house that has three
+   * bedrooms. Both are contradicted by the property record, so the list is
+   * distrusted and the approved one is used.
+   */
+  1: (rates) =>
+    rates.some((rate) => {
+      const label = String((rate as { option?: unknown }).option ?? "");
+      const amount = Number((rate as { amount?: unknown }).amount ?? 0);
+      return /4\s*bedroom/i.test(label) || amount === 36000;
+    }),
+  // Aburi: same copied monthly figure, and no party rate in a list that should
+  // carry the GHS 5,000 one.
+  2: (rates) =>
+    rates.some((rate) => Number((rate as { amount?: unknown }).amount ?? 0) === 30000) ||
+    !rates.some((rate) => /party/i.test(String((rate as { option?: unknown }).option ?? ""))),
   // Adenta: no studio exists there, and nothing is sold at GHS 600.
   3: (rates) =>
     rates.some((rate) => {
@@ -216,6 +233,20 @@ function advertisedPrice(stored: number | null, units: ReturnType<typeof normali
   return nightly[0] ?? Number(stored ?? 0);
 }
 
+/**
+ * Display order for a property's rates.
+ *
+ * Monthly is checked before "whole apartment" because its label contains that
+ * phrase, and the test room is always last.
+ */
+function rateRank(name: string): number {
+  if (/test/i.test(name)) return 5;
+  if (/monthly/i.test(name)) return 3;
+  if (/party/i.test(name)) return 4;
+  if (/whole|entire/i.test(name)) return 2;
+  return 1;
+}
+
 function toCoordinates(value: unknown, fallbackId: number): { lat: number; lng: number } {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const record = value as Record<string, unknown>;
@@ -292,13 +323,18 @@ export function toVillaProps(row: VillaRow): VillaProps {
     guests: guests || null,
     bedrooms: bedrooms || null,
     bathrooms: row.bathrooms ?? null,
-  }).map((unit) => {
-    // A stored clip always wins; the bundled one fills the gap for a row that
-    // predates room clips.
-    if (unit.video) return unit;
-    const clip = BUNDLED_UNIT_CLIPS[row.id]?.[unit.id];
-    return clip ? { ...unit, video: clip.video, videoPoster: clip.poster } : unit;
-  });
+  })
+    .map((unit) => {
+      // A stored clip always wins; the bundled one fills the gap for a row that
+      // predates room clips.
+      if (unit.video) return unit;
+      const clip = BUNDLED_UNIT_CLIPS[row.id]?.[unit.id];
+      return clip ? { ...unit, video: clip.video, videoPoster: clip.poster } : unit;
+    })
+    // Rooms first, then the whole apartment, then the monthly enquiry, then the
+    // party rate, then the test room. The whole house is the headline offer and
+    // used to sit below a monthly enquiry that read like a nightly price.
+    .sort((a, b) => rateRank(a.name) - rateRank(b.name));
 
   return {
     id: row.id,

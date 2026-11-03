@@ -296,6 +296,26 @@ console.log("\n=== Adenta and weekends ===\n");
   check("A10", "the approved list replaces it", stale.units.some((unit) => unit.amount === 2000));
 }
 
+// Rate order and the party price across the three properties.
+{
+  const lakeside = bundledVillaById(1)!;
+  const whole = lakeside.units.find((unit) => unit.kind === "whole_property" && unit.amount > 0)!;
+  check("L1", "Lakeside's whole apartment is labelled 3 bedrooms", whole.name.includes("3 bedrooms"), whole.name);
+  check("L2", "…and priced 3,500", whole.amount === 3500);
+  check("L3", "…and it sits above the monthly enquiry",
+    lakeside.units.findIndex((u) => u.id === whole.id) <
+      lakeside.units.findIndex((u) => u.priceBasis === "monthly"));
+  check("L4", "…on every property",
+    bundledVillas.every((villa) => {
+      const w = villa.units.findIndex((u) => u.kind === "whole_property" && u.amount > 0);
+      const m = villa.units.findIndex((u) => u.priceBasis === "monthly");
+      return w === -1 || m === -1 || w < m;
+    }));
+  check("L5", "Lakeside and Aburi both offer the 5,000 party rate",
+    [1, 2].every((id) =>
+      bundledVillaById(id)!.units.some((u) => /party/i.test(u.name) && u.amount === 5000)));
+}
+
 // --- 4. Services -----------------------------------------------------------
 
 console.log("\n=== Services ===\n");
