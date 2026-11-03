@@ -503,6 +503,62 @@ export default function VillaClient({
                 </div>
               )}
 
+              {/*
+                Explore Aburi — nearby places, deliberately separate from the
+                amenities list above. Nothing here states a distance, a drive
+                time, an entry fee or an inclusion, because none has been
+                verified. Photographs of the gardens and craft village are not
+                published yet; the section says so rather than borrowing an
+                unrelated image.
+              */}
+              {villa.id === 2 && (
+                <section className="mt-10 border-t border-[var(--color-line-soft)] pt-8">
+                  <h2 className="text-xl font-semibold tracking-tight">Explore Aburi</h2>
+                  <p className="mt-1 text-sm text-[var(--color-muted)]">
+                    Places near the retreat that guests ask about. These are not
+                    part of the apartment and are not included in your stay.
+                  </p>
+                  <ul className="mt-5 space-y-3">
+                    {[
+                      {
+                        name: "Aburi Botanical Gardens",
+                        text: "One of Ghana's oldest botanical gardens, on the ridge above Accra, with mature trees and walking paths.",
+                      },
+                      {
+                        name: "Aburi Craft Village",
+                        text: "Woodcarvers and textile makers selling stools, carvings and cloth along the Accra–Aburi road.",
+                      },
+                      {
+                        name: "The Akuapem ridge",
+                        text: "The hill country around Aburi, cooler and greener than the coast, with views back towards Accra on a clear day.",
+                      },
+                    ].map((place) => (
+                      <li
+                        key={place.name}
+                        className="rounded-xl border border-[var(--color-line-soft)] p-4"
+                      >
+                        <span className="block text-sm font-semibold text-[var(--color-ink)]">
+                          {place.name}
+                        </span>
+                        <span className="mt-1 block text-sm leading-relaxed text-[var(--color-muted)]">
+                          {place.text}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-xs text-[var(--color-faint)]">
+                    Photographs of these places are not published yet — we add
+                    them once we have permission to use them.
+                  </p>
+                  <a
+                    href="/guides/staying-in-aburi"
+                    className="mt-4 inline-block text-sm font-medium underline underline-offset-4"
+                  >
+                    Read our guide to staying in Aburi
+                  </a>
+                </section>
+              )}
+
               {/* Rate card */}
               <div className="mt-10 border-t border-[var(--color-line-soft)] pt-8">
                 <h2 className="text-xl font-semibold tracking-tight">
