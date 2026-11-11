@@ -25,6 +25,7 @@ const NAV_ITEMS = [
   { name: "Create Invoice", href: "/admin/invoice", icon: FileText },
   { name: "Gallery", href: "/admin/gallery", icon: Images },
   { name: "Services", href: "/admin/services", icon: Sparkles },
+  { name: "House rules", href: "/admin/house-rules", icon: FileText },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
