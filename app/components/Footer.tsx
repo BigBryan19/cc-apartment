@@ -1,5 +1,8 @@
 "use client";
 
+import { useSiteTheme } from "./ThemeProvider";
+import { DEFAULT_THEME } from "../lib/theme";
+
 // ---------------------------------------------------------------------------
 // Footer.
 //
@@ -32,6 +35,9 @@ interface FooterProps {
 }
 
 const Footer: React.FC<FooterProps> = ({ showContact = true }) => {
+  const theme = useSiteTheme();
+  const brand = theme.brandName;
+  const brandIsCustom = brand.trim() !== DEFAULT_THEME.brandName;
   return (
     <footer className="bg-[var(--color-canvas-warm)] pt-16 md:pt-20">
       <div className="shell">
@@ -47,11 +53,17 @@ const Footer: React.FC<FooterProps> = ({ showContact = true }) => {
         >
           <div>
             {/* White wordmark, darkened for the light footer background. */}
-            <img
-              src="/cc-horinzontal.png"
-              alt="Cosy Crest"
-              className="mb-4 h-8 w-auto brightness-0"
-            />
+            {brandIsCustom ? (
+              <p className="mb-4 font-display text-2xl tracking-tight text-[var(--color-ink)]">
+                {brand}
+              </p>
+            ) : (
+              <img
+                src="/cc-horinzontal.png"
+                alt={brand}
+                className="mb-4 h-8 w-auto brightness-0"
+              />
+            )}
             <p className="max-w-xs leading-relaxed">
               Fully serviced apartments in Accra and Aburi, delivered with
               hotel-grade housekeeping and 24/7 support.
@@ -89,8 +101,7 @@ const Footer: React.FC<FooterProps> = ({ showContact = true }) => {
               ))}
             </div>
             <p className="mt-4 text-[11px] text-[var(--color-faint)]">
-              © {new Date().getFullYear()} Cosy Crest Apartments. All rights
-              reserved.
+              © {new Date().getFullYear()} {brand}. All rights reserved.
             </p>
           </div>
         </div>

@@ -587,10 +587,12 @@ export default function VillaClient({
                       {
                         name: "Aburi Botanical Gardens",
                         text: "One of Ghana's oldest botanical gardens, on the ridge above Accra, with mature trees and walking paths.",
+                        photo: "/media/destinations/eastern/aburi-botanical-gardens-1.jpg",
                       },
                       {
                         name: "Aburi Craft Village",
                         text: "Woodcarvers and textile makers selling stools, carvings and cloth along the Accra–Aburi road.",
+                        photo: "/media/destinations/eastern/aburi-craft-village-1.jpg",
                       },
                       {
                         name: "The Akuapem ridge",
@@ -599,20 +601,30 @@ export default function VillaClient({
                     ].map((place) => (
                       <li
                         key={place.name}
-                        className="rounded-xl border border-[var(--color-line-soft)] p-4"
+                        className="overflow-hidden rounded-xl border border-[var(--color-line-soft)]"
                       >
-                        <span className="block text-sm font-semibold text-[var(--color-ink)]">
-                          {place.name}
-                        </span>
-                        <span className="mt-1 block text-sm leading-relaxed text-[var(--color-muted)]">
-                          {place.text}
-                        </span>
+                        {"photo" in place && place.photo ? (
+                          <img
+                            src={place.photo}
+                            alt={place.name}
+                            loading="lazy"
+                            className="h-40 w-full object-cover"
+                          />
+                        ) : null}
+                        <div className="p-4">
+                          <span className="block text-sm font-semibold text-[var(--color-ink)]">
+                            {place.name}
+                          </span>
+                          <span className="mt-1 block text-sm leading-relaxed text-[var(--color-muted)]">
+                            {place.text}
+                          </span>
+                        </div>
                       </li>
                     ))}
                   </ul>
                   <p className="mt-3 text-xs text-[var(--color-faint)]">
-                    Photographs of these places are not published yet — we add
-                    them once we have permission to use them.
+                    Photographs of the gardens and the craft village are ours;
+                    the ridge itself is shown in the property photography above.
                   </p>
                   <a
                     href="/guides/staying-in-aburi"

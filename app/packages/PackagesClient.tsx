@@ -3,7 +3,13 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, CalendarHeart, Cake, PartyPopper, ChevronDown } from "lucide-react";
-import { PACKAGES, primaryActionLabel, type PackageCategory } from "../lib/packages";
+import {
+  PACKAGES,
+  primaryActionLabel,
+  partyPriceFor,
+  PARTY_PACKAGE_PRICE_BY_PROPERTY,
+  type PackageCategory,
+} from "../lib/packages";
 
 const CATEGORY_ICON: Record<PackageCategory, any> = {
   honeymoon: CalendarHeart,
@@ -144,9 +150,24 @@ export default function PackagesClient() {
                     {accommodationNote(entry.slug)}
                   </span>
                 </div>
-                <div className="shrink-0 rounded-full bg-[var(--color-ink)] px-5 py-2.5 text-xs font-bold text-white transition-opacity group-hover:opacity-90">
-                  Request a Quote
-                </div>
+                {entry.category === "honeymoon" ? (
+                  <div className="shrink-0 rounded-full bg-[var(--color-ink)] px-5 py-2.5 text-xs font-bold text-white transition-opacity group-hover:opacity-90">
+                    Request a Quote
+                  </div>
+                ) : (
+                  <div className="shrink-0 text-right">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-faint)]">
+                      Party package
+                    </span>
+                    <span className="mt-1 block text-sm font-semibold text-[var(--color-ink)]">
+                      From GHS {partyPriceFor(null).toLocaleString("en-GH")}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] text-[var(--color-muted)]">
+                      Adenta GHS{" "}
+                      {Object.values(PARTY_PACKAGE_PRICE_BY_PROPERTY)[0]?.toLocaleString("en-GH")}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </Link>

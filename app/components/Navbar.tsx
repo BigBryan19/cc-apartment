@@ -5,6 +5,8 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, Globe, Check } from "lucide-react";
+import { useSiteTheme } from "./ThemeProvider";
+import { DEFAULT_THEME } from "../lib/theme";
 
 interface NavbarProps {
   currency: "GHS" | "USD";
@@ -43,6 +45,13 @@ const Navbar: React.FC<NavbarProps> = ({
   toggleCurrency,
   variant = "overlay",
 }) => {
+  const theme = useSiteTheme();
+  const brand = theme.brandName;
+  /*
+   * The default name is already drawn by the wordmark image. Any other name is
+   * text, otherwise the setting would appear to save and change nothing.
+   */
+  const brandIsCustom = brand.trim() !== DEFAULT_THEME.brandName;
   const [isScrolled, setIsScrolled] = useState(false);
   // Only real pages can be "current"; the `/#section` links never are.
   const pathname = usePathname();
@@ -94,17 +103,29 @@ const Navbar: React.FC<NavbarProps> = ({
           <Link
             href="/"
             className="flex items-center shrink-0"
-            aria-label="Cosy Crest home"
+            aria-label={`${brand} home`}
           >
             {/* The brand asset is a pure-white wordmark, so it needs a filter
-                on either background: black on light surfaces, white on dark. */}
-            <img
-              src="/cc-horinzontal.png"
-              alt="Cosy Crest"
-              className={`w-auto transition-all duration-300 ${
-                isLight ? "h-7 md:h-8" : "h-8 md:h-10"
-              } ${isLight ? "brightness-0" : "brightness-0 invert"}`}
-            />
+                on either background: black on light surfaces, white on dark.
+                A brand name set in Admin -> Settings replaces it, so the name
+                the owner typed is what a visitor reads. */}
+            {brandIsCustom ? (
+              <span
+                className={`font-display text-xl md:text-2xl tracking-tight ${
+                  isLight ? "text-[var(--color-ink)]" : "text-white"
+                }`}
+              >
+                {brand}
+              </span>
+            ) : (
+              <img
+                src="/cc-horinzontal.png"
+                alt={brand}
+                className={`w-auto transition-all duration-300 ${
+                  isLight ? "h-7 md:h-8" : "h-8 md:h-10"
+                } ${isLight ? "brightness-0" : "brightness-0 invert"}`}
+              />
+            )}
           </Link>
 
           {/* Desktop links */}
