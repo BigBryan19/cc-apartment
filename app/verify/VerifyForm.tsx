@@ -19,7 +19,6 @@
 //      and a guest with a blocked camera is inconvenienced by nothing.
 //   3. No navigation. This route renders no navbar, no footer and no back
 //      link, so a guest cannot wander into the marketing site mid-check-in.
-//   4. The booking reference arrives in the link (`/verify?ref=CC-1042`) and is
 //      locked when it does. A guest who arrived without one types it, and can
 //      correct a wrong prefill. The value is read on the server (page.tsx) and
 //      passed in, so the first paint already shows it — no flash of an empty
@@ -49,7 +48,6 @@ import {
   Check,
   ChevronDown,
   Loader2,
-  Lock,
   ShieldCheck,
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "../utils/supabase";
@@ -100,7 +98,6 @@ const ID_TYPES: { value: Exclude<IdType, "">; label: string; hint: string }[] = 
 interface GuestForm {
   /** The reservation this registration belongs to. Required — it is how the
    *  record is reconciled with the booking. */
-  reference: string;
   fullName: string;
   phone: string;
   whatsapp: string;
@@ -122,7 +119,6 @@ interface HouseRule {
 }
 
 const EMPTY_FORM: GuestForm = {
-  reference: "",
   fullName: "",
   phone: "",
   whatsapp: "",
@@ -164,12 +160,7 @@ function extensionFor(file: File): string {
   return /^[a-z0-9]{2,5}$/.test(fromName) ? fromName : "jpg";
 }
 
-export default function VerifyForm({
-  /** Taken from the URL by the server component, upper-cased and trimmed. */
-  initialReference,
-}: {
-  initialReference: string;
-}) {
+export default function VerifyForm() {
   const configured = isSupabaseConfigured();
   const router = useRouter();
 
@@ -185,7 +176,6 @@ export default function VerifyForm({
 
   const [form, setForm] = useState<GuestForm>(() => ({
     ...EMPTY_FORM,
-    reference: initialReference,
   }));
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState("");
@@ -195,8 +185,6 @@ export default function VerifyForm({
   /** Which page of the wizard is showing. 1-based, matching STEPS. */
   const [step, setStep] = useState(1);
 
-  /** True when the reference came from the link and should not be edited. */
-  const [referenceLocked, setReferenceLocked] = useState(Boolean(initialReference));
 
   /* ---------------- identification ---------------- */
 
@@ -209,6 +197,8 @@ export default function VerifyForm({
   /* ---------------- optional selfie ---------------- */
 
   const [cameraState, setCameraState] = useState<CameraState>("idle");
+  /** Why the camera did not start, phrased for the guest rather than the log. */
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [photoConsent, setPhotoConsent] = useState(false);
   const [selfie, setSelfie] = useState<string | null>(null);
   const [selfiePath, setSelfiePath] = useState<string | null>(null);
@@ -261,25 +251,57 @@ export default function VerifyForm({
   }, []);
 
   const startCamera = useCallback(async () => {
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    // Outside a secure context `navigator.mediaDevices` is not even defined, so
+    // "no camera" would be the wrong thing to tell the guest.
+    if (typeof window !== "undefined" && !window.isSecureContext) {
       setCameraState("unsupported");
+      setCameraError(
+        "The camera needs a secure (https) connection. You can skip this step — your ID picture is enough.",
+      );
       return;
     }
-    setCameraState("starting");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 720 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-      }
-      setCameraState("ready");
-    } catch {
-      setCameraState("denied");
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setCameraState("unsupported");
+      setCameraError(
+        "This browser cannot open a camera. You can skip this step — your ID picture is enough.",
+      );
+      return;
     }
+
+    setCameraState("starting");
+    setCameraError(null);
+
+    // Cameras disagree about constraints: some reject a facingMode they do not
+    // have, some reject any constraint at all. Try progressively looser ones
+    // rather than calling a perfectly good camera broken.
+    const attempts: MediaStreamConstraints[] = [
+      { video: { facingMode: "user", width: { ideal: 720 } }, audio: false },
+      { video: { width: { ideal: 720 } }, audio: false },
+      { video: true, audio: false },
+    ];
+
+    let lastError: unknown = null;
+    for (const constraints of attempts) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => {});
+        }
+        setCameraState("ready");
+        setCameraError(null);
+        return;
+      } catch (error) {
+        lastError = error;
+        const name = cameraErrorName(error);
+        // A refusal or a missing device will not change by asking again.
+        if (name === "NotAllowedError" || name === "SecurityError" || name === "NotFoundError") break;
+      }
+    }
+
+    setCameraState("denied");
+    setCameraError(describeCameraFailure(lastError));
   }, []);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
@@ -400,7 +422,6 @@ export default function VerifyForm({
         .upsert(
           {
             session_id: sessionId,
-            booking_reference: record.reference.trim().toUpperCase() || null,
             full_name: record.fullName.trim() || null,
             contact_number: record.phone.trim() || null,
             whatsapp_number: record.whatsapp.trim() || null,
@@ -436,7 +457,6 @@ export default function VerifyForm({
 
   /** Something worth saving exists once any identifying field has content. */
   const hasProgress =
-    Boolean(form.reference.trim()) ||
     Boolean(form.fullName.trim()) ||
     Boolean(form.phone.trim()) ||
     Boolean(idPath);
@@ -475,14 +495,14 @@ export default function VerifyForm({
 
     if (!isPlausiblePhone(form.phone)) issues[2] = "Enter a phone number we can reach you on.";
     else if (!isPlausiblePhone(form.whatsapp)) issues[2] = "Enter your WhatsApp number.";
-    else if (!isPlausibleEmail(form.email)) issues[2] = "Enter a valid email address.";
+    else if (form.email.trim() && !isPlausibleEmail(form.email))
+      issues[2] = "Enter a valid email address, or leave the field blank.";
 
     if (!form.idType) issues[3] = "Choose the type of ID you are presenting.";
     else if (!idPath && !idFile) issues[3] = "Upload a clear picture of your ID.";
 
     const guests = Number.parseInt(form.guests, 10);
-    if (!form.reference.trim()) issues[4] = "Enter the booking reference from your confirmation.";
-    else if (!form.checkIn) issues[4] = "Choose your check-in date.";
+    if (!form.checkIn) issues[4] = "Choose your check-in date.";
     else if (!form.checkOut) issues[4] = "Choose your check-out date.";
     else if (form.checkOut < form.checkIn) issues[4] = "Check-out cannot be before check-in.";
     else if (!(guests >= 1)) issues[4] = "Enter how many guests are staying.";
@@ -788,18 +808,30 @@ export default function VerifyForm({
                   autoComplete="tel"
                   inputMode="tel"
                 />
-                <Field
-                  label="WhatsApp number"
-                  required
-                  value={form.whatsapp}
-                  onChange={(value) => set("whatsapp", value)}
-                  placeholder="Usually the same as your phone number"
-                  autoComplete="tel"
-                  inputMode="tel"
-                />
+                <div>
+                  <Field
+                    label="WhatsApp number"
+                    required
+                    value={form.whatsapp}
+                    onChange={(value) => set("whatsapp", value)}
+                    placeholder="Usually the same as your phone number"
+                    autoComplete="tel"
+                    inputMode="tel"
+                  />
+                  {isPlausiblePhone(form.phone) && form.whatsapp !== form.phone && (
+                    <button
+                      type="button"
+                      onClick={() => set("whatsapp", form.phone)}
+                      className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium underline underline-offset-4"
+                      style={{ color: "var(--color-accent)" }}
+                    >
+                      Same as phone number
+                    </button>
+                  )}
+                </div>
                 <Field
                   label="Email address"
-                  required
+                  optional
                   type="email"
                   value={form.email}
                   onChange={(value) => set("email", value)}
@@ -844,6 +876,7 @@ export default function VerifyForm({
                   preview={selfie}
                   consent={photoConsent}
                   uploading={selfieUploading}
+                  error={cameraError}
                   onConsent={setPhotoConsent}
                   onStart={() => void startCamera()}
                   onCapture={() => void takeSelfie()}
@@ -854,27 +887,6 @@ export default function VerifyForm({
 
             {step === 4 && (
               <Section index={4} title="Booking details" description="Which nights, and how many.">
-                <div>
-                  <Field
-                    label="Booking reference"
-                    required
-                    value={form.reference}
-                    onChange={(value) => set("reference", value.toUpperCase())}
-                    placeholder="From your confirmation, e.g. CC-1042"
-                    autoComplete="off"
-                    readOnly={referenceLocked}
-                  />
-                  {referenceLocked && (
-                    <button
-                      type="button"
-                      onClick={() => setReferenceLocked(false)}
-                      className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-stone-500 underline underline-offset-4 hover:text-stone-900"
-                    >
-                      <Lock className="h-3 w-3" /> Taken from your link — use a different reference
-                    </button>
-                  )}
-                </div>
-
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field
                     label="Check-in date"
@@ -1205,4 +1217,34 @@ function ReviewCard({
       </dl>
     </section>
   );
+}
+
+/** The DOMException name from a rejected getUserMedia, or "". */
+function cameraErrorName(error: unknown): string {
+  if (error && typeof error === "object" && "name" in error) {
+    return String((error as { name?: unknown }).name ?? "");
+  }
+  return "";
+}
+
+/**
+ * Turn a getUserMedia rejection into something a guest at the gate can act on.
+ * The browser's own error names are the only reliable signal here — every
+ * device fails differently, and "camera blocked" was being shown for all of
+ * them, including laptops with no camera at all.
+ */
+function describeCameraFailure(error: unknown): string {
+  switch (cameraErrorName(error)) {
+    case "NotAllowedError":
+    case "SecurityError":
+      return "Your browser is blocking the camera for this page. Allow camera access from the lock icon in the address bar, then try again — or skip this step, your ID picture is enough.";
+    case "NotFoundError":
+    case "OverconstrainedError":
+      return "No camera was found on this device. You can skip this step — your ID picture is enough.";
+    case "NotReadableError":
+    case "AbortError":
+      return "The camera is in use by another app. Close it and try again, or skip this step — your ID picture is enough.";
+    default:
+      return "The camera could not be started on this device. You can skip this step — your ID picture is enough.";
+  }
 }

@@ -151,6 +151,7 @@ export function Field({
   onChange,
   placeholder,
   required,
+  optional,
   readOnly,
   type = "text",
   autoComplete,
@@ -163,6 +164,8 @@ export function Field({
   onChange: (value: string) => void;
   placeholder?: string;
   required?: boolean;
+  /** Shows an "Optional" chip after the label. Never used with `required`. */
+  optional?: boolean;
   readOnly?: boolean;
   type?: "text" | "email" | "tel" | "date" | "number";
   autoComplete?: string;
@@ -181,6 +184,14 @@ export function Field({
         {required && (
           <span className="ml-1" style={{ color: BRASS }} aria-hidden>
             *
+          </span>
+        )}
+        {optional && (
+          <span
+            className="ml-2 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em]"
+            style={{ background: "#F5F0E7", color: "#9A9284" }}
+          >
+            Optional
           </span>
         )}
       </label>
@@ -415,6 +426,7 @@ export function SelfieCard({
   preview,
   consent,
   uploading,
+  error,
   onConsent,
   onStart,
   onCapture,
@@ -425,6 +437,8 @@ export function SelfieCard({
   preview: string | null;
   consent: boolean;
   uploading: boolean;
+  /** Why the camera did not start, in words a guest can act on. */
+  error: string | null;
   onConsent: (value: boolean) => void;
   onStart: () => void;
   onCapture: () => void;
@@ -522,9 +536,10 @@ export function SelfieCard({
                   <CameraOff className="h-4 w-4" /> Camera not available
                 </p>
                 <p className="mt-1.5 text-[11px] leading-relaxed text-[#7A7264]">
-                  {state === "unsupported"
-                    ? "This browser can't use a camera. You can skip this step — your ID picture is enough to complete registration."
-                    : "Allow the camera from the lock icon in your address bar, then try again. You can also skip this step entirely."}
+                  {error ??
+                    (state === "unsupported"
+                      ? "This browser can't use a camera. You can skip this step — your ID picture is enough to complete registration."
+                      : "Allow the camera from the lock icon in your address bar, then try again. You can also skip this step entirely.")}
                 </p>
               </div>
             )}
