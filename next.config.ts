@@ -94,9 +94,15 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   {
     key: "Permissions-Policy",
-    // `payment=(self)` keeps the Payment Request API on-origin; nothing on the
-    // site needs camera, microphone or location.
-    value: "camera=(), microphone=(), geolocation=(), payment=(self)",
+    // `camera=(self)` is required, not incidental: /verify offers an optional
+    // selfie via getUserMedia. The previous `camera=()` denied the feature to
+    // every origin including this one, so getUserMedia rejected before the
+    // permission prompt was ever shown and the camera reported "blocked".
+    //
+    // Same-origin only, so no third-party frame can ask. Nothing else on the
+    // site calls getUserMedia; microphone and location stay denied outright.
+    // `payment=(self)` keeps the Payment Request API on-origin.
+    value: "camera=(self), microphone=(), geolocation=(), payment=(self)",
   },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ];
