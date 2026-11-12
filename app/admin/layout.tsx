@@ -14,6 +14,7 @@ import {
   FileText,
   Images,
   Sparkles,
+  ClipboardCheck,
 } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "../utils/supabase";
 
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { name: "Manage Villas", href: "/admin/villas", icon: Home },
   { name: "Availability", href: "/admin/availability", icon: CalendarOff },
   { name: "Bookings", href: "/admin/bookings", icon: CalendarCheck },
+  { name: "Verifications", href: "/admin/verifications", icon: ClipboardCheck },
   { name: "Create Invoice", href: "/admin/invoice", icon: FileText },
   { name: "Gallery", href: "/admin/gallery", icon: Images },
   { name: "Services", href: "/admin/services", icon: Sparkles },

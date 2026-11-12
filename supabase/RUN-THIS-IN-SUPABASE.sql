@@ -138,6 +138,31 @@ end $$;
 
 
 -- ---------------------------------------------------------------------------
+-- 3b. Staff review — the fourth status, the rejection reason, the review stamp
+--
+--     `rejected` exists so a blurry or mismatched ID can leave the queue without
+--     either sitting in it for ever or being deleted (which would lose the fact
+--     that a document was presented and refused).
+-- ---------------------------------------------------------------------------
+
+alter table public.guest_verifications
+  drop constraint if exists guest_verifications_status_check;
+
+alter table public.guest_verifications
+  add constraint guest_verifications_status_check
+  check (status in ('draft', 'submitted', 'verified', 'rejected'));
+
+alter table public.guest_verifications
+  add column if not exists rejection_reason text,
+  add column if not exists reviewed_at timestamptz;
+
+create index if not exists guest_verifications_review_idx
+  on public.guest_verifications (status, submitted_at desc nulls last);
+create index if not exists guest_verifications_updated_idx
+  on public.guest_verifications (updated_at);
+
+
+-- ---------------------------------------------------------------------------
 -- 4. Constraints and indexes
 -- ---------------------------------------------------------------------------
 
@@ -227,3 +252,9 @@ select policyname, cmd, permissive, roles
  order by policyname;
 
 select id, public from storage.buckets where id = 'verifications';
+
+select conname, pg_get_constraintdef(oid) as definition
+  from pg_constraint
+ where conrelid = 'public.guest_verifications'::regclass
+   and contype = 'c'
+   and conname = 'guest_verifications_status_check';

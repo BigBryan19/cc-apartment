@@ -34,6 +34,7 @@ import {
   AlertTriangle,
   Users,
   Percent,
+  ClipboardCheck,
 } from "lucide-react";
 
 interface BookingRow {
@@ -53,6 +54,23 @@ interface BookingRow {
 interface VillaRow {
   id: number;
   title: string | null;
+}
+
+/** Only what the "unverified today" count needs. */
+interface VerificationRow {
+  status: string;
+  submitted_at: string | null;
+  check_in_date: string | null;
+}
+
+/** Local calendar day as YYYY-MM-DD, so "today" means the staff member's today. */
+function localDay(value: string | Date | null): string {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -82,6 +100,7 @@ export default function AdminDashboard() {
 
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [villas, setVillas] = useState<VillaRow[]>([]);
+  const [verifications, setVerifications] = useState<VerificationRow[]>([]);
   const [isLoading, setIsLoading] = useState(configured);
   const [error, setError] = useState("");
 
@@ -94,7 +113,7 @@ export default function AdminDashboard() {
     const load = async () => {
       const supabase = createClient();
       try {
-        const [bookingResult, villaResult] = await Promise.all([
+        const [bookingResult, villaResult, verificationResult] = await Promise.all([
           supabase
             .from("bookings")
             .select(
@@ -103,6 +122,13 @@ export default function AdminDashboard() {
             .order("created_at", { ascending: false })
             .limit(500),
           supabase.from("villas").select("id, title"),
+          // Kept separate from the failure check below: a missing verifications
+          // table must not blank out the money and occupancy figures.
+          supabase
+            .from("guest_verifications")
+            .select("status, submitted_at, check_in_date")
+            .eq("status", "submitted")
+            .limit(500),
         ]);
 
         if (cancelled) return;
@@ -114,6 +140,9 @@ export default function AdminDashboard() {
 
         setBookings((bookingResult.data ?? []) as BookingRow[]);
         setVillas((villaResult.data ?? []) as VillaRow[]);
+        if (!verificationResult.error) {
+          setVerifications((verificationResult.data ?? []) as VerificationRow[]);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Could not reach the database.");
@@ -227,6 +256,24 @@ export default function AdminDashboard() {
     };
   }, [bookings, villas]);
 
+  /**
+   * Arrivals still unverified today.
+   *
+   * A registration counts if it is still `submitted` and either arrived today
+   * (`check_in_date`) or was filled in today. Both, because a guest who fills
+   * the form this afternoon for tomorrow's stay is still today's work, and a
+   * guest who arrived this morning but submitted last night is still waiting.
+   */
+  const unverifiedToday = useMemo(() => {
+    const today = localDay(new Date());
+    return verifications.filter(
+      (row) =>
+        row.status === "submitted" &&
+        (row.check_in_date === today || localDay(row.submitted_at) === today),
+    ).length;
+  }, [verifications]);
+
+
   if (isLoading) {
     return (
       <div className="mx-auto flex max-w-6xl animate-pulse gap-4">
@@ -297,6 +344,49 @@ export default function AdminDashboard() {
             <p className="mt-0.5 break-words opacity-90">{error}</p>
           </div>
         </div>
+      )}
+
+      {/* Needs attention. Above the figures on purpose: an unverified arrival is
+          the only item here that has a person standing at a gate. */}
+      {configured && !error && (
+        <Link
+          href="/admin/verifications"
+          className={`mb-6 flex items-center justify-between gap-4 rounded-2xl border p-4 transition-colors ${
+            unverifiedToday > 0
+              ? "border-amber-200 bg-amber-50 hover:bg-amber-100/70"
+              : "border-[var(--color-line-soft)] bg-white hover:bg-slate-50"
+          }`}
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${
+                unverifiedToday > 0 ? "bg-amber-100 text-amber-700" : "bg-green-50 text-green-600"
+              }`}
+            >
+              <ClipboardCheck size={20} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--color-ink)]">
+                Arrivals still unverified today
+              </p>
+              <p className="truncate text-xs text-slate-500">
+                {unverifiedToday > 0
+                  ? "Somebody has submitted their ID and is waiting to be checked in."
+                  : "Every registration from today has been reviewed."}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <span
+              className={`text-2xl font-semibold tabular-nums ${
+                unverifiedToday > 0 ? "text-amber-800" : "text-[var(--color-ink)]"
+              }`}
+            >
+              {unverifiedToday}
+            </span>
+            <ArrowUpRight size={16} className="text-slate-400" />
+          </div>
+        </Link>
       )}
 
       {/* Stat cards */}
