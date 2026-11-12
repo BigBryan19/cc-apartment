@@ -2,34 +2,42 @@
 -- ===========================================================================
 -- Guest registration (/verify) — one file, run once.
 --
--- WHY YOU NEED THIS
+-- WHAT IS WRONG RIGHT NOW
 --
---   Until this runs, every visit to /verify ends with
+--   Verified against your project on 13 Nov: the table has every column the
+--   form writes, but an anonymous insert is still refused with
 --
---     new row violates row-level security policy for table "guest_verifications"
+--     42501  new row violates row-level security policy for table
+--            "guest_verifications"
 --
---   That is Postgres refusing the insert because the table has row-level
---   security switched on but no policy that allows an anonymous guest to write
---   to it. The table existing is not enough — a policy has to allow the insert,
---   and the `anon` role needs a grant on the table.
+--   So the *columns* migration ran and the *policies* migration did not. The
+--   table has row-level security switched on and no policy that lets a guest
+--   write to it. A table existing is not enough: a policy has to allow the
+--   insert, and the `anon` role needs a grant on the table.
 --
 -- HOW TO RUN IT
 --
 --   1. Supabase dashboard -> SQL Editor -> New query
 --   2. Paste this entire file
 --   3. Run
---   4. You should get a final table listing every column. If you see
---      `declared_accurate` and `accepted_rules` in that list, it worked.
+--   4. The last three queries print the columns, the policies and the bucket.
+--      You want to see `guests can create a verification` in the policy list.
 --
--- Safe to run more than once: every statement is idempotent (create if not
--- exists, drop policy if exists, add column if not exists).
+-- DESIGNED NOT TO FAIL PARTWAY
+--
+--   The SQL editor stops at the first statement that raises an error, which is
+--   the most likely reason the policies never landed last time: `create
+--   extension` is refused on some plans and everything after it is skipped.
+--   This file therefore creates no extensions, puts the policies early, and
+--   wraps the storage setup so a bucket problem cannot take the table with it.
+--
+-- Safe to run repeatedly: every statement is idempotent.
 -- ===========================================================================
 
--- ---------------------------------------------------------------------------
--- 1. Schema
--- ---------------------------------------------------------------------------
 
-create extension if not exists "pgcrypto";
+-- ---------------------------------------------------------------------------
+-- 1. The table, if it does not exist yet
+-- ---------------------------------------------------------------------------
 
 create table if not exists public.guest_verifications (
   id uuid primary key default gen_random_uuid(),
@@ -46,14 +54,37 @@ create table if not exists public.guest_verifications (
   updated_at timestamptz not null default now()
 );
 
+
+-- ---------------------------------------------------------------------------
+-- 2. Every column the six-page form writes
+--
+--    Nullable on purpose. The form autosaves while the guest types, so a row
+--    exists before they have finished; the required set is enforced in the page,
+--    not by NOT NULL, which would break the first keystroke of the autosave.
+-- ---------------------------------------------------------------------------
+
 alter table public.guest_verifications
-  add column if not exists booking_reference text;
+  add column if not exists whatsapp_number text,
+  add column if not exists id_type text,
+  add column if not exists id_photo_path text,
+  add column if not exists check_in_date date,
+  add column if not exists check_out_date date,
+  add column if not exists guests_count integer,
+  add column if not exists emergency_name text,
+  add column if not exists emergency_relationship text,
+  add column if not exists emergency_phone text,
+  add column if not exists declared_accurate boolean not null default false,
+  add column if not exists accepted_rules boolean not null default false,
+  add column if not exists submitted_at timestamptz;
 
-create index if not exists guest_verifications_reference_idx
-  on public.guest_verifications (booking_reference);
 
-create index if not exists guest_verifications_status_idx
-  on public.guest_verifications (status, created_at desc);
+-- ---------------------------------------------------------------------------
+-- 3. The part that has been missing — write access for a guest
+--
+--    A guest has no account, so `anon` must be able to INSERT and UPDATE. It is
+--    deliberately not able to SELECT: a guessed session id must not be a way to
+--    read somebody else's name, number or photograph.
+-- ---------------------------------------------------------------------------
 
 alter table public.guest_verifications enable row level security;
 
@@ -82,82 +113,46 @@ create policy "staff can change verifications"
   to authenticated
   using (true);
 
--- Grants: policies alone do not give a role access to the table.
+-- A policy is not a privilege. Without these grants the role is still refused.
+grant usage on schema public to anon, authenticated;
 grant insert, update on public.guest_verifications to anon;
 grant select, insert, update, delete on public.guest_verifications to authenticated;
 
--- ---------------------------------------------------------------------------
--- 3. Photographs. Private bucket: row-level access, not a public URL.
--- ---------------------------------------------------------------------------
-insert into storage.buckets (id, name, public)
-values ('verifications', 'verifications', false)
-on conflict (id) do nothing;
 
-drop policy if exists "guests can upload verification photos" on storage.objects;
-create policy "guests can upload verification photos"
-  on storage.objects for insert
-  to anon, authenticated
-  with check (bucket_id = 'verifications');
-
-drop policy if exists "staff can read verification photos" on storage.objects;
-create policy "staff can read verification photos"
-  on storage.objects for select
-  to authenticated
-  using (bucket_id = 'verifications');
-
-drop policy if exists "staff can remove verification photos" on storage.objects;
-create policy "staff can remove verification photos"
-  on storage.objects for delete
-  to authenticated
-  using (bucket_id = 'verifications');
-
--- ---------------------------------------------------------------------------
--- Confirmation.
--- ---------------------------------------------------------------------------
-select table_name from information_schema.tables
- where table_schema = 'public' and table_name = 'guest_verifications';
-
-select id, public from storage.buckets where id = 'verifications';
+-- A policy left behind by an earlier attempt can be RESTRICTIVE, which ANDs
+-- with the permissive ones above and quietly keeps blocking writes. Nothing in
+-- the app creates one, but if the table was hand-built it is worth clearing.
+do $$
+declare leftover record;
+begin
+  for leftover in
+    select policyname from pg_policies
+     where schemaname = 'public'
+       and tablename = 'guest_verifications'
+       and permissive = 'RESTRICTIVE'
+  loop
+    execute format('drop policy if exists %I on public.guest_verifications', leftover.policyname);
+    raise notice 'Dropped restrictive policy %', leftover.policyname;
+  end loop;
+end $$;
 
 
 -- ---------------------------------------------------------------------------
--- 2. Columns added by the six-page form
+-- 4. Constraints and indexes
 -- ---------------------------------------------------------------------------
 
-alter table public.guest_verifications
-  add column if not exists whatsapp_number text,
-  add column if not exists id_type text,
-  add column if not exists id_photo_path text,
-  add column if not exists check_in_date date,
-  add column if not exists check_out_date date,
-  add column if not exists guests_count integer,
-  add column if not exists emergency_name text,
-  add column if not exists emergency_relationship text,
-  add column if not exists emergency_phone text,
-  add column if not exists declared_accurate boolean not null default false,
-  add column if not exists accepted_rules boolean not null default false,
-  add column if not exists submitted_at timestamptz;
-
--- Identification is one of three documents. A check constraint rather than an
--- enum: the list is short, and adding a fourth document type should not need a
--- type migration. `is null` is allowed so drafts save.
 alter table public.guest_verifications
   drop constraint if exists guest_verifications_id_type_check;
 alter table public.guest_verifications
   add constraint guest_verifications_id_type_check
   check (id_type is null or id_type in ('ghana_card', 'passport', 'drivers_licence'));
 
--- One guest is the minimum: a registration with zero people is not a stay.
--- The upper bound matches the largest approved occupancy so a typo of 400
--- cannot be stored.
 alter table public.guest_verifications
   drop constraint if exists guest_verifications_guests_count_check;
 alter table public.guest_verifications
   add constraint guest_verifications_guests_count_check
   check (guests_count is null or (guests_count >= 1 and guests_count <= 40));
 
--- A stay cannot end before it begins. Both dates are nullable for drafts, and
--- the comparison short-circuits on the first null.
 alter table public.guest_verifications
   drop constraint if exists guest_verifications_dates_check;
 alter table public.guest_verifications
@@ -168,43 +163,56 @@ alter table public.guest_verifications
     or check_out_date >= check_in_date
   );
 
--- Staff review reads the queue newest-first by status, and looks a guest up by
--- the reference on their confirmation.
+create index if not exists guest_verifications_reference_idx
+  on public.guest_verifications (booking_reference);
+create index if not exists guest_verifications_status_idx
+  on public.guest_verifications (status, created_at desc);
 create index if not exists guest_verifications_submitted_idx
   on public.guest_verifications (submitted_at desc nulls last);
 
 
+-- ---------------------------------------------------------------------------
+-- 5. Photographs — private bucket, row-level access, no public URL
+--
+--    Wrapped, so that a bucket permission problem cannot abort the policies
+--    above. If this block raises a notice instead, create the bucket by hand:
+--    Storage -> New bucket -> name `verifications` -> Public: off.
+-- ---------------------------------------------------------------------------
+
+do $$
+begin
+  insert into storage.buckets (id, name, public)
+  values ('verifications', 'verifications', false)
+  on conflict (id) do nothing;
+
+  drop policy if exists "guests can upload verification photos" on storage.objects;
+  create policy "guests can upload verification photos"
+    on storage.objects for insert
+    to anon, authenticated
+    with check (bucket_id = 'verifications');
+
+  drop policy if exists "staff can read verification photos" on storage.objects;
+  create policy "staff can read verification photos"
+    on storage.objects for select
+    to authenticated
+    using (bucket_id = 'verifications');
+
+  drop policy if exists "staff can remove verification photos" on storage.objects;
+  create policy "staff can remove verification photos"
+    on storage.objects for delete
+    to authenticated
+    using (bucket_id = 'verifications');
+exception
+  when others then
+    raise notice 'Storage setup skipped: %', sqlerrm;
+end $$;
 
 
 -- ---------------------------------------------------------------------------
--- 4. Belt and braces
--- ---------------------------------------------------------------------------
-
--- Policies do not imply table privileges.
-grant usage on schema public to anon, authenticated;
-grant insert, update on public.guest_verifications to anon;
-grant select, insert, update, delete on public.guest_verifications to authenticated;
-
--- If the table was created by hand in the dashboard it may have RLS on with no
--- policy at all. Re-state the two write policies so this file is the fix either
--- way.
-alter table public.guest_verifications enable row level security;
-
-drop policy if exists "guests can create a verification" on public.guest_verifications;
-create policy "guests can create a verification"
-  on public.guest_verifications for insert
-  to anon, authenticated
-  with check (true);
-
-drop policy if exists "guests can update their verification" on public.guest_verifications;
-create policy "guests can update their verification"
-  on public.guest_verifications for update
-  to anon, authenticated
-  using (true)
-  with check (true);
-
--- ---------------------------------------------------------------------------
--- 5. Did it work?
+-- 6. Did it work?
+--
+--    Look for `guests can create a verification` in the second result. If it is
+--    there, /verify saves.
 -- ---------------------------------------------------------------------------
 
 select column_name, data_type
@@ -213,7 +221,7 @@ select column_name, data_type
    and table_name = 'guest_verifications'
  order by ordinal_position;
 
-select policyname, cmd, roles
+select policyname, cmd, permissive, roles
   from pg_policies
  where schemaname = 'public' and tablename = 'guest_verifications'
  order by policyname;
