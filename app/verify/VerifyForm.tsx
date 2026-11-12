@@ -42,7 +42,16 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Check, ChevronDown, Loader2, Lock, ShieldCheck } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  Loader2,
+  Lock,
+  ShieldCheck,
+} from "lucide-react";
 import { createClient, isSupabaseConfigured } from "../utils/supabase";
 import {
   CheckRow,
@@ -62,8 +71,21 @@ const AUTOSAVE_DELAY_MS = 1500;
 /** Phone cameras produce large files; 8 MB accepts a full-resolution photo. */
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const MAX_GUESTS = 40;
-/** Sections that count toward the progress rail. Section 5 is optional. */
-const REQUIRED_SECTIONS = 5;
+/**
+ * The wizard, one section per page. Numbering matches the confirmation email a
+ * guest was sent, so "section three" means the same thing to them and to staff.
+ */
+const STEPS = [
+  { n: 1, title: "Personal information" },
+  { n: 2, title: "Contact information" },
+  { n: 3, title: "Identification" },
+  { n: 4, title: "Booking details" },
+  { n: 5, title: "Emergency contact" },
+  { n: 6, title: "Guest declaration" },
+] as const;
+
+const STEP_NUMBERS = [1, 2, 3, 4, 5, 6];
+const LAST_STEP = 6;
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 type IdType = "" | "ghana_card" | "passport" | "drivers_licence";
@@ -169,6 +191,9 @@ export default function VerifyForm({
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+
+  /** Which page of the wizard is showing. 1-based, matching STEPS. */
+  const [step, setStep] = useState(1);
 
   /** True when the reference came from the link and should not be edited. */
   const [referenceLocked, setReferenceLocked] = useState(Boolean(initialReference));
@@ -434,43 +459,104 @@ export default function VerifyForm({
 
   /* ---------------- validation ---------------- */
 
-  /** First thing wrong with the form, or null when it is ready to submit. */
-  const problem = useMemo((): string | null => {
-    if (!form.reference.trim())
-      return "Enter the booking reference from your confirmation.";
-    if (!form.fullName.trim()) return "Enter your full name as it appears on your ID.";
-    if (!isPlausiblePhone(form.phone)) return "Enter a phone number we can reach you on.";
-    if (!isPlausiblePhone(form.whatsapp)) return "Enter your WhatsApp number.";
-    if (!isPlausibleEmail(form.email)) return "Enter a valid email address.";
-    if (!form.idType) return "Choose the type of ID you are presenting.";
-    if (!idPath && !idFile) return "Upload a clear picture of your ID.";
-    if (!form.checkIn) return "Choose your check-in date.";
-    if (!form.checkOut) return "Choose your check-out date.";
-    if (form.checkOut < form.checkIn) return "Check-out cannot be before check-in.";
-    const guests = Number.parseInt(form.guests, 10);
-    if (!Number.isFinite(guests) || guests < 1)
-      return "Enter how many guests are staying.";
-    if (guests > MAX_GUESTS) return `Enter a number of guests up to ${MAX_GUESTS}.`;
-    if (!declaredAccurate) return "Confirm that the information you gave is accurate.";
-    if (!acceptedRules) return "Agree to the house rules to continue.";
-    return null;
-  }, [
-    form,
-    idPath,
-    idFile,
-    declaredAccurate,
-    acceptedRules,
-  ]);
+  /**
+   * Outstanding issues, keyed by the step that owns them.
+   *
+   * One object rather than a chain of ifs: Continue, the error banner and the
+   * final submit all read from here, so they can never disagree — and a guest
+   * who reaches the last page with an earlier page still incomplete is sent
+   * back to the page that owns the problem instead of being told about a field
+   * that is no longer on screen.
+   */
+  const stepIssues = useMemo((): Record<number, string> => {
+    const issues: Record<number, string> = {};
 
+    if (!form.fullName.trim()) issues[1] = "Enter your full name as it appears on your ID.";
+
+    if (!isPlausiblePhone(form.phone)) issues[2] = "Enter a phone number we can reach you on.";
+    else if (!isPlausiblePhone(form.whatsapp)) issues[2] = "Enter your WhatsApp number.";
+    else if (!isPlausibleEmail(form.email)) issues[2] = "Enter a valid email address.";
+
+    if (!form.idType) issues[3] = "Choose the type of ID you are presenting.";
+    else if (!idPath && !idFile) issues[3] = "Upload a clear picture of your ID.";
+
+    const guests = Number.parseInt(form.guests, 10);
+    if (!form.reference.trim()) issues[4] = "Enter the booking reference from your confirmation.";
+    else if (!form.checkIn) issues[4] = "Choose your check-in date.";
+    else if (!form.checkOut) issues[4] = "Choose your check-out date.";
+    else if (form.checkOut < form.checkIn) issues[4] = "Check-out cannot be before check-in.";
+    else if (!(guests >= 1)) issues[4] = "Enter how many guests are staying.";
+    else if (guests > MAX_GUESTS) issues[4] = `Enter a number of guests up to ${MAX_GUESTS}.`;
+
+    // Section 5 is optional, but half an emergency contact is worse than none:
+    // once one field is used, a name and a number are both required.
+    const emergencyTouched = Boolean(
+      form.emergencyName.trim() || form.emergencyRelationship.trim() || form.emergencyPhone.trim(),
+    );
+    if (emergencyTouched && !form.emergencyName.trim())
+      issues[5] = "Enter the name of your emergency contact.";
+    else if (emergencyTouched && !isPlausiblePhone(form.emergencyPhone))
+      issues[5] = "Enter a usable phone number for your emergency contact.";
+
+    if (!declaredAccurate) issues[6] = "Confirm that the information you gave is accurate.";
+    else if (!acceptedRules) issues[6] = "Agree to the house rules to continue.";
+
+    return issues;
+  }, [form, idPath, idFile, declaredAccurate, acceptedRules]);
+
+  /** The earliest page with an outstanding issue; 0 when all six are clear. */
+  const firstBadStep = STEP_NUMBERS.find((n) => stepIssues[n]) ?? 0;
+  const currentIssue = stepIssues[step] ?? null;
+  const problem = firstBadStep ? stepIssues[firstBadStep] : null;
   const canSubmit = !problem && !submitting;
+  const isLast = step === LAST_STEP;
+
+  /* ---------------- stepping ---------------- */
+
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const firstPaint = useRef(true);
+
+  useEffect(() => {
+    // Not on the first paint — the guest has not moved yet, so there is nothing
+    // to announce and no reason to jump the page.
+    if (firstPaint.current) {
+      firstPaint.current = false;
+      return;
+    }
+    // A new page, so start at the top of it — and move focus to the heading so
+    // a screen reader announces where the guest has landed. preventScroll
+    // because the smooth scroll above is already doing that job.
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    headingRef.current?.focus({ preventScroll: true });
+  }, [step]);
+
+  /** Advance, or explain what is missing on this page. */
+  function goNext() {
+    if (currentIssue) {
+      setError(currentIssue);
+      return;
+    }
+    setError("");
+    setStep((value) => Math.min(LAST_STEP, value + 1));
+  }
+
+  function goBack() {
+    setError("");
+    setStep((value) => Math.max(1, value - 1));
+  }
+
+  function jumpTo(target: number) {
+    setError("");
+    setStep(target);
+  }
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
 
     if (problem) {
+      setStep(firstBadStep);
       setError(problem);
-      errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
@@ -496,36 +582,6 @@ export default function VerifyForm({
     // Kiosk hand-off: the guest is returned to the site, not left on a dead end.
     setTimeout(() => router.replace("/"), 1400);
   }
-
-  /* ---------------- progress ---------------- */
-
-  /**
-   * Per-section completion, from the same predicates the submit check uses.
-   * One source of truth: a section cannot show a tick while its fields would
-   * still block submission.
-   */
-  const sectionDone = {
-    personal: Boolean(form.fullName.trim()),
-    contact:
-      isPlausiblePhone(form.phone) &&
-      isPlausiblePhone(form.whatsapp) &&
-      isPlausibleEmail(form.email),
-    identification: Boolean(form.idType) && Boolean(idPath ?? idFile),
-    booking:
-      Boolean(form.reference.trim()) &&
-      Boolean(form.checkIn) &&
-      Boolean(form.checkOut) &&
-      form.checkOut >= form.checkIn &&
-      Number.parseInt(form.guests, 10) >= 1,
-  };
-
-  const completedSections = [
-    sectionDone.personal,
-    sectionDone.contact,
-    sectionDone.identification,
-    sectionDone.booking,
-    declaredAccurate && acceptedRules,
-  ].filter(Boolean).length;
 
   /* ---------------- views ---------------- */
 
@@ -564,14 +620,20 @@ export default function VerifyForm({
     );
   }
 
+  const isFirst = step === 1;
+
   return (
     <main className="min-h-screen" style={{ background: "var(--color-canvas-warm)" }}>
       <VerifyStyles />
-      {/* The property, not a form. The photograph is the first thing a guest
-          sees at the gate, and it says "you have arrived" better than copy.
-          Text sits on a bottom-heavy scrim so it stays legible whatever part
-          of the frame is behind it. */}
-      <header className="relative isolate flex min-h-[320px] items-end overflow-hidden sm:min-h-[360px]">
+
+      {/* The property, not a form. Full height on the first page, then folded
+          down to a strip so the remaining five pages start with the field
+          rather than with a photograph they have already seen. */}
+      <header
+        className={`relative isolate flex items-end overflow-hidden ${
+          isFirst ? "min-h-[320px] sm:min-h-[360px]" : "min-h-[104px] sm:min-h-[116px]"
+        }`}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/Adenta4.jpg"
@@ -579,6 +641,7 @@ export default function VerifyForm({
           aria-hidden
           className="absolute inset-0 h-full w-full object-cover object-[50%_45%]"
         />
+
         {/* Two scrims, one per shape of the screen. A phone shows the band as a
             wide, short strip with type across the full width, so it needs a
             vertical wash; a desktop keeps the room visible to the right and
@@ -597,64 +660,91 @@ export default function VerifyForm({
               "linear-gradient(100deg, rgba(18,22,26,0.94) 0%, rgba(18,22,26,0.86) 30%, rgba(18,22,26,0.55) 58%, rgba(18,22,26,0.22) 82%, rgba(18,22,26,0.10) 100%)",
           }}
         />
-        {/* Brass hairline where the photograph meets the page. */}
         <div
           className="absolute inset-x-0 bottom-0 h-px"
           style={{ background: "linear-gradient(90deg, transparent, #C9A227, transparent)" }}
           aria-hidden
         />
 
-        <div className="relative mx-auto w-full max-w-lg px-5 pb-7 pt-6">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/cc-horinzontal.png"
-            alt="Cosy Crest Apartments"
-            className="h-8 w-auto self-start drop-shadow-[0_1px_6px_rgba(0,0,0,0.45)]"
-          />
-
-          <span className="mt-8 inline-flex w-fit items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-white/90 backdrop-blur">
-            <ShieldCheck className="h-3 w-3" /> Required for access
-          </span>
-
-          <h1 className="mt-3 font-display text-[34px] leading-[1.08] tracking-tight text-white drop-shadow-sm">
-            Guest registration
-          </h1>
-          <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-white/80">
-            A picture of your ID and a few details, and the keys are yours. About a minute.
-          </p>
-
-          <div className="mt-4 flex flex-wrap gap-1.5">
-            {["Photo ID", "About a minute", "No paperwork at the gate"].map((chip) => (
-              <span
-                key={chip}
-                className="rounded-full border border-white/20 bg-black/20 px-2.5 py-1 text-[10px] font-medium text-white/85 backdrop-blur-sm"
-              >
-                {chip}
-              </span>
-            ))}
+        <div className="relative mx-auto w-full max-w-lg px-5 pb-6 pt-5">
+          <div className="flex items-center justify-between gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/cc-horinzontal.png"
+              alt="Cosy Crest Apartments"
+              className={`w-auto drop-shadow-[0_1px_6px_rgba(0,0,0,0.45)] ${isFirst ? "h-8" : "h-6"}`}
+            />
           </div>
+
+          {isFirst ? (
+            <>
+              <span className="mt-8 inline-flex w-fit items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-white/90 backdrop-blur">
+                <ShieldCheck className="h-3 w-3" /> Required for access
+              </span>
+              <h1
+                ref={headingRef}
+                tabIndex={-1}
+                style={{ outline: "none" }}
+                className="mt-3 font-display text-[34px] leading-[1.08] tracking-tight text-white drop-shadow-sm"
+              >
+                Guest registration
+              </h1>
+              <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-white/80">
+                Six short steps, about a minute, and no paperwork at the gate.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {["Photo ID", "About a minute", "No paperwork at the gate"].map((chip) => (
+                  <span
+                    key={chip}
+                    className="rounded-full border border-white/20 bg-black/20 px-2.5 py-1 text-[10px] font-medium text-white/85 backdrop-blur-sm"
+                  >
+                    {chip}
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <h1 ref={headingRef} tabIndex={-1} style={{ outline: "none" }} className="sr-only">
+              {STEPS[step - 1].title}
+            </h1>
+          )}
         </div>
       </header>
 
       <div className="mx-auto max-w-lg px-5 pb-14">
-        {/* Progress rail. Pinned while scrolling: a six-section form on a phone
-            is long, and a guest who cannot see the end of it abandons it. */}
+        {/* Step rail. Six segments rather than a percentage: the guest can see
+            how many pages are left, and tapping a finished segment goes back to
+            it. Pinned, because the page is otherwise taller than a phone. */}
         <div
-          className="sticky top-0 z-20 -mx-5 mb-4 flex items-center gap-3 px-5 py-3 backdrop-blur"
+          className="sticky top-0 z-20 -mx-5 mb-4 px-5 py-3 backdrop-blur"
           style={{ background: "rgba(251,249,246,0.92)", boxShadow: "0 1px 0 #E8E2D8" }}
         >
-          <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-[#E9E2D6]">
-            <div
-              className="h-full rounded-full transition-[width] duration-500 ease-out"
-              style={{
-                width: `${(completedSections / REQUIRED_SECTIONS) * 100}%`,
-                background: "var(--color-accent)",
-              }}
-            />
+          <div className="flex items-center gap-3">
+            <div className="flex flex-1 gap-1">
+              {STEPS.map((item) => (
+                <button
+                  key={item.n}
+                  type="button"
+                  onClick={() => item.n < step && jumpTo(item.n)}
+                  disabled={item.n >= step}
+                  aria-label={`Step ${item.n}: ${item.title}`}
+                  aria-current={item.n === step ? "step" : undefined}
+                  className="h-[3px] flex-1 rounded-full transition-colors disabled:cursor-default"
+                  style={{
+                    background:
+                      item.n < step
+                        ? "var(--color-accent)"
+                        : item.n === step
+                          ? "#8795A1"
+                          : "#E9E2D6",
+                  }}
+                />
+              ))}
+            </div>
+            <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[#9A9284]">
+              Step {step} of {LAST_STEP}
+            </span>
           </div>
-          <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[#9A9284]">
-            {completedSections} of {REQUIRED_SECTIONS} complete
-          </span>
         </div>
 
         {!configured && (
@@ -667,254 +757,355 @@ export default function VerifyForm({
         )}
 
         <form onSubmit={onSubmit} className="space-y-4">
-          {/* 1 — Personal information */}
-          <Section index={1} title="Personal information" complete={sectionDone.personal}>
-            <Field
-              label="Full name"
-              required
-              value={form.fullName}
-              onChange={(value) => set("fullName", value)}
-              placeholder="As it appears on your ID"
-              autoComplete="name"
-            />
-          </Section>
+          {/* Keyed on the step so React remounts the page and the entry
+              animation replays — the only reason a key is ever needed here. */}
+          <div key={step} className="cc-step space-y-4">
+            {step === 1 && (
+              <Section index={1} title="Personal information" description="Who is staying.">
+                <Field
+                  label="Full name"
+                  required
+                  value={form.fullName}
+                  onChange={(value) => set("fullName", value)}
+                  placeholder="As it appears on your ID"
+                  autoComplete="name"
+                />
+              </Section>
+            )}
 
-          {/* 2 — Contact information */}
-          <Section
-            index={2}
-            title="Contact information"
-            description="We use these only to reach you about this stay."
-            complete={sectionDone.contact}
-          >
-            <Field
-              label="Phone number"
-              required
-              value={form.phone}
-              onChange={(value) => set("phone", value)}
-              placeholder="e.g. 024 000 0000"
-              autoComplete="tel"
-              inputMode="tel"
-            />
-            <Field
-              label="WhatsApp number"
-              required
-              value={form.whatsapp}
-              onChange={(value) => set("whatsapp", value)}
-              placeholder="Usually the same as your phone number"
-              autoComplete="tel"
-              inputMode="tel"
-            />
-            <Field
-              label="Email address"
-              required
-              type="email"
-              value={form.email}
-              onChange={(value) => set("email", value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-              inputMode="email"
-            />
-          </Section>
-
-          {/* 3 — Identification */}
-          <Section
-            index={3}
-            title="Identification"
-            complete={sectionDone.identification}
-            description="Choose the document you are presenting, then photograph it. Make sure the whole card is in frame and the text is readable."
-          >
-            <SelectField
-              label="Type of ID"
-              required
-              value={form.idType}
-              onChange={(value) => set("idType", value as IdType)}
-              placeholder="Choose a document"
-              options={ID_TYPES.map((type) => ({
-                value: type.value,
-                label: `${type.label} — ${type.hint}`,
-              }))}
-            />
-
-            <IdUpload
-              inputRef={idInputRef}
-              preview={idPreview}
-              uploading={idUploading}
-              onSelect={(file) => void acceptIdFile(file)}
-              onClear={clearIdFile}
-            />
-          </Section>
-
-          {/* Optional selfie. Collapsed until the guest asks for it, so the
-              camera is never opened just because the page loaded. */}
-          <SelfieCard
-            state={cameraState}
-            videoRef={videoRef}
-            preview={selfie}
-            consent={photoConsent}
-            uploading={selfieUploading}
-            onConsent={setPhotoConsent}
-            onStart={() => void startCamera()}
-            onCapture={() => void takeSelfie()}
-            onRemove={removeSelfie}
-          />
-
-          {/* 4 — Booking details */}
-          <Section index={4} title="Booking details" complete={sectionDone.booking}>
-            <div>
-              <Field
-                label="Booking reference"
-                required
-                value={form.reference}
-                onChange={(value) => set("reference", value.toUpperCase())}
-                placeholder="From your confirmation, e.g. CC-1042"
-                autoComplete="off"
-                readOnly={referenceLocked}
-              />
-              {referenceLocked && (
-                <button
-                  type="button"
-                  onClick={() => setReferenceLocked(false)}
-                  className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-stone-500 underline underline-offset-4 hover:text-stone-900"
-                >
-                  <Lock className="h-3 w-3" /> Taken from your link — use a different reference
-                </button>
-              )}
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="Check-in date"
-                required
-                type="date"
-                value={form.checkIn}
-                onChange={(value) => set("checkIn", value)}
-              />
-              <Field
-                label="Check-out date"
-                required
-                type="date"
-                value={form.checkOut}
-                onChange={(value) => set("checkOut", value)}
-                min={form.checkIn || undefined}
-              />
-            </div>
-
-            <Field
-              label="Number of guests"
-              required
-              type="number"
-              value={form.guests}
-              onChange={(value) => set("guests", value)}
-              placeholder="Including yourself"
-              inputMode="numeric"
-              min={1}
-              max={MAX_GUESTS}
-            />
-          </Section>
-
-          {/* 5 — Emergency contact */}
-          <Section
-            index={5}
-            title="Emergency contact"
-            optional
-            description="Someone we may call if we cannot reach you during the stay."
-          >
-            <Field
-              label="Full name"
-              value={form.emergencyName}
-              onChange={(value) => set("emergencyName", value)}
-              placeholder="Their full name"
-              autoComplete="off"
-            />
-            <Field
-              label="Relationship"
-              value={form.emergencyRelationship}
-              onChange={(value) => set("emergencyRelationship", value)}
-              placeholder="e.g. Sister, colleague, spouse"
-              autoComplete="off"
-            />
-            <Field
-              label="Phone number"
-              value={form.emergencyPhone}
-              onChange={(value) => set("emergencyPhone", value)}
-              placeholder="e.g. 024 000 0000"
-              inputMode="tel"
-              autoComplete="off"
-            />
-          </Section>
-
-          {/* House rules, folded away. A native <details> rather than a scripted
-              accordion: it opens without JavaScript, is keyboard accessible by
-              default, and keeps the page short for someone checking in at the
-              airport. */}
-          <details
-            className="group overflow-hidden rounded-2xl border bg-white shadow-[0_1px_2px_rgba(30,36,43,0.05)] [&_summary::-webkit-details-marker]:hidden"
-            style={{ borderColor: "#E8E2D8" }}
-          >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 sm:px-6">
-              <span
-                className="font-display text-[17px] tracking-tight"
-                style={{ color: "var(--color-ink)" }}
+            {step === 2 && (
+              <Section
+                index={2}
+                title="Contact information"
+                description="We use these only to reach you about this stay."
               >
-                House rules &amp; terms
-              </span>
-              <ChevronDown className="h-4 w-4 shrink-0 text-[#B5AE9F] transition-transform duration-200 group-open:rotate-180" />
-            </summary>
+                <Field
+                  label="Phone number"
+                  required
+                  value={form.phone}
+                  onChange={(value) => set("phone", value)}
+                  placeholder="e.g. 024 000 0000"
+                  autoComplete="tel"
+                  inputMode="tel"
+                />
+                <Field
+                  label="WhatsApp number"
+                  required
+                  value={form.whatsapp}
+                  onChange={(value) => set("whatsapp", value)}
+                  placeholder="Usually the same as your phone number"
+                  autoComplete="tel"
+                  inputMode="tel"
+                />
+                <Field
+                  label="Email address"
+                  required
+                  type="email"
+                  value={form.email}
+                  onChange={(value) => set("email", value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  inputMode="email"
+                />
+              </Section>
+            )}
 
-            <div className="border-t px-5 pb-5 pt-4 sm:px-6" style={{ borderColor: "#F2EDE4" }}>
-              {rules.length > 0 ? (
-                <ul className="space-y-3">
-                  {rules.map((rule) => (
-                    <li key={rule.id} className="border-l pl-3" style={{ borderColor: "#C9A22766" }}>
-                      <span
-                        className="block text-[11px] font-semibold"
-                        style={{ color: "var(--color-ink)" }}
-                      >
-                        {rule.title}
-                      </span>
-                      {rule.body && (
-                        <span className="mt-0.5 block text-[11px] leading-relaxed text-[var(--color-muted)]">
-                          {rule.body}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-[11px] leading-relaxed text-[var(--color-muted)]">
-                  House rules are provided with your booking confirmation.
-                </p>
-              )}
-
-              <p className="mt-4 text-[11px] leading-relaxed text-[var(--color-muted)]">
-                The full{" "}
-                <a
-                  href="/terms"
-                  className="underline underline-offset-4"
-                  style={{ color: "var(--color-accent)" }}
+            {step === 3 && (
+              <>
+                <Section
+                  index={3}
+                  title="Identification"
+                  description="Choose the document you are presenting, then photograph it. Make sure the whole card is in frame and the text is readable."
                 >
-                  terms and conditions
-                </a>{" "}
-                apply to this stay.
-              </p>
-            </div>
-          </details>
+                  <SelectField
+                    label="Type of ID"
+                    required
+                    value={form.idType}
+                    onChange={(value) => set("idType", value as IdType)}
+                    placeholder="Choose a document"
+                    options={ID_TYPES.map((type) => ({
+                      value: type.value,
+                      label: `${type.label} — ${type.hint}`,
+                    }))}
+                  />
 
-          {/* 6 — Declaration */}
-          <Section index={6} title="Guest declaration" complete={declaredAccurate && acceptedRules}>
-            <CheckRow
-              checked={declaredAccurate}
-              onChange={setDeclaredAccurate}
-              label="I confirm that the information provided is accurate."
-            />
-            <CheckRow
-              checked={acceptedRules}
-              onChange={setAcceptedRules}
-              label="I agree to abide by the property's house rules."
-            />
-          </Section>
+                  <IdUpload
+                    inputRef={idInputRef}
+                    preview={idPreview}
+                    uploading={idUploading}
+                    onSelect={(file) => void acceptIdFile(file)}
+                    onClear={clearIdFile}
+                  />
+                </Section>
 
-          <div className="flex items-center justify-center gap-2 pt-1 text-[10.5px]">
+                <SelfieCard
+                  state={cameraState}
+                  videoRef={videoRef}
+                  preview={selfie}
+                  consent={photoConsent}
+                  uploading={selfieUploading}
+                  onConsent={setPhotoConsent}
+                  onStart={() => void startCamera()}
+                  onCapture={() => void takeSelfie()}
+                  onRemove={removeSelfie}
+                />
+              </>
+            )}
+
+            {step === 4 && (
+              <Section index={4} title="Booking details" description="Which nights, and how many.">
+                <div>
+                  <Field
+                    label="Booking reference"
+                    required
+                    value={form.reference}
+                    onChange={(value) => set("reference", value.toUpperCase())}
+                    placeholder="From your confirmation, e.g. CC-1042"
+                    autoComplete="off"
+                    readOnly={referenceLocked}
+                  />
+                  {referenceLocked && (
+                    <button
+                      type="button"
+                      onClick={() => setReferenceLocked(false)}
+                      className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-stone-500 underline underline-offset-4 hover:text-stone-900"
+                    >
+                      <Lock className="h-3 w-3" /> Taken from your link — use a different reference
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field
+                    label="Check-in date"
+                    required
+                    type="date"
+                    value={form.checkIn}
+                    onChange={(value) => set("checkIn", value)}
+                  />
+                  <Field
+                    label="Check-out date"
+                    required
+                    type="date"
+                    value={form.checkOut}
+                    onChange={(value) => set("checkOut", value)}
+                    min={form.checkIn || undefined}
+                  />
+                </div>
+
+                <Field
+                  label="Number of guests"
+                  required
+                  type="number"
+                  value={form.guests}
+                  onChange={(value) => set("guests", value)}
+                  placeholder="Including yourself"
+                  inputMode="numeric"
+                  min={1}
+                  max={MAX_GUESTS}
+                />
+              </Section>
+            )}
+
+            {step === 5 && (
+              <Section
+                index={5}
+                title="Emergency contact"
+                optional
+                description="Someone we may call if we cannot reach you during the stay. Leave all three blank to skip."
+              >
+                <Field
+                  label="Full name"
+                  value={form.emergencyName}
+                  onChange={(value) => set("emergencyName", value)}
+                  placeholder="Their full name"
+                  autoComplete="off"
+                />
+                <Field
+                  label="Relationship"
+                  value={form.emergencyRelationship}
+                  onChange={(value) => set("emergencyRelationship", value)}
+                  placeholder="e.g. Sister, colleague, spouse"
+                  autoComplete="off"
+                />
+                <Field
+                  label="Phone number"
+                  value={form.emergencyPhone}
+                  onChange={(value) => set("emergencyPhone", value)}
+                  placeholder="e.g. 024 000 0000"
+                  inputMode="tel"
+                  autoComplete="off"
+                />
+              </Section>
+            )}
+
+            {step === 6 && (
+              <>
+                {/* Everything they typed, on one page, before they commit. An
+                    Edit button returns to the page that owns the value. */}
+                <ReviewCard
+                  rows={[
+                    { label: "Guest", value: form.fullName || "—", step: 1 },
+                    {
+                      label: "Contact",
+                      value: [form.phone, form.email].filter(Boolean).join(" · ") || "—",
+                      step: 2,
+                    },
+                    {
+                      label: "ID",
+                      value:
+                        ID_TYPES.find((type) => type.value === form.idType)?.label ?? "Not chosen",
+                      step: 3,
+                    },
+                    {
+                      label: "Stay",
+                      value: `${prettyDate(form.checkIn)} → ${prettyDate(form.checkOut)} · ${
+                        form.guests || "—"
+                      } ${Number.parseInt(form.guests, 10) === 1 ? "guest" : "guests"}`,
+                      step: 4,
+                    },
+                    {
+                      label: "Emergency",
+                      value: form.emergencyName
+                        ? `${form.emergencyName}${
+                            form.emergencyRelationship ? ` (${form.emergencyRelationship})` : ""
+                          } · ${form.emergencyPhone || "no number"}`
+                        : "Not provided",
+                      step: 5,
+                    },
+                  ]}
+                  onEdit={jumpTo}
+                />
+
+                <details
+                  className="group overflow-hidden rounded-2xl border bg-white shadow-[0_1px_2px_rgba(30,36,43,0.05)] [&_summary::-webkit-details-marker]:hidden"
+                  style={{ borderColor: "#E8E2D8" }}
+                >
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 sm:px-6">
+                    <span
+                      className="font-display text-[17px] tracking-tight"
+                      style={{ color: "var(--color-ink)" }}
+                    >
+                      House rules &amp; terms
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-[#B5AE9F] transition-transform duration-200 group-open:rotate-180" />
+                  </summary>
+
+                  <div className="border-t px-5 pb-5 pt-4 sm:px-6" style={{ borderColor: "#F2EDE4" }}>
+                    {rules.length > 0 ? (
+                      <ul className="space-y-3">
+                        {rules.map((rule) => (
+                          <li
+                            key={rule.id}
+                            className="border-l pl-3"
+                            style={{ borderColor: "#C9A22766" }}
+                          >
+                            <span
+                              className="block text-[11px] font-semibold"
+                              style={{ color: "var(--color-ink)" }}
+                            >
+                              {rule.title}
+                            </span>
+                            {rule.body && (
+                              <span className="mt-0.5 block text-[11px] leading-relaxed text-[var(--color-muted)]">
+                                {rule.body}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-[11px] leading-relaxed text-[var(--color-muted)]">
+                        House rules are provided with your booking confirmation.
+                      </p>
+                    )}
+
+                    <p className="mt-4 text-[11px] leading-relaxed text-[var(--color-muted)]">
+                      The full{" "}
+                      <a
+                        href="/terms"
+                        className="underline underline-offset-4"
+                        style={{ color: "var(--color-accent)" }}
+                      >
+                        terms and conditions
+                      </a>{" "}
+                      apply to this stay.
+                    </p>
+                  </div>
+                </details>
+
+                <Section index={6} title="Guest declaration">
+                  <CheckRow
+                    checked={declaredAccurate}
+                    onChange={setDeclaredAccurate}
+                    label="I confirm that the information provided is accurate."
+                  />
+                  <CheckRow
+                    checked={acceptedRules}
+                    onChange={setAcceptedRules}
+                    label="I agree to abide by the property's house rules."
+                  />
+                </Section>
+              </>
+            )}
+          </div>
+
+          {error && (
+            <p
+              ref={errorRef}
+              aria-live="polite"
+              className="flex items-start gap-2 rounded-xl border p-3 text-[11.5px] leading-relaxed"
+              style={{ borderColor: "#E4C9BE", background: "#FBF1ED", color: "#8C3B28" }}
+            >
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
+            </p>
+          )}
+
+          <div className="flex items-center gap-2.5 pt-1">
+            {step > 1 && (
+              <button
+                type="button"
+                onClick={goBack}
+                className="inline-flex items-center gap-1.5 rounded-xl border bg-white/60 px-4 py-3.5 text-[12.5px] font-semibold transition-colors hover:bg-white"
+                style={{ borderColor: "#E8E2D8", color: "var(--color-accent)" }}
+              >
+                <ArrowLeft className="h-3.5 w-3.5" /> Back
+              </button>
+            )}
+
+            {isLast ? (
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className="cc-cta flex flex-1 items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[13px] font-semibold text-white shadow-[0_10px_24px_rgba(69,83,96,0.20)] transition-[background-color,box-shadow,transform] duration-200 hover:shadow-[0_14px_30px_rgba(69,83,96,0.26)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+                style={{ background: "var(--color-accent)" }}
+              >
+                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {submitting ? "Submitting…" : "Submit registration"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={goNext}
+                className="cc-cta flex flex-1 items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[13px] font-semibold text-white shadow-[0_10px_24px_rgba(69,83,96,0.20)] transition-[background-color,box-shadow,transform] duration-200 hover:shadow-[0_14px_30px_rgba(69,83,96,0.26)]"
+                style={{ background: "var(--color-accent)" }}
+              >
+                Continue <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {isLast && problem && (
+            <p
+              id="submit-hint"
+              aria-live="polite"
+              className="text-center text-[10.5px] leading-relaxed text-[#9A9284]"
+            >
+              {problem}
+            </p>
+          )}
+
+          <div className="flex items-center justify-between gap-3 pt-1 text-[10.5px]">
             {saveState === "saving" && (
               <span className="inline-flex items-center gap-1.5 text-[#9A9284]">
                 <Loader2 className="h-3 w-3 animate-spin" /> Saving…
@@ -931,52 +1122,87 @@ export default function VerifyForm({
             {saveState === "idle" && (
               <span className="text-[#B5AE9F]">Your details save automatically.</span>
             )}
-          </div>
-
-          {error && (
-            <p
-              ref={errorRef}
-              className="flex items-start gap-2 rounded-xl border p-3 text-[11.5px] leading-relaxed"
-              style={{ borderColor: "#E4C9BE", background: "#FBF1ED", color: "#8C3B28" }}
-            >
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            aria-describedby={problem ? "submit-hint" : undefined}
-            className="cc-cta flex w-full items-center justify-center gap-2 rounded-xl px-6 py-4 text-[13px] font-semibold tracking-[0.02em] text-white shadow-[0_10px_24px_rgba(69,83,96,0.20)] transition-[background-color,box-shadow,transform] duration-200 hover:shadow-[0_14px_30px_rgba(69,83,96,0.26)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-            style={{ background: "var(--color-accent)" }}
-          >
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {submitting ? "Submitting…" : "Submit registration"}
-          </button>
-
-          {problem && hasProgress && (
-            <p
-              id="submit-hint"
-              aria-live="polite"
-              className="text-center text-[10.5px] leading-relaxed text-[#9A9284]"
-            >
-              {problem}
-            </p>
-          )}
-
-          <div className="pb-2 text-center">
-            <div
-              className="mx-auto mb-3 h-px w-10"
-              style={{ background: "#C9A22766" }}
-              aria-hidden
-            />
-            <p className="text-[10.5px] leading-relaxed text-[#B5AE9F]">
-              Your details and ID picture are stored privately and used only to verify who is
-              staying.
-            </p>
+            {saveState === "error" && <span className="text-[#8C3B28]" />}
           </div>
         </form>
+
+        <div className="pb-2 pt-4 text-center">
+          <div className="mx-auto mb-3 h-px w-10" style={{ background: "#C9A22766" }} aria-hidden />
+          <p className="text-[10.5px] leading-relaxed text-[#B5AE9F]">
+            Your details and ID picture are stored privately and used only to verify who is
+            staying.
+          </p>
+        </div>
       </div>
     </main>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Presentational helpers that need the form's own handlers                   */
+/* -------------------------------------------------------------------------- */
+
+/** "1 Dec 2026", for the review page. Falls back to the raw value. */
+function prettyDate(value: string): string {
+  if (!value) return "—";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+/**
+ * The last page's summary. Deliberately read-only: the pencil is a jump back to
+ * the page that owns the field, so there is one place to edit each value and no
+ * duplicated validation.
+ */
+function ReviewCard({
+  rows,
+  onEdit,
+}: {
+  rows: { label: string; value: string; step: number }[];
+  onEdit: (step: number) => void;
+}) {
+  return (
+    <section
+      className="overflow-hidden rounded-2xl border bg-white shadow-[0_1px_2px_rgba(30,36,43,0.05)]"
+      style={{ borderColor: "#E8E2D8" }}
+    >
+      <div
+        className="flex items-baseline justify-between gap-3 border-b px-5 py-3.5 sm:px-6"
+        style={{ borderColor: "#F2EDE4" }}
+      >
+        <h2 className="font-display text-[17px] tracking-tight" style={{ color: "var(--color-ink)" }}>
+          Check your details
+        </h2>
+        <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#B5AE9F]">
+          Before you submit
+        </span>
+      </div>
+
+      <dl className="divide-y" style={{ borderColor: "#F5F1EA" }}>
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-start gap-3 px-5 py-2.5 sm:px-6">
+            <dt className="w-[68px] shrink-0 pt-0.5 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[#B5AE9F]">
+              {row.label}
+            </dt>
+            <dd className="min-w-0 flex-1 text-[12px] leading-relaxed text-[#3A3A3A]">
+              {row.value}
+            </dd>
+            <button
+              type="button"
+              onClick={() => onEdit(row.step)}
+              className="shrink-0 text-[10.5px] font-semibold underline underline-offset-4"
+              style={{ color: "var(--color-accent)" }}
+            >
+              Edit
+            </button>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }

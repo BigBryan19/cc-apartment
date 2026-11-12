@@ -52,6 +52,16 @@ export function VerifyStyles() {
       }
       .cc-cta:hover:not(:disabled) { background: var(--color-accent-deep) !important; }
       .cc-cta:active:not(:disabled) { transform: translateY(1px); }
+      /* Each wizard page enters the same way, so the change of page reads as
+         movement rather than as the content being swapped underneath them. */
+      @keyframes cc-step-in {
+        from { opacity: 0; transform: translateY(7px); }
+        to   { opacity: 1; transform: none; }
+      }
+      .cc-step { animation: cc-step-in .26s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+      @media (prefers-reduced-motion: reduce) {
+        .cc-step { animation: none; }
+      }
     `}</style>
   );
 }
@@ -79,6 +89,7 @@ export function Section({
   description,
   optional,
   complete,
+  headingRef,
   children,
 }: {
   index: number;
@@ -86,6 +97,8 @@ export function Section({
   description?: string;
   optional?: boolean;
   complete?: boolean;
+  /** Set when this heading is the page's focus target after a step change. */
+  headingRef?: React.RefObject<HTMLHeadingElement | null>;
   children: React.ReactNode;
 }) {
   return (
@@ -105,7 +118,9 @@ export function Section({
 
         <div className="min-w-0 flex-1">
           <h2
-            className="flex flex-wrap items-baseline gap-2 font-display text-[19px] leading-tight tracking-tight"
+            ref={headingRef}
+            tabIndex={headingRef ? -1 : undefined}
+            className="flex flex-wrap items-baseline gap-2 font-display text-[19px] leading-tight tracking-tight outline-none"
             style={{ color: INK }}
           >
             {title}
