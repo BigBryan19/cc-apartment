@@ -279,12 +279,19 @@ export function IdUpload({
   inputRef,
   preview,
   uploading,
+  hasStored,
   onSelect,
   onClear,
 }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
   preview: string | null;
   uploading: boolean;
+  /**
+   * A picture was uploaded earlier and its path survived a reload, but there is
+   * no local copy to preview. Without this the guest would be shown an empty
+   * dropzone for a file that is already attached.
+   */
+  hasStored?: boolean;
   onSelect: (file: File | null) => void;
   onClear: () => void;
 }) {
@@ -350,6 +357,38 @@ export function IdUpload({
                 <Trash2 className="h-3.5 w-3.5" /> Remove
               </button>
             </div>
+          </div>
+        </div>
+      ) : hasStored ? (
+        <div
+          className="flex items-center justify-between gap-3 rounded-xl border px-4 py-3"
+          style={{ borderColor: HAIRLINE, background: "#FDFBF8" }}
+        >
+          <span className="inline-flex items-center gap-2 text-[11.5px] font-medium" style={{ color: INK }}>
+            <span
+              className="grid h-6 w-6 place-items-center rounded-full"
+              style={{ background: "#F5EEDF" }}
+            >
+              <Check className="h-3.5 w-3.5" style={{ color: "#A88B2A" }} />
+            </span>
+            ID picture uploaded earlier
+          </span>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="text-[11px] font-medium underline underline-offset-4"
+              style={{ color: ACCENT }}
+            >
+              Replace
+            </button>
+            <button
+              type="button"
+              onClick={onClear}
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-[#A8A090] transition-colors hover:text-[#8C3B28]"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Remove
+            </button>
           </div>
         </div>
       ) : (

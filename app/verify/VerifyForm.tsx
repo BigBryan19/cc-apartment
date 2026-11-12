@@ -85,6 +85,73 @@ const STEPS = [
 const STEP_NUMBERS = [1, 2, 3, 4, 5, 6];
 const LAST_STEP = 6;
 
+/**
+ * The draft the guest is working on, kept on their own device.
+ *
+ * Two reasons this exists rather than relying on the database row:
+ *
+ *   1. A reload, a dead battery or a phone that locks mid-form should not cost
+ *      the guest their typing. localStorage survives all three; a React state
+ *      tree does not.
+ *   2. The row in Supabase is only as reliable as the network. The draft is not.
+ *
+ * It is deliberately mirrored, not merged: the database is still the record of
+ * truth for staff, and this is only ever read back by the same browser. It is
+ * cleared when the guest submits — never before, and never on a step change.
+ */
+const DRAFT_KEY = "cc.verify.draft.v1";
+const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const DRAFT_DEBOUNCE_MS = 400;
+
+type Draft = {
+  version: 1;
+  sessionId: string;
+  form: GuestForm;
+  step: number;
+  declaredAccurate: boolean;
+  acceptedRules: boolean;
+  idPath: string | null;
+  selfiePath: string | null;
+  savedAt: number;
+};
+
+function readDraft(): Draft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as Draft;
+    if (draft?.version !== 1 || !draft.form) return null;
+    if (Date.now() - (draft.savedAt ?? 0) > DRAFT_MAX_AGE_MS) {
+      window.localStorage.removeItem(DRAFT_KEY);
+      return null;
+    }
+    return draft;
+  } catch {
+    // Private mode, a full quota, or a half-written value: none of these are
+    // worth breaking the form over.
+    return null;
+  }
+}
+
+function writeDraft(draft: Draft): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // Ignore. The database save is still attempted independently.
+  }
+}
+
+function clearDraft(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // Ignore.
+  }
+}
+
 type SaveState = "idle" | "saving" | "saved" | "error";
 type IdType = "" | "ghana_card" | "passport" | "drivers_licence";
 
@@ -167,8 +234,11 @@ export default function VerifyForm() {
   /**
    * One id per visit. The row is keyed on it, so the debounced auto-save
    * updates the same record instead of creating a guest on every pause.
+   *
+   * Restored from the local draft when there is one, so a reload continues the
+   * same row instead of leaving an abandoned draft behind and starting another.
    */
-  const [sessionId] = useState(() =>
+  const [sessionId, setSessionId] = useState(() =>
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : `v-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -184,6 +254,9 @@ export default function VerifyForm() {
 
   /** Which page of the wizard is showing. 1-based, matching STEPS. */
   const [step, setStep] = useState(1);
+
+  /** When a draft was restored, so the page can say so and offer a reset. */
+  const [restoredAt, setRestoredAt] = useState<number | null>(null);
 
 
   /* ---------------- identification ---------------- */
@@ -305,6 +378,56 @@ export default function VerifyForm() {
   }, []);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
+
+  /**
+   * Attach the stream once the <video> is actually on the page.
+   *
+   * The element is only rendered while the card is in its ready state, so
+   * assigning `srcObject` inside startCamera ran while there was still nothing
+   * to assign it to: permission granted, frames flowing, and a black rectangle
+   * on screen — which reads as "the camera doesn't work". Re-attaching after
+   * every state change is harmless and also covers "Try again".
+   */
+  useEffect(() => {
+    if (cameraState !== "ready") return;
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream) return;
+    if (video.srcObject !== stream) video.srcObject = stream;
+    void video.play().catch(() => {});
+  }, [cameraState]);
+
+  /* ---------------- draft on this device ---------------- */
+
+  /**
+   * Restore after mount, never during render.
+   *
+   * Reading localStorage in a useState initialiser would make the server's HTML
+   * (empty fields) disagree with the browser's first render (filled fields) and
+   * trigger a hydration mismatch, so the read has to happen once the page is
+   * live. That is exactly the case this rule is meant to catch, and exactly the
+   * case it must allow.
+   */
+  useEffect(() => {
+    const draft = readDraft();
+    if (!draft) return;
+
+    /* eslint-disable react-hooks/set-state-in-effect --
+       A one-time read from this device's storage. The rule assumes state can be
+       derived during render, which is not true here: the server has no
+       localStorage, so restoring during render would emit markup that disagrees
+       with the browser's first paint and trip hydration. This effect is the
+       documented place for a sync from an external system. */
+    setSessionId(draft.sessionId);
+    setForm({ ...EMPTY_FORM, ...draft.form });
+    setDeclaredAccurate(Boolean(draft.declaredAccurate));
+    setAcceptedRules(Boolean(draft.acceptedRules));
+    setIdPath(draft.idPath);
+    setSelfiePath(draft.selfiePath);
+    setStep(Math.min(LAST_STEP, Math.max(1, draft.step || 1)));
+    setRestoredAt(draft.savedAt);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   /* ---------------- storage ---------------- */
 
@@ -445,7 +568,7 @@ export default function VerifyForm() {
         );
 
       if (writeError) {
-        setError(writeError.message);
+        setError(describeSaveError(writeError.message));
         setSaveState("error");
         return;
       }
@@ -460,6 +583,28 @@ export default function VerifyForm() {
     Boolean(form.fullName.trim()) ||
     Boolean(form.phone.trim()) ||
     Boolean(idPath);
+
+  // The local draft, written on a shorter fuse than the database: it is cheap,
+  // synchronous and must not be lost to a refresh.
+  useEffect(() => {
+    if (done || !hasProgress) return;
+
+    const timer = setTimeout(() => {
+      writeDraft({
+        version: 1,
+        sessionId,
+        form,
+        step,
+        declaredAccurate,
+        acceptedRules,
+        idPath,
+        selfiePath,
+        savedAt: Date.now(),
+      });
+    }, DRAFT_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [form, step, declaredAccurate, acceptedRules, idPath, selfiePath, sessionId, done, hasProgress]);
 
   useEffect(() => {
     if (done || !hasProgress) return;
@@ -565,6 +710,22 @@ export default function VerifyForm() {
     setStep((value) => Math.max(1, value - 1));
   }
 
+  /** A shared kiosk must not hand the next guest the previous one's details. */
+  function startOver() {
+    clearDraft();
+    setForm(EMPTY_FORM);
+    setDeclaredAccurate(false);
+    setAcceptedRules(false);
+    setIdPath(null);
+    setSelfiePath(null);
+    setIdPreview(null);
+    setSelfie(null);
+    setPhotoConsent(false);
+    setRestoredAt(null);
+    setStep(1);
+    setError("");
+  }
+
   function jumpTo(target: number) {
     setError("");
     setStep(target);
@@ -599,6 +760,8 @@ export default function VerifyForm() {
 
     setSubmitting(false);
     setDone(true);
+    // The one and only place the draft is discarded.
+    clearDraft();
     // Kiosk hand-off: the guest is returned to the site, not left on a dead end.
     setTimeout(() => router.replace("/"), 1400);
   }
@@ -776,6 +939,25 @@ export default function VerifyForm() {
           </div>
         )}
 
+        {restoredAt && (
+          <div
+            className="mb-4 flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5"
+            style={{ borderColor: "#E8E2D8", background: "#FDFBF8" }}
+          >
+            <p className="text-[11.5px] leading-relaxed text-[#7A7264]">
+              We kept the details entered earlier on this device.
+            </p>
+            <button
+              type="button"
+              onClick={startOver}
+              className="shrink-0 text-[11px] font-semibold underline underline-offset-4"
+              style={{ color: "var(--color-accent)" }}
+            >
+              Start over
+            </button>
+          </div>
+        )}
+
         <form onSubmit={onSubmit} className="space-y-4">
           {/* Keyed on the step so React remounts the page and the entry
               animation replays — the only reason a key is ever needed here. */}
@@ -865,6 +1047,7 @@ export default function VerifyForm() {
                     inputRef={idInputRef}
                     preview={idPreview}
                     uploading={idUploading}
+                    hasStored={Boolean(idPath) && !idPreview}
                     onSelect={(file) => void acceptIdFile(file)}
                     onClear={clearIdFile}
                   />
@@ -1247,4 +1430,21 @@ function describeCameraFailure(error: unknown): string {
     default:
       return "The camera could not be started on this device. You can skip this step — your ID picture is enough.";
   }
+}
+
+/**
+ * The database speaks to a developer; the screen speaks to a guest at a gate.
+ * These are the failures we have actually seen, mapped to something honest.
+ */
+function describeSaveError(message: string): string {
+  if (/row-level security|permission denied/i.test(message)) {
+    return "We could not save this yet — registration is not switched on for the site. Please see the manager; your details are still on this device.";
+  }
+  if (/column .* does not exist|schema cache/i.test(message)) {
+    return "We could not save this yet — the database is missing a field. Please see the manager; your details are still on this device.";
+  }
+  if (/failed to fetch|network/i.test(message)) {
+    return "No connection to the server. Your details are saved on this device — try again when you have signal.";
+  }
+  return `We could not save this yet: ${message}`;
 }
