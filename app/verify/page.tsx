@@ -29,6 +29,7 @@ import {
   Camera,
   CameraOff,
   Check,
+  ChevronDown,
   Loader2,
   Lock,
   RefreshCw,
@@ -45,6 +46,9 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 type CameraState = "starting" | "ready" | "denied" | "unsupported";
 
 interface GuestForm {
+  /** The reservation this check-in belongs to. Required — it is how the record
+   *  is reconciled with the booking. */
+  reference: string;
   name: string;
   contact: string;
   email: string;
@@ -70,7 +74,12 @@ export default function VerifyPage() {
       : `v-${Date.now()}-${Math.random().toString(16).slice(2)}`,
   );
 
-  const [form, setForm] = useState<GuestForm>({ name: "", contact: "", email: "" });
+  const [form, setForm] = useState<GuestForm>({
+    reference: "",
+    name: "",
+    contact: "",
+    email: "",
+  });
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -149,7 +158,7 @@ export default function VerifyPage() {
   const save = useCallback(
     async (record: GuestForm, path: string | null, finalise = false) => {
       if (!configured) return;
-      if (!record.name.trim() && !record.contact.trim()) return;
+      if (!record.reference.trim() && !record.name.trim() && !record.contact.trim()) return;
 
       setSaveState("saving");
       const { error: writeError } = await createClient()
@@ -157,6 +166,7 @@ export default function VerifyPage() {
         .upsert(
           {
             session_id: sessionId,
+            booking_reference: record.reference.trim() || null,
             full_name: record.name.trim() || null,
             contact_number: record.contact.trim() || null,
             email: record.email.trim() || null,
@@ -180,7 +190,7 @@ export default function VerifyPage() {
 
   useEffect(() => {
     if (done) return;
-    if (!form.name.trim() && !form.contact.trim()) return;
+    if (!form.reference.trim() && !form.name.trim() && !form.contact.trim()) return;
 
     const timer = setTimeout(() => void save(form, photoPath), AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timer);
@@ -241,6 +251,7 @@ export default function VerifyPage() {
 
   const canSubmit =
     cameraReady &&
+    Boolean(form.reference.trim()) &&
     Boolean(form.name.trim()) &&
     Boolean(form.contact.trim()) &&
     photoConsent &&
@@ -251,7 +262,9 @@ export default function VerifyPage() {
     event.preventDefault();
     setError("");
 
-    if (!cameraReady) return setError("Allow camera access to continue.");
+    if (!cameraReady) return setError("Please allow camera access to continue.");
+    if (!form.reference.trim())
+      return setError("Please enter the booking reference from your confirmation.");
     if (!form.name.trim()) return setError("Please enter your full name.");
     if (!form.contact.trim()) return setError("Please enter a contact number.");
     if (!photoConsent) return setError("Please agree to the verification photo.");
@@ -379,33 +392,39 @@ export default function VerifyPage() {
             )}
           </div>
 
-          {/* Blocked state: a real instruction, not a shrug. */}
+          {/* Blocked state. Calm, factual, and easy to act on: the guest is
+              already doing us a favour by checking in this way. */}
           {blocked && (
-            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
-              <p className="flex items-center gap-2 text-sm font-semibold text-red-900">
-                <AlertCircle className="h-4 w-4" /> Camera access is required
+            <div className="mt-4 rounded-2xl border border-stone-200 bg-slate-50 p-4">
+              <p className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <CameraOff className="h-4 w-4 text-slate-400" /> Camera access needed
               </p>
-              <p className="mt-2 text-xs leading-relaxed text-red-800">
+              <p className="mt-2 text-xs leading-relaxed text-slate-600">
                 {cameraState === "unsupported"
-                  ? "This browser cannot use a camera. Open this page in Chrome or Safari on a phone or laptop with a camera."
-                  : "You must allow the camera before you can continue."}
+                  ? "This browser can't use a camera. Opening the page in Chrome or Safari on a phone or laptop with a camera will let you finish check-in."
+                  : "To complete your check-in, please allow the camera: click the lock icon in your address bar, set Camera to \u201cAllow\u201d, then reload this page."}
               </p>
               {cameraState === "denied" && (
-                <ol className="mt-3 space-y-1.5 text-xs leading-relaxed text-red-800">
+                <ol className="mt-3 space-y-1.5 text-xs leading-relaxed text-slate-600">
                   <li className="flex gap-2">
-                    <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    Click the <strong className="font-semibold">lock icon</strong> (or the camera
-                    icon) in your browser&apos;s address bar.
+                    <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <span>
+                      Tap the <strong className="font-medium text-slate-700">lock icon</strong>{" "}
+                      beside the web address.
+                    </span>
                   </li>
-                  <li>2. Set <strong className="font-semibold">Camera</strong> to “Allow”.</li>
-                  <li>3. Reload this page, or press the button below.</li>
+                  <li>
+                    2. Choose{" "}
+                    <strong className="font-medium text-slate-700">Camera</strong> and allow it.
+                  </li>
+                  <li>3. Reload, or press the button below.</li>
                 </ol>
               )}
               {cameraState === "denied" && (
                 <button
                   type="button"
                   onClick={() => void startCamera()}
-                  className="mt-4 inline-flex items-center gap-2 rounded-full bg-red-900 px-4 py-2 text-xs font-semibold text-white"
+                  className="mt-4 inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
                 >
                   <RefreshCw className="h-3.5 w-3.5" /> Try the camera again
                 </button>
@@ -460,6 +479,14 @@ export default function VerifyPage() {
           >
             <div className="space-y-4">
               <Field
+                label="Booking reference"
+                required
+                value={form.reference}
+                onChange={(value) => setForm((prev) => ({ ...prev, reference: value }))}
+                placeholder="From your confirmation, e.g. CC-1042"
+                autoComplete="off"
+              />
+              <Field
                 label="Full name"
                 required
                 value={form.name}
@@ -503,24 +530,50 @@ export default function VerifyPage() {
             </div>
           </section>
 
-          {/* House rules — from the database, editable in Admin. */}
-          {rules.length > 0 && (
-            <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-              <h2 className="text-sm font-semibold text-stone-900">House rules</h2>
-              <ul className="mt-4 space-y-3">
-                {rules.map((rule) => (
-                  <li key={rule.id} className="border-l-2 border-stone-200 pl-3">
-                    <span className="block text-xs font-semibold text-stone-800">{rule.title}</span>
-                    {rule.body && (
-                      <span className="mt-0.5 block text-xs leading-relaxed text-stone-600">
-                        {rule.body}
+          {/*
+            House rules and terms, folded away.
+
+            A native <details> rather than a scripted accordion: it opens without
+            JavaScript, is keyboard accessible by default, and keeps the page short
+            for someone checking in on a phone at the airport.
+          */}
+          <details className="group rounded-3xl border border-stone-200 bg-white shadow-sm [&_summary::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-6 text-sm font-semibold text-stone-900">
+              View House Rules &amp; Terms
+              <ChevronDown className="h-4 w-4 text-stone-400 transition-transform duration-200 group-open:rotate-180" />
+            </summary>
+
+            <div className="border-t border-stone-100 px-6 pb-6 pt-5">
+              {rules.length > 0 ? (
+                <ul className="space-y-3">
+                  {rules.map((rule) => (
+                    <li key={rule.id} className="border-l-2 border-stone-200 pl-3">
+                      <span className="block text-xs font-semibold text-stone-800">
+                        {rule.title}
                       </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+                      {rule.body && (
+                        <span className="mt-0.5 block text-xs leading-relaxed text-stone-600">
+                          {rule.body}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs leading-relaxed text-stone-500">
+                  House rules are provided with your booking confirmation.
+                </p>
+              )}
+
+              <p className="mt-5 text-xs leading-relaxed text-stone-500">
+                By filling this form you accept our{" "}
+                <a href="/terms" className="underline underline-offset-4">
+                  terms and conditions
+                </a>{" "}
+                and the house rules above.
+              </p>
+            </div>
+          </details>
 
           <label className="flex items-start gap-3 rounded-2xl border border-stone-200 bg-white p-4 text-xs leading-relaxed text-stone-700">
             <input

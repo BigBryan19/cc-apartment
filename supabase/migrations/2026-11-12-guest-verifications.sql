@@ -25,6 +25,7 @@ create extension if not exists "pgcrypto";
 create table if not exists public.guest_verifications (
   id uuid primary key default gen_random_uuid(),
   session_id text not null unique,
+  booking_reference text,
   full_name text,
   contact_number text,
   email text,
@@ -35,6 +36,12 @@ create table if not exists public.guest_verifications (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.guest_verifications
+  add column if not exists booking_reference text;
+
+create index if not exists guest_verifications_reference_idx
+  on public.guest_verifications (booking_reference);
 
 create index if not exists guest_verifications_status_idx
   on public.guest_verifications (status, created_at desc);
