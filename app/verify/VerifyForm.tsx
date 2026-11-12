@@ -42,22 +42,18 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  AlertCircle,
-  Camera,
-  CameraOff,
-  Check,
-  ChevronDown,
-  IdCard,
-  Loader2,
-  Lock,
-  RefreshCw,
-  ShieldCheck,
-  Trash2,
-  Upload,
-  Users,
-} from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "../utils/supabase";
+import {
+  CheckRow,
+  Field,
+  IdUpload,
+  Section,
+  SelectField,
+  SelfieCard,
+  VerifyStyles,
+  type CameraState,
+} from "./ui";
 
 const TABLE = "guest_verifications";
 const BUCKET = "verifications";
@@ -66,10 +62,10 @@ const AUTOSAVE_DELAY_MS = 1500;
 /** Phone cameras produce large files; 8 MB accepts a full-resolution photo. */
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const MAX_GUESTS = 40;
+/** Sections that count toward the progress rail. Section 5 is optional. */
+const REQUIRED_SECTIONS = 5;
 
 type SaveState = "idle" | "saving" | "saved" | "error";
-/** `idle` means the camera has not been asked for yet — it is opt-in. */
-type CameraState = "idle" | "starting" | "ready" | "denied" | "unsupported";
 type IdType = "" | "ghana_card" | "passport" | "drivers_licence";
 
 /** The three documents accepted at the gate. */
@@ -501,22 +497,66 @@ export default function VerifyForm({
     setTimeout(() => router.replace("/"), 1400);
   }
 
+  /* ---------------- progress ---------------- */
+
+  /**
+   * Per-section completion, from the same predicates the submit check uses.
+   * One source of truth: a section cannot show a tick while its fields would
+   * still block submission.
+   */
+  const sectionDone = {
+    personal: Boolean(form.fullName.trim()),
+    contact:
+      isPlausiblePhone(form.phone) &&
+      isPlausiblePhone(form.whatsapp) &&
+      isPlausibleEmail(form.email),
+    identification: Boolean(form.idType) && Boolean(idPath ?? idFile),
+    booking:
+      Boolean(form.reference.trim()) &&
+      Boolean(form.checkIn) &&
+      Boolean(form.checkOut) &&
+      form.checkOut >= form.checkIn &&
+      Number.parseInt(form.guests, 10) >= 1,
+  };
+
+  const completedSections = [
+    sectionDone.personal,
+    sectionDone.contact,
+    sectionDone.identification,
+    sectionDone.booking,
+    declaredAccurate && acceptedRules,
+  ].filter(Boolean).length;
+
   /* ---------------- views ---------------- */
 
   if (done) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-stone-50 px-5">
-        <div className="w-full max-w-md rounded-3xl border border-stone-200 bg-white p-10 text-center shadow-sm">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
-            <Check className="h-7 w-7 text-emerald-600" />
+      <main
+        className="flex min-h-screen items-center justify-center px-5"
+        style={{ background: "var(--color-canvas-warm)" }}
+      >
+        <div
+          className="w-full max-w-sm rounded-2xl border bg-white p-9 text-center shadow-[0_12px_40px_rgba(30,36,43,0.08)]"
+          style={{ borderColor: "#E8E2D8" }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/cc-real.png" alt="Cosy Crest" className="mx-auto h-10 w-auto opacity-90" />
+          <div
+            className="mx-auto mt-6 flex h-12 w-12 items-center justify-center rounded-full"
+            style={{ background: "var(--color-accent)" }}
+          >
+            <Check className="h-6 w-6 text-white" />
           </div>
-          <h1 className="mt-6 font-display text-2xl tracking-tight text-stone-900">
+          <h1
+            className="mt-5 font-display text-2xl tracking-tight"
+            style={{ color: "var(--color-ink)" }}
+          >
             Registered — thank you
           </h1>
-          <p className="mt-3 text-sm leading-relaxed text-stone-600">
+          <p className="mt-2.5 text-[13px] leading-relaxed text-[var(--color-muted)]">
             Your details are with us. Taking you back to Cosy Crest…
           </p>
-          <p className="mt-6 inline-flex items-center gap-1.5 text-xs text-stone-500">
+          <p className="mt-6 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#B5AE9F]">
             <Loader2 className="h-3 w-3 animate-spin" /> Redirecting
           </p>
         </div>
@@ -525,31 +565,110 @@ export default function VerifyForm({
   }
 
   return (
-    <main className="min-h-screen bg-stone-50 px-5 py-10">
-      <div className="mx-auto max-w-lg">
-        {/* Welcome. No navigation, no exit — this is a required step. */}
-        <header className="mb-7">
-          <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 ring-1 ring-stone-200">
-            <ShieldCheck className="h-3.5 w-3.5" /> Required for access
+    <main className="min-h-screen" style={{ background: "var(--color-canvas-warm)" }}>
+      <VerifyStyles />
+      {/* The property, not a form. The photograph is the first thing a guest
+          sees at the gate, and it says "you have arrived" better than copy.
+          Text sits on a bottom-heavy scrim so it stays legible whatever part
+          of the frame is behind it. */}
+      <header className="relative isolate flex min-h-[320px] items-end overflow-hidden sm:min-h-[360px]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/Adenta4.jpg"
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full object-cover object-[50%_45%]"
+        />
+        {/* Two scrims, one per shape of the screen. A phone shows the band as a
+            wide, short strip with type across the full width, so it needs a
+            vertical wash; a desktop keeps the room visible to the right and
+            only darkens the left, where the type sits. */}
+        <div
+          className="absolute inset-0 md:hidden"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(18,22,26,0.62) 0%, rgba(18,22,26,0.72) 55%, rgba(18,22,26,0.92) 100%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 hidden md:block"
+          style={{
+            background:
+              "linear-gradient(100deg, rgba(18,22,26,0.94) 0%, rgba(18,22,26,0.86) 30%, rgba(18,22,26,0.55) 58%, rgba(18,22,26,0.22) 82%, rgba(18,22,26,0.10) 100%)",
+          }}
+        />
+        {/* Brass hairline where the photograph meets the page. */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-px"
+          style={{ background: "linear-gradient(90deg, transparent, #C9A227, transparent)" }}
+          aria-hidden
+        />
+
+        <div className="relative mx-auto w-full max-w-lg px-5 pb-7 pt-6">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/cc-horinzontal.png"
+            alt="Cosy Crest Apartments"
+            className="h-8 w-auto self-start drop-shadow-[0_1px_6px_rgba(0,0,0,0.45)]"
+          />
+
+          <span className="mt-8 inline-flex w-fit items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-white/90 backdrop-blur">
+            <ShieldCheck className="h-3 w-3" /> Required for access
           </span>
-          <h1 className="mt-4 font-display text-3xl tracking-tight text-stone-900">
+
+          <h1 className="mt-3 font-display text-[34px] leading-[1.08] tracking-tight text-white drop-shadow-sm">
             Guest registration
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-stone-600">
-            We need these details and a picture of your ID before we can hand over the keys. It
-            takes about a minute, and it means no paperwork at the gate.
+          <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-white/80">
+            A picture of your ID and a few details, and the keys are yours. About a minute.
           </p>
-        </header>
+
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {["Photo ID", "About a minute", "No paperwork at the gate"].map((chip) => (
+              <span
+                key={chip}
+                className="rounded-full border border-white/20 bg-black/20 px-2.5 py-1 text-[10px] font-medium text-white/85 backdrop-blur-sm"
+              >
+                {chip}
+              </span>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-lg px-5 pb-14">
+        {/* Progress rail. Pinned while scrolling: a six-section form on a phone
+            is long, and a guest who cannot see the end of it abandons it. */}
+        <div
+          className="sticky top-0 z-20 -mx-5 mb-4 flex items-center gap-3 px-5 py-3 backdrop-blur"
+          style={{ background: "rgba(251,249,246,0.92)", boxShadow: "0 1px 0 #E8E2D8" }}
+        >
+          <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-[#E9E2D6]">
+            <div
+              className="h-full rounded-full transition-[width] duration-500 ease-out"
+              style={{
+                width: `${(completedSections / REQUIRED_SECTIONS) * 100}%`,
+                background: "var(--color-accent)",
+              }}
+            />
+          </div>
+          <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[#9A9284]">
+            {completedSections} of {REQUIRED_SECTIONS} complete
+          </span>
+        </div>
 
         {!configured && (
-          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div
+            className="mb-4 rounded-xl border p-3.5 text-[12px] leading-relaxed"
+            style={{ borderColor: "#E8DCC0", background: "#FBF6E9", color: "#7A6520" }}
+          >
             This form is not connected to the database yet. Nothing you enter will be saved.
           </div>
         )}
 
-        <form onSubmit={onSubmit} className="space-y-5">
+        <form onSubmit={onSubmit} className="space-y-4">
           {/* 1 — Personal information */}
-          <Section index={1} title="Personal information">
+          <Section index={1} title="Personal information" complete={sectionDone.personal}>
             <Field
               label="Full name"
               required
@@ -565,6 +684,7 @@ export default function VerifyForm({
             index={2}
             title="Contact information"
             description="We use these only to reach you about this stay."
+            complete={sectionDone.contact}
           >
             <Field
               label="Phone number"
@@ -600,6 +720,7 @@ export default function VerifyForm({
           <Section
             index={3}
             title="Identification"
+            complete={sectionDone.identification}
             description="Choose the document you are presenting, then photograph it. Make sure the whole card is in frame and the text is readable."
           >
             <SelectField
@@ -638,7 +759,7 @@ export default function VerifyForm({
           />
 
           {/* 4 — Booking details */}
-          <Section index={4} title="Booking details">
+          <Section index={4} title="Booking details" complete={sectionDone.booking}>
             <div>
               <Field
                 label="Booking reference"
@@ -726,22 +847,33 @@ export default function VerifyForm({
               accordion: it opens without JavaScript, is keyboard accessible by
               default, and keeps the page short for someone checking in at the
               airport. */}
-          <details className="group rounded-3xl border border-stone-200 bg-white shadow-sm [&_summary::-webkit-details-marker]:hidden">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-6 text-sm font-semibold text-stone-900">
-              Read the house rules &amp; terms
-              <ChevronDown className="h-4 w-4 text-stone-400 transition-transform duration-200 group-open:rotate-180" />
+          <details
+            className="group overflow-hidden rounded-2xl border bg-white shadow-[0_1px_2px_rgba(30,36,43,0.05)] [&_summary::-webkit-details-marker]:hidden"
+            style={{ borderColor: "#E8E2D8" }}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 sm:px-6">
+              <span
+                className="font-display text-[17px] tracking-tight"
+                style={{ color: "var(--color-ink)" }}
+              >
+                House rules &amp; terms
+              </span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-[#B5AE9F] transition-transform duration-200 group-open:rotate-180" />
             </summary>
 
-            <div className="border-t border-stone-100 px-6 pb-6 pt-5">
+            <div className="border-t px-5 pb-5 pt-4 sm:px-6" style={{ borderColor: "#F2EDE4" }}>
               {rules.length > 0 ? (
                 <ul className="space-y-3">
                   {rules.map((rule) => (
-                    <li key={rule.id} className="border-l-2 border-stone-200 pl-3">
-                      <span className="block text-xs font-semibold text-stone-800">
+                    <li key={rule.id} className="border-l pl-3" style={{ borderColor: "#C9A22766" }}>
+                      <span
+                        className="block text-[11px] font-semibold"
+                        style={{ color: "var(--color-ink)" }}
+                      >
                         {rule.title}
                       </span>
                       {rule.body && (
-                        <span className="mt-0.5 block text-xs leading-relaxed text-stone-600">
+                        <span className="mt-0.5 block text-[11px] leading-relaxed text-[var(--color-muted)]">
                           {rule.body}
                         </span>
                       )}
@@ -749,14 +881,18 @@ export default function VerifyForm({
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs leading-relaxed text-stone-500">
+                <p className="text-[11px] leading-relaxed text-[var(--color-muted)]">
                   House rules are provided with your booking confirmation.
                 </p>
               )}
 
-              <p className="mt-5 text-xs leading-relaxed text-stone-500">
+              <p className="mt-4 text-[11px] leading-relaxed text-[var(--color-muted)]">
                 The full{" "}
-                <a href="/terms" className="underline underline-offset-4">
+                <a
+                  href="/terms"
+                  className="underline underline-offset-4"
+                  style={{ color: "var(--color-accent)" }}
+                >
                   terms and conditions
                 </a>{" "}
                 apply to this stay.
@@ -765,7 +901,7 @@ export default function VerifyForm({
           </details>
 
           {/* 6 — Declaration */}
-          <Section index={6} title="Guest declaration">
+          <Section index={6} title="Guest declaration" complete={declaredAccurate && acceptedRules}>
             <CheckRow
               checked={declaredAccurate}
               onChange={setDeclaredAccurate}
@@ -778,26 +914,30 @@ export default function VerifyForm({
             />
           </Section>
 
-          <div className="flex items-center gap-2 text-[11px]">
+          <div className="flex items-center justify-center gap-2 pt-1 text-[10.5px]">
             {saveState === "saving" && (
-              <span className="inline-flex items-center gap-1.5 text-stone-500">
+              <span className="inline-flex items-center gap-1.5 text-[#9A9284]">
                 <Loader2 className="h-3 w-3 animate-spin" /> Saving…
               </span>
             )}
             {saveState === "saved" && (
-              <span className="inline-flex items-center gap-1.5 text-emerald-700">
+              <span
+                className="inline-flex items-center gap-1.5 font-medium"
+                style={{ color: "var(--color-accent)" }}
+              >
                 <Check className="h-3 w-3" /> Saved
               </span>
             )}
             {saveState === "idle" && (
-              <span className="text-stone-400">Your details save automatically.</span>
+              <span className="text-[#B5AE9F]">Your details save automatically.</span>
             )}
           </div>
 
           {error && (
             <p
               ref={errorRef}
-              className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-xs leading-relaxed text-red-800"
+              className="flex items-start gap-2 rounded-xl border p-3 text-[11.5px] leading-relaxed"
+              style={{ borderColor: "#E4C9BE", background: "#FBF1ED", color: "#8C3B28" }}
             >
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
             </p>
@@ -807,7 +947,8 @@ export default function VerifyForm({
             type="submit"
             disabled={!canSubmit}
             aria-describedby={problem ? "submit-hint" : undefined}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-stone-900 px-6 py-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="cc-cta flex w-full items-center justify-center gap-2 rounded-xl px-6 py-4 text-[13px] font-semibold tracking-[0.02em] text-white shadow-[0_10px_24px_rgba(69,83,96,0.20)] transition-[background-color,box-shadow,transform] duration-200 hover:shadow-[0_14px_30px_rgba(69,83,96,0.26)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+            style={{ background: "var(--color-accent)" }}
           >
             {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {submitting ? "Submitting…" : "Submit registration"}
@@ -817,418 +958,25 @@ export default function VerifyForm({
             <p
               id="submit-hint"
               aria-live="polite"
-              className="text-center text-[11px] leading-relaxed text-stone-500"
+              className="text-center text-[10.5px] leading-relaxed text-[#9A9284]"
             >
               {problem}
             </p>
           )}
 
-          <p className="pb-4 text-center text-[11px] leading-relaxed text-stone-500">
-            Your details and ID picture are stored privately and used only to verify who is
-            staying.
-          </p>
+          <div className="pb-2 text-center">
+            <div
+              className="mx-auto mb-3 h-px w-10"
+              style={{ background: "#C9A22766" }}
+              aria-hidden
+            />
+            <p className="text-[10.5px] leading-relaxed text-[#B5AE9F]">
+              Your details and ID picture are stored privately and used only to verify who is
+              staying.
+            </p>
+          </div>
         </form>
       </div>
     </main>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Presentational pieces                                                      */
-/* -------------------------------------------------------------------------- */
-
-/**
- * A numbered card. The number is not decoration: guests arrive with a
- * confirmation email that lists the same sections, and staff ask for "section
- * three" at the gate.
- */
-function Section({
-  index,
-  title,
-  description,
-  optional,
-  children,
-}: {
-  index: number;
-  title: string;
-  description?: string;
-  optional?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 text-[11px] font-semibold tabular-nums text-stone-400">
-          {String(index).padStart(2, "0")}
-        </span>
-        <div className="min-w-0">
-          <h2 className="flex flex-wrap items-baseline gap-2 text-sm font-semibold text-stone-900">
-            {title}
-            {optional && (
-              <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-stone-500">
-                Optional
-              </span>
-            )}
-          </h2>
-          {description && (
-            <p className="mt-1 text-xs leading-relaxed text-stone-500">{description}</p>
-          )}
-        </div>
-      </div>
-      <div className="mt-5 space-y-4">{children}</div>
-    </section>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  required,
-  readOnly,
-  type = "text",
-  autoComplete,
-  inputMode,
-  min,
-  max,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  required?: boolean;
-  readOnly?: boolean;
-  type?: "text" | "email" | "tel" | "date" | "number";
-  autoComplete?: string;
-  inputMode?: "tel" | "email" | "text" | "numeric";
-  min?: string | number;
-  max?: string | number;
-}) {
-  const id = `field-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`;
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-stone-700">
-        {label}
-        {required && <span className="ml-1 text-stone-400">*</span>}
-      </label>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        required={required}
-        readOnly={readOnly}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        inputMode={inputMode}
-        min={min}
-        max={max}
-        onChange={(event) => onChange(event.target.value)}
-        className={`w-full rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-900 outline-none transition-colors placeholder:text-stone-400 focus:border-stone-900 focus:bg-white ${
-          readOnly ? "cursor-not-allowed bg-stone-100 text-stone-500" : "bg-stone-50"
-        }`}
-      />
-    </div>
-  );
-}
-
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-  placeholder,
-  required,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-  placeholder?: string;
-  required?: boolean;
-}) {
-  const id = `select-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`;
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-stone-700">
-        {label}
-        {required && <span className="ml-1 text-stone-400">*</span>}
-      </label>
-      <select
-        id={id}
-        value={value}
-        required={required}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full appearance-none rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 outline-none transition-colors focus:border-stone-900 focus:bg-white"
-      >
-        <option value="">{placeholder ?? "Choose one"}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-/**
- * The ID document. Deliberately one input with no `capture` attribute: the
- * browser then offers camera *and* photo library, so a guest who already
- * photographed their card can pick it instead of retaking it.
- */
-function IdUpload({
-  inputRef,
-  preview,
-  uploading,
-  onSelect,
-  onClear,
-}: {
-  inputRef: React.RefObject<HTMLInputElement | null>;
-  preview: string | null;
-  uploading: boolean;
-  onSelect: (file: File | null) => void;
-  onClear: () => void;
-}) {
-  return (
-    <div>
-      <span className="mb-1.5 block text-xs font-semibold text-stone-700">
-        Picture of your ID<span className="ml-1 text-stone-400">*</span>
-      </span>
-
-      <input
-        ref={inputRef}
-        id="id-upload"
-        type="file"
-        accept="image/*"
-        className="sr-only"
-        onChange={(event) => onSelect(event.target.files?.[0] ?? null)}
-      />
-
-      {preview ? (
-        <div className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-50">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={preview}
-            alt="Your uploaded ID"
-            className="max-h-64 w-full bg-stone-900/5 object-contain"
-          />
-          <div className="flex items-center justify-between gap-3 border-t border-stone-200 px-4 py-3">
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700">
-              {uploading ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…
-                </>
-              ) : (
-                <>
-                  <Check className="h-3.5 w-3.5" /> Added
-                </>
-              )}
-            </span>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                className="text-[11px] font-medium text-stone-600 underline underline-offset-4 hover:text-stone-900"
-              >
-                Replace
-              </button>
-              <button
-                type="button"
-                onClick={onClear}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-stone-500 hover:text-red-700"
-              >
-                <Trash2 className="h-3.5 w-3.5" /> Remove
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-6 py-8 text-center transition-colors hover:border-stone-400 hover:bg-white"
-        >
-          <IdCard className="h-6 w-6 text-stone-400" />
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-700">
-            <Upload className="h-3.5 w-3.5" /> Upload a picture of your ID
-          </span>
-          <span className="text-[11px] leading-relaxed text-stone-500">
-            JPG, PNG or HEIC, up to 8 MB. Lay the card flat and fill the frame.
-          </span>
-        </button>
-      )}
-    </div>
-  );
-}
-
-function CheckRow({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-4 text-xs leading-relaxed text-stone-700 transition-colors hover:bg-white">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="mt-0.5 h-4 w-4 shrink-0 rounded border-stone-300"
-      />
-      <span>{label}</span>
-    </label>
-  );
-}
-
-/**
- * Optional selfie.
- *
- * The camera stays off until the guest presses the button — no permission
- * prompt on load, no preview of a stranger's room. A blocked camera is a dead
- * end for this card only, never for the form.
- */
-function SelfieCard({
-  state,
-  videoRef,
-  preview,
-  consent,
-  uploading,
-  onConsent,
-  onStart,
-  onCapture,
-  onRemove,
-}: {
-  state: CameraState;
-  videoRef: React.RefObject<HTMLVideoElement | null>;
-  preview: string | null;
-  consent: boolean;
-  uploading: boolean;
-  onConsent: (value: boolean) => void;
-  onStart: () => void;
-  onCapture: () => void;
-  onRemove: () => void;
-}) {
-  const ready = state === "ready";
-  const blocked = state === "denied" || state === "unsupported";
-
-  return (
-    <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="flex flex-wrap items-baseline gap-2 text-sm font-semibold text-stone-900">
-            A photo of yourself
-            <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-stone-500">
-              Optional
-            </span>
-          </h2>
-          <p className="mt-1 text-xs leading-relaxed text-stone-500">
-            Speeds things up at the gate, but your ID is what we actually need.
-          </p>
-        </div>
-        {preview && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-            <Check className="h-3 w-3" /> Added
-          </span>
-        )}
-      </div>
-
-      {preview ? (
-        <div className="mt-4 flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={preview}
-            alt="Your verification photo"
-            className="h-20 w-20 rounded-xl object-cover"
-          />
-          <div className="min-w-0">
-            <p className="text-[11px] leading-relaxed text-stone-500">
-              {uploading ? "Uploading…" : "Attached to your registration."}
-            </p>
-            <button
-              type="button"
-              onClick={onRemove}
-              className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-stone-500 underline underline-offset-4 hover:text-red-700"
-            >
-              <Trash2 className="h-3 w-3" /> Remove photo
-            </button>
-          </div>
-        </div>
-      ) : ready ? (
-        <>
-          <div className="relative mt-4 aspect-[4/3] overflow-hidden rounded-2xl bg-stone-900">
-            <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
-          </div>
-          <label className="mt-4 flex items-start gap-3 text-xs leading-relaxed text-stone-600">
-            <input
-              type="checkbox"
-              checked={consent}
-              onChange={(event) => onConsent(event.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-stone-300"
-            />
-            <span>
-              I agree to a photo being taken for check-in verification. It is used only to match
-              me to my booking.
-            </span>
-          </label>
-          <button
-            type="button"
-            onClick={onCapture}
-            disabled={!consent || uploading}
-            className="mt-3 inline-flex items-center gap-2 rounded-full bg-stone-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
-          >
-            {uploading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Camera className="h-3.5 w-3.5" />
-            )}
-            Take photo
-          </button>
-        </>
-      ) : (
-        <>
-          {blocked && (
-            <div className="mt-4 rounded-2xl border border-stone-200 bg-slate-50 p-4">
-              <p className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                <CameraOff className="h-4 w-4 text-slate-400" /> Camera not available
-              </p>
-              <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                {state === "unsupported"
-                  ? "This browser can't use a camera. You can skip this step — your ID picture is enough to complete registration."
-                  : "Allow the camera from the lock icon in your address bar, then try again. You can also skip this step entirely."}
-              </p>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={onStart}
-            className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-stone-700 ring-1 ring-stone-300 transition-colors hover:bg-stone-50"
-          >
-            {state === "starting" ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Starting the camera…
-              </>
-            ) : blocked ? (
-              <>
-                <RefreshCw className="h-3.5 w-3.5" /> Try the camera again
-              </>
-            ) : (
-              <>
-                <Camera className="h-3.5 w-3.5" /> Turn on the camera
-              </>
-            )}
-          </button>
-        </>
-      )}
-
-      {!preview && !blocked && (
-        <p className="mt-3 flex items-center gap-1.5 text-[11px] text-stone-400">
-          <Users className="h-3 w-3" /> Nothing is recorded until you press Take photo.
-        </p>
-      )}
-    </section>
   );
 }
