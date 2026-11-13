@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useMessageToast } from "../../lib/use-toast-message";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 import { KeyRound, Loader2, Palette, ShieldCheck, Wallet } from "lucide-react";
 import { SETTINGS_TABLE } from "../../lib/tables";
@@ -68,6 +69,11 @@ export default function SettingsPage() {
   });
 
   const [policyMessage, setPolicyMessage] = useState({ text: "", type: "" });
+
+  // Profile, theme and policy saves share one presentation: a toast, not a block.
+  useMessageToast(message);
+  useMessageToast(themeMessage);
+  useMessageToast(policyMessage);
 
   const configured = isSupabaseConfigured();
 

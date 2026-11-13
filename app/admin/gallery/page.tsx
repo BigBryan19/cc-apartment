@@ -23,6 +23,7 @@ import {
   Trash2,
   Video,
 } from "lucide-react";
+import { useMessageToast } from "../../lib/use-toast-message";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 import { GALLERY_TABLE } from "../../lib/tables";
 
@@ -62,6 +63,7 @@ export default function AdminGalleryPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
+  useMessageToast(message);
   const [draft, setDraft] = useState<DraftItem>(EMPTY_DRAFT);
 
   const configured = isSupabaseConfigured();
@@ -285,17 +287,6 @@ export default function AdminGalleryPage() {
         </p>
       </div>
 
-      {message.text && (
-        <div
-          className={`mb-6 rounded-xl p-4 text-sm ${
-            message.type === "error"
-              ? "border border-red-100 bg-red-50 text-red-600"
-              : "border border-green-100 bg-green-50 text-green-700"
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
 
       {!configured && (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">

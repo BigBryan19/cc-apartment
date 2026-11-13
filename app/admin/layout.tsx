@@ -178,12 +178,10 @@ export default function AdminLayout({
         just before a navigation survives it.
       */}
       <Toaster
-        position="bottom-left"
-        // Bottom-left as asked, but nudged past the 256px sidebar on desktop —
-        // otherwise a toast sits on top of Sign out. On phones the sidebar is
-        // hidden, so the offset comes back to the edge.
-        offset={{ left: 276, bottom: 20 }}
-        mobileOffset={{ left: 16, bottom: 16 }}
+        position="top-right"
+        // Top-right: clear of the sidebar on the left and of the table's own
+        // controls along the bottom, so no offset is needed.
+        offset={20}
         closeButton
         richColors
         toastOptions={{

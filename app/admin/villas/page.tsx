@@ -20,6 +20,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMessageToast } from "../../lib/use-toast-message";
 import { createClient } from "../../utils/supabase";
 import {
   approvedCapacity,
@@ -169,6 +170,7 @@ export default function ManageVillas() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
+  useMessageToast(message);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [imagePath, setImagePath] = useState("");
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -393,17 +395,6 @@ export default function ManageVillas() {
         </button>
       </div>
 
-      {message.text && (
-        <div
-          className={`mb-6 rounded-xl p-4 text-sm ${
-            message.type === "error"
-              ? "border border-red-100 bg-red-50 text-red-600"
-              : "border border-green-100 bg-green-50 text-green-700"
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-24">

@@ -9,6 +9,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useAlertToast } from "../../lib/use-toast-message";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 import {
   CalendarOff,
@@ -50,6 +51,8 @@ export default function ManageAvailability() {
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState("");
+
+  useAlertToast(formError, notice);
 
   const availability = useVillaAvailability(selectedVillaId);
 
@@ -343,16 +346,6 @@ export default function ManageAvailability() {
               />
             </div>
 
-            {formError && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-3">
-                {formError}
-              </p>
-            )}
-            {notice && (
-              <p className="text-sm text-green-700 bg-green-50 border border-green-100 rounded-xl p-3">
-                {notice}
-              </p>
-            )}
 
             <button
               type="submit"

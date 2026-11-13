@@ -17,6 +17,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ImagePlus, Plus, Trash2 } from "lucide-react";
+import { useAlertToast } from "../../lib/use-toast-message";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 import { SERVICES } from "../../lib/services";
 import {
@@ -34,6 +35,7 @@ export default function AdminServicesPage() {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useAlertToast(error, message);
   const [uploading, setUploading] = useState<string | null>(null);
   /** Ids removed in this session, deleted from the table when Save is pressed. */
   const [removed, setRemoved] = useState<string[]>([]);
@@ -212,17 +214,6 @@ export default function AdminServicesPage() {
           </button>
         </div>
       </div>
-
-      {error && (
-        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          {error}
-        </p>
-      )}
-      {message && (
-        <p className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-          {message}
-        </p>
-      )}
 
       <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {rows.map((row) => {

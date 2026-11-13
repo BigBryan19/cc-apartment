@@ -357,7 +357,6 @@ export default function VerificationsQueue({
    * still verified, and saying so is more useful than a blanket error.
    */
   function markVerified(row: VerificationRow) {
-    const who = row.full_name ?? "This guest";
     setBusyId(row.id);
 
     const task = (async () => {
@@ -385,13 +384,11 @@ export default function VerificationsQueue({
       );
 
       const sms = payload.sms;
-      return sms?.sent
-        ? `${who} verified and texted on ${sms.to ?? "their number"}.`
-        : `${who} verified. No SMS went out${sms?.error ? ` — ${sms.error}` : ""}.`;
+      return sms?.sent ? "Verified & SMS sent." : "Verified";
     })();
 
     void toast.promise(task, {
-      loading: `Verifying ${who.toLowerCase()}…`,
+      loading: "Verifying...",
       success: (message) => message,
       error: (error) =>
         error instanceof Error ? error.message : "The registration could not be verified.",
@@ -433,11 +430,11 @@ export default function VerificationsQueue({
         rejection_reason: reason,
         reviewed_at: new Date().toISOString(),
       });
-      return `${who} rejected.`;
+      return "Guest rejected.";
     })();
 
     void toast.promise(task, {
-      loading: `Rejecting ${who.toLowerCase()}…`,
+      loading: "Rejecting...",
       success: (message) => message,
       error: (error) => (error instanceof Error ? error.message : "The registration was not rejected."),
     });
@@ -454,11 +451,11 @@ export default function VerificationsQueue({
 
     const task = (async () => {
       await patch(row, { booking_reference: value || null });
-      return value ? `Reference ${value} saved.` : "Booking reference cleared.";
+      return "Reference saved.";
     })();
 
     void toast.promise(task, {
-      loading: "Saving reference…",
+      loading: "Saving...",
       success: (message) => message,
       error: (error) => (error instanceof Error ? error.message : "The reference was not saved."),
     });
@@ -485,13 +482,11 @@ export default function VerificationsQueue({
       setRows((current) => current.filter((row) => !gone.some((item) => item.id === row.id)));
       setAbandonedIds([]);
 
-      return gone.length === 0
-        ? "No abandoned drafts to clear."
-        : `Cleared ${gone.length} abandoned draft${gone.length === 1 ? "" : "s"}.`;
+      return gone.length === 0 ? "No drafts to clear." : "Drafts cleared.";
     })();
 
     void toast.promise(task, {
-      loading: "Clearing abandoned drafts…",
+      loading: "Clearing...",
       success: (message) => message,
       error: (error) => (error instanceof Error ? error.message : "The drafts were not cleared."),
     });

@@ -23,6 +23,7 @@
 
 "use client";
 
+import { toast } from "sonner";
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient, isSupabaseConfigured } from "../utils/supabase";
@@ -135,6 +136,7 @@ export default function AdminDashboard() {
         const failure = bookingResult.error || villaResult.error;
         if (failure) {
           setError(failure.message);
+          toast.error("Could not load your figures", { description: failure.message });
           return;
         }
 
@@ -145,7 +147,9 @@ export default function AdminDashboard() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not reach the database.");
+          const message = err instanceof Error ? err.message : "Could not reach the database.";
+          setError(message);
+          toast.error("Could not load your figures", { description: message });
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -337,13 +341,9 @@ export default function AdminDashboard() {
       )}
 
       {configured && error && (
-        <div className="mb-8 flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-          <div>
-            <p className="font-semibold">Could not load your figures.</p>
-            <p className="mt-0.5 break-words opacity-90">{error}</p>
-          </div>
-        </div>
+        <p className="mb-6 text-xs text-red-600">
+          Live figures unavailable — {error}
+        </p>
       )}
 
       {/* Needs attention. Above the figures on purpose: an unverified arrival is

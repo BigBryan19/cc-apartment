@@ -349,13 +349,7 @@ export default function ManageBookings() {
       </div>
 
       {error && (
-        <div className="mb-5 flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-          <div>
-            <p className="font-semibold">Could not load bookings.</p>
-            <p className="mt-0.5 break-words opacity-90">{error}</p>
-          </div>
-        </div>
+        <p className="mb-4 text-xs text-red-600">Bookings unavailable — {error}</p>
       )}
 
       {/* -------------------------------- Table ------------------------------- */}

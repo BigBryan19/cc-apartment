@@ -12,6 +12,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { AlertCircle, Check, GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
+import { useAlertToast } from "../../lib/use-toast-message";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 
 const TABLE = "house_rules";
@@ -33,6 +34,7 @@ export default function HouseRulesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  useAlertToast(error, message);
 
   const load = useCallback(async () => {
     if (!configured) {
@@ -160,16 +162,6 @@ export default function HouseRulesPage() {
         </button>
       </div>
 
-      {error && (
-        <p className="mt-5 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
-        </p>
-      )}
-      {message && (
-        <p className="mt-5 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
-          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {message}
-        </p>
-      )}
 
       {loading ? (
         <p className="mt-8 inline-flex items-center gap-2 text-sm text-slate-500">
