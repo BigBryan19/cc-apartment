@@ -35,34 +35,12 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+// The rule lives in one module so the gate and the API routes cannot drift
+// apart — a weaker endpoint would make this gate decorative.
+import { isAdministrator } from "./app/lib/admin-access";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-/** Emails allowed into /admin, lower-cased. Empty when unset. */
-function adminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-/**
- * A signed-in user is an administrator only if the session says so.
- *
- * `app_metadata` is the Supabase-owned half of the user record — it is stripped
- * from anything a client can write via `updateUser({ data })`, which writes to
- * `user_metadata` instead. That distinction is why the role lives there.
- */
-function isAdministrator(user: {
-  email?: string | null;
-  app_metadata?: Record<string, unknown>;
-}): boolean {
-  if (user.app_metadata?.role === "admin") return true;
-
-  const email = user.email?.toLowerCase();
-  return Boolean(email && adminEmails().includes(email));
-}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

@@ -760,6 +760,15 @@ export default function VerifyForm() {
 
     setSubmitting(false);
     setDone(true);
+
+    // Tell the office. Fire-and-forget on purpose: the guest's registration is
+    // already saved, and a mail outage must not turn that into an error screen.
+    // The endpoint re-reads the row by session id, so nothing here is trusted.
+    void fetch("/api/verify/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+    }).catch(() => {});
     // The one and only place the draft is discarded.
     clearDraft();
     // Kiosk hand-off: the guest is returned to the site, not left on a dead end.
