@@ -38,6 +38,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { createClient, isSupabaseConfigured } from "../../utils/supabase";
 
 /* -------------------------------------------------------------------------- */
@@ -150,8 +151,12 @@ export default function VerificationsQueue({
 
   const [rows, setRows] = useState<VerificationRow[]>([]);
   const [isLoading, setIsLoading] = useState(configured);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  /**
+   * Read failures keep a home in the table body rather than only a toast: a
+   * toast that has faded leaves somebody staring at an empty queue with no idea
+   * why. Action outcomes are transient by nature and go to a toast.
+   */
+  const [loadError, setLoadError] = useState("");
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("submitted");
@@ -197,13 +202,14 @@ export default function VerificationsQueue({
         if (cancelled) return;
 
         if (readError) {
-          setError(readError.message);
+          setLoadError(readError.message);
+          toast.error("Could not load the queue", { description: readError.message });
           return;
         }
 
         const loaded = (data ?? []) as VerificationRow[];
         setRows(loaded);
-        setError("");
+        setLoadError("");
 
         // Decided here rather than during render: reading the clock is not a
         // pure operation, and a draft's age must be measured once per load, not
@@ -216,7 +222,9 @@ export default function VerificationsQueue({
         );
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Could not reach the database.");
+        const message = err instanceof Error ? err.message : "Could not reach the database.";
+        setLoadError(message);
+        toast.error("Could not load the queue", { description: message });
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -306,7 +314,6 @@ export default function VerificationsQueue({
     (row: VerificationRow) => {
       const next = openId === row.id ? null : row.id;
       setOpenId(next);
-      setNotice("");
       if (next) {
         void signPath(row.id_photo_path);
         void signPath(row.photo_path);
@@ -317,32 +324,27 @@ export default function VerificationsQueue({
 
   /* ---------------- mutations ---------------- */
 
+  /**
+   * Write a change and mirror it locally. Throws on failure, so the caller can
+   * hand the message straight to a toast — action errors have no inline home
+   * on this page any more.
+   */
   async function patch(
     row: VerificationRow,
-    changes: Partial<Pick<VerificationRow, "status" | "rejection_reason" | "reviewed_at" | "booking_reference">>,
-    successMessage: string,
+    changes: Partial<
+      Pick<VerificationRow, "status" | "rejection_reason" | "reviewed_at" | "booking_reference">
+    >,
   ) {
-    setBusyId(row.id);
-    setError("");
-    setNotice("");
-
     const { error: writeError } = await createClient()
       .from("guest_verifications")
       .update({ ...changes, updated_at: new Date().toISOString() })
       .eq("id", row.id);
 
-    setBusyId(null);
-
-    if (writeError) {
-      setError(writeError.message);
-      return false;
-    }
+    if (writeError) throw new Error(writeError.message);
 
     setRows((current) =>
       current.map((item) => (item.id === row.id ? { ...item, ...changes } : item)),
     );
-    setNotice(successMessage);
-    return true;
   }
 
   /**
@@ -350,14 +352,15 @@ export default function VerificationsQueue({
    *
    * The status change itself is trivial, but it is followed by an SMS, and the
    * Arkesel key is a server secret. Doing it in the browser would mean shipping
-   * the key or pretending to send. The endpoint reports both outcomes.
+   * the key or pretending to send. The endpoint reports both outcomes, and the
+   * toast carries whichever it returns — a verified guest whose text failed is
+   * still verified, and saying so is more useful than a blanket error.
    */
-  async function markVerified(row: VerificationRow) {
+  function markVerified(row: VerificationRow) {
+    const who = row.full_name ?? "This guest";
     setBusyId(row.id);
-    setError("");
-    setNotice("");
 
-    try {
+    const task = (async () => {
       const response = await fetch("/api/verifications/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -369,8 +372,7 @@ export default function VerificationsQueue({
         | null;
 
       if (!response.ok || !payload?.ok) {
-        setError(payload?.error ?? "The registration could not be verified.");
-        return;
+        throw new Error(payload?.error ?? "The registration could not be verified.");
       }
 
       const reviewedAt = new Date().toISOString();
@@ -382,28 +384,27 @@ export default function VerificationsQueue({
         ),
       );
 
-      const who = row.full_name ?? "This guest";
       const sms = payload.sms;
-      setNotice(
-        sms?.sent
-          ? `${who} verified and texted on ${sms.to ?? "their number"}.`
-          : `${who} verified. No SMS went out${sms?.error ? ` — ${sms.error}` : ""}.`,
-      );
-    } catch (networkError) {
-      setError(
-        networkError instanceof Error
-          ? networkError.message
-          : "The registration could not be verified.",
-      );
-    } finally {
-      setBusyId(null);
-    }
+      return sms?.sent
+        ? `${who} verified and texted on ${sms.to ?? "their number"}.`
+        : `${who} verified. No SMS went out${sms?.error ? ` — ${sms.error}` : ""}.`;
+    })();
+
+    void toast.promise(task, {
+      loading: `Verifying ${who.toLowerCase()}…`,
+      success: (message) => message,
+      error: (error) =>
+        error instanceof Error ? error.message : "The registration could not be verified.",
+    });
+
+    // The toast owns the rejection; this keeps the row's spinner honest and
+    // stops an unhandled rejection reaching the console.
+    void task.catch(() => {}).finally(() => setBusyId(null));
   }
 
   function openReject(row: VerificationRow) {
     setRejectTarget(row);
     setRejectReason("");
-    setError("");
   }
 
   function closeReject() {
@@ -411,58 +412,91 @@ export default function VerificationsQueue({
     setRejectReason("");
   }
 
-  async function submitRejection() {
+  function submitRejection() {
     const target = rejectTarget;
     if (!target) return;
 
     const reason = rejectReason.trim();
-    if (!reason) return;
-
-    const done = await patch(
-      target,
-      { status: "rejected", rejection_reason: reason, reviewed_at: new Date().toISOString() },
-      `${target.full_name ?? "This guest"} rejected.`,
-    );
-
-    if (done) closeReject();
-  }
-
-  async function saveReference(row: VerificationRow) {
-    const value = (refDrafts[row.id] ?? row.booking_reference ?? "").trim().toUpperCase();
-    await patch(row, { booking_reference: value || null }, "Booking reference saved.");
-  }
-
-  async function sweepDrafts() {
-    if (!configured) return;
-    setBusyId("sweep");
-    setError("");
-    setNotice("");
-
-    const { data, error: deleteError } = await createClient()
-      .from("guest_verifications")
-      .delete()
-      .eq("status", "draft")
-      .in("id", abandonedIds)
-      .select("id");
-
-    setBusyId(null);
-    setConfirmSweep(false);
-
-    if (deleteError) {
-      setError(deleteError.message);
+    if (!reason) {
+      toast.error("A reason is needed to reject", {
+        description: "The next person to open this record will read it.",
+      });
       return;
     }
 
-    const removed = (data ?? []).length;
-    setRows((current) =>
-      current.filter((row) => !(data ?? []).some((gone) => gone.id === row.id)),
-    );
-    setAbandonedIds([]);
-    setNotice(
-      removed === 0
+    const who = target.full_name ?? "This guest";
+    setBusyId(target.id);
+
+    const task = (async () => {
+      await patch(target, {
+        status: "rejected",
+        rejection_reason: reason,
+        reviewed_at: new Date().toISOString(),
+      });
+      return `${who} rejected.`;
+    })();
+
+    void toast.promise(task, {
+      loading: `Rejecting ${who.toLowerCase()}…`,
+      success: (message) => message,
+      error: (error) => (error instanceof Error ? error.message : "The registration was not rejected."),
+    });
+
+    void task
+      .then(() => closeReject())
+      .catch(() => {})
+      .finally(() => setBusyId(null));
+  }
+
+  function saveReference(row: VerificationRow) {
+    const value = (refDrafts[row.id] ?? row.booking_reference ?? "").trim().toUpperCase();
+    setBusyId(row.id);
+
+    const task = (async () => {
+      await patch(row, { booking_reference: value || null });
+      return value ? `Reference ${value} saved.` : "Booking reference cleared.";
+    })();
+
+    void toast.promise(task, {
+      loading: "Saving reference…",
+      success: (message) => message,
+      error: (error) => (error instanceof Error ? error.message : "The reference was not saved."),
+    });
+
+    void task.catch(() => {}).finally(() => setBusyId(null));
+  }
+
+  function sweepDrafts() {
+    if (!configured) return;
+    setBusyId("sweep");
+    setConfirmSweep(false);
+
+    const task = (async () => {
+      const { data, error: deleteError } = await createClient()
+        .from("guest_verifications")
+        .delete()
+        .eq("status", "draft")
+        .in("id", abandonedIds)
+        .select("id");
+
+      if (deleteError) throw new Error(deleteError.message);
+
+      const gone = data ?? [];
+      setRows((current) => current.filter((row) => !gone.some((item) => item.id === row.id)));
+      setAbandonedIds([]);
+
+      return gone.length === 0
         ? "No abandoned drafts to clear."
-        : `Cleared ${removed} abandoned draft${removed === 1 ? "" : "s"}.`,
-    );
+        : `Cleared ${gone.length} abandoned draft${gone.length === 1 ? "" : "s"}.`;
+    })();
+
+    void toast.promise(task, {
+      loading: "Clearing abandoned drafts…",
+      success: (message) => message,
+      error: (error) => (error instanceof Error ? error.message : "The drafts were not cleared."),
+    });
+
+    void task.catch(() => {}).finally(() => setBusyId(null));
   }
 
   /* ---------------- render ---------------- */
@@ -524,23 +558,6 @@ export default function VerificationsQueue({
             Supabase is not configured, so there is nothing to show. Add your keys to{" "}
             <code className="font-mono text-xs">.env.local</code> and rebuild.
           </p>
-        </div>
-      )}
-
-      {configured && error && (
-        <div className="mb-6 flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-          <div className="min-w-0">
-            <p className="font-semibold">Something went wrong.</p>
-            <p className="mt-0.5 break-words opacity-90">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {notice && (
-        <div className="mb-6 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-3.5 text-sm text-green-800">
-          <Check size={16} className="shrink-0" />
-          {notice}
         </div>
       )}
 
@@ -618,9 +635,22 @@ export default function VerificationsQueue({
             {!isLoading && visible.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-500">
-                  {rows.length === 0
-                    ? "No registrations yet. They appear here as guests fill in the form."
-                    : "Nothing matches that search."}
+                  {loadError ? (
+                    <span className="inline-flex flex-col items-center gap-2">
+                      <span className="text-red-700">Could not load the queue: {loadError}</span>
+                      <button
+                        type="button"
+                        onClick={refresh}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                      >
+                        Try again
+                      </button>
+                    </span>
+                  ) : rows.length === 0 ? (
+                    "No registrations yet. They appear here as guests fill in the form."
+                  ) : (
+                    "Nothing matches that search."
+                  )}
                 </td>
               </tr>
             )}

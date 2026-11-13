@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { Toaster } from "sonner";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -169,6 +170,28 @@ export default function AdminLayout({
       <main className="min-w-0 flex-1 p-5 pt-32 md:ml-64 md:p-8 md:pt-8">
         {children}
       </main>
+
+      {/*
+        Bottom-left, clear of the sidebar's sign-out and of the table's own
+        controls. Mounted once here rather than per page, so every admin screen
+        can raise a toast without repeating the provider — and so a toast raised
+        just before a navigation survives it.
+      */}
+      <Toaster
+        position="bottom-left"
+        // Bottom-left as asked, but nudged past the 256px sidebar on desktop —
+        // otherwise a toast sits on top of Sign out. On phones the sidebar is
+        // hidden, so the offset comes back to the edge.
+        offset={{ left: 276, bottom: 20 }}
+        mobileOffset={{ left: 16, bottom: 16 }}
+        closeButton
+        richColors
+        toastOptions={{
+          className:
+            "rounded-xl border text-[13px] shadow-lg shadow-slate-900/5",
+          duration: 5000,
+        }}
+      />
     </div>
   );
 }
