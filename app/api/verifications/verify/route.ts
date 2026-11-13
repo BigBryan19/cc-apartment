@@ -71,6 +71,7 @@ export async function POST(request: Request) {
     .eq("id", id);
 
   if (updateError) {
+    console.error("[verify] the status update was refused", { id, message: updateError.message });
     // The most likely cause is the `rejected` status or `reviewed_at` column not
     // existing yet, which the SQL runbook adds.
     const hint = /check constraint|column .* does not exist/i.test(updateError.message)
@@ -89,10 +90,17 @@ export async function POST(request: Request) {
   try {
     sms = await sendSms({ to, message: verificationSms(guest) });
   } catch (error) {
+    console.error("[verify] SMS threw", { id, message: error instanceof Error ? error.message : String(error) });
     sms = {
       sent: false,
       error: error instanceof Error ? error.message : "SMS could not be sent.",
     };
+  }
+
+  if (!sms.sent) {
+    // The verification stands; only the text failed. Logged so a failure in
+    // production is diagnosable without asking the guest whether it arrived.
+    console.warn("[verify] verified, SMS not sent", { id, error: sms.error });
   }
 
   return NextResponse.json({ ok: true, sms, reviewedAt: new Date().toISOString() });

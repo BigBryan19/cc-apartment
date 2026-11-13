@@ -26,8 +26,21 @@ export interface SmsResult {
   to?: string;
 }
 
+/**
+ * Trimmed: a pasted key often carries a newline, and Arkesel answers a key with
+ * a trailing space with exactly "Invalid key" — which reads like a wrong key
+ * rather than a formatting problem. Verified against the live endpoint.
+ */
+function apiKey(): string {
+  return (process.env.ARKESEL_API_KEY ?? "").trim();
+}
+
+function senderId(): string {
+  return (process.env.ARKESEL_SENDER_ID ?? "").trim();
+}
+
 export function isSmsConfigured(): boolean {
-  return Boolean(process.env.ARKESEL_API_KEY && process.env.ARKESEL_SENDER_ID);
+  return Boolean(apiKey() && senderId());
 }
 
 /**
@@ -69,10 +82,10 @@ export async function sendSms({
   to: string | null | undefined;
   message: string;
 }): Promise<SmsResult> {
-  const apiKey = process.env.ARKESEL_API_KEY;
-  const sender = process.env.ARKESEL_SENDER_ID;
+  const key = apiKey();
+  const sender = senderId();
 
-  if (!apiKey || !sender) {
+  if (!key || !sender) {
     console.info("[sms] ARKESEL_API_KEY or ARKESEL_SENDER_ID is not set — skipping send.");
     return { sent: false, error: "SMS is not configured." };
   }
@@ -89,7 +102,7 @@ export async function sendSms({
     const response = await fetch(ARKESEL_ENDPOINT, {
       method: "POST",
       headers: {
-        "api-key": apiKey,
+        "api-key": key,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -119,8 +132,22 @@ export async function sendSms({
         : undefined;
 
     if (response.ok && (status === null || status === "success")) {
+      console.info("[sms] sent", { to: msisdn, id });
       return { sent: true, id, to: msisdn };
     }
+
+    // Everything needed to tell a bad credential from a bad payload. The key is
+    // never logged — its length and whether it needed trimming are enough to
+    // spot an empty, truncated or space-padded value without leaking it.
+    console.error("[sms] Arkesel refused the message", {
+      httpStatus: response.status,
+      body: raw,
+      sender,
+      to: msisdn,
+      keyLength: key.length,
+      keyHadWhitespace: (process.env.ARKESEL_API_KEY ?? "") !== key,
+      endpoint: ARKESEL_ENDPOINT,
+    });
 
     // Prefer the gateway's own wording ("Invalid sender id") over its status
     // word, which is just "error".
@@ -130,9 +157,19 @@ export async function sendSms({
         : "";
     const detail = gatewayMessage || status || `HTTP ${response.status}`;
 
-    return { sent: false, to: msisdn, error: `Arkesel refused the message: ${detail}` };
+    const hint =
+      response.status === 401 || /invalid key/i.test(detail)
+        ? ' The api-key header is being read — Arkesel answered "Invalid key", not "Missing key" — so the value itself is wrong or space-padded. Regenerate the main key under Arkesel → SMS API and paste it again without a trailing newline.'
+        : "";
+
+    return {
+      sent: false,
+      to: msisdn,
+      error: `Arkesel refused the message: ${detail}.${hint}`,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "network error";
+    console.error("[sms] request threw", { to: msisdn, message });
     return { sent: false, to: msisdn, error: `Could not reach Arkesel: ${message}` };
   }
 }

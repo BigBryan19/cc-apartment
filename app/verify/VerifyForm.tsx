@@ -536,7 +536,7 @@ export default function VerifyForm() {
       flags: { accurate: boolean; rules: boolean },
       finalise: boolean,
     ) => {
-      if (!configured) return;
+      if (!configured) return false;
       setSaveState("saving");
 
       const guests = Number.parseInt(record.guests, 10);
@@ -570,10 +570,11 @@ export default function VerifyForm() {
       if (writeError) {
         setError(describeSaveError(writeError.message));
         setSaveState("error");
-        return;
+        return false;
       }
       setError("");
       setSaveState("saved");
+      return true;
     },
     [configured, sessionId],
   );
@@ -751,7 +752,7 @@ export default function VerifyForm() {
       if (finalIdPath) setIdPath(finalIdPath);
     }
 
-    await persist(
+    const saved = await persist(
       form,
       { id: finalIdPath, selfie: selfiePath },
       { accurate: declaredAccurate, rules: acceptedRules },
@@ -759,6 +760,13 @@ export default function VerifyForm() {
     );
 
     setSubmitting(false);
+
+    // Do not thank somebody for a registration that was not written. persist()
+    // has already put the reason on screen; showing the success screen anyway
+    // would leave the guest believing they are checked in and the office with
+    // nothing to review.
+    if (!saved) return;
+
     setDone(true);
 
     // Tell the office. Fire-and-forget on purpose: the guest's registration is

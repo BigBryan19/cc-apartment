@@ -81,6 +81,9 @@ export async function POST(request: Request) {
   }
 
   if (!isServiceRoleConfigured()) {
+    console.error("[notify] SUPABASE_SERVICE_ROLE_KEY is missing; the row cannot be read", {
+      sessionId,
+    });
     return NextResponse.json({
       sent: false,
       error: "SUPABASE_SERVICE_ROLE_KEY is not set, so the registration cannot be read.",
@@ -88,6 +91,10 @@ export async function POST(request: Request) {
   }
 
   if (!isEmailConfigured()) {
+    console.error(
+      "[notify] RESEND_API_KEY is empty in this deployment — the office alert cannot be sent.",
+      { sessionId, office: officeAddress() },
+    );
     return NextResponse.json({ sent: false, error: "RESEND_API_KEY is not set." });
   }
 
@@ -103,17 +110,31 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (error) {
+      console.error("[notify] reading the registration failed", {
+        sessionId,
+        message: error.message,
+        code: error.code,
+      });
       return NextResponse.json({ sent: false, error: error.message });
     }
 
     const row = data as Row | null;
     if (!row) {
+      console.error("[notify] no registration matched", { sessionId });
       return NextResponse.json({ sent: false, error: "No registration matched that session." });
     }
 
     // Drafts are autosaved continuously; only a real submit is worth an email.
     if (row.status !== "submitted") {
-      return NextResponse.json({ sent: false, error: `Registration is ${row.status}, not submitted.` });
+      // The usual cause: the insert itself failed, so the row is still a draft.
+      console.warn("[notify] registration is not submitted — no alert sent", {
+        sessionId,
+        status: row.status,
+      });
+      return NextResponse.json({
+        sent: false,
+        error: `Registration is ${row.status}, not submitted.`,
+      });
     }
 
     const name = row.full_name?.trim() || "A guest";
@@ -161,15 +182,30 @@ export async function POST(request: Request) {
         </p>
       </div>`;
 
+    const office = officeAddress();
+    console.info("[notify] sending office alert", { sessionId, id: row.id, office });
+
     const result = await sendEmail({
-      to: officeAddress(),
+      to: office,
       subject: `New guest registration — ${name}, ${stay}`,
       html,
       text: lines.join("\n"),
     });
 
-    return NextResponse.json({ sent: result.sent, error: result.error, id: result.id });
+    if (!result.sent) {
+      console.error("[notify] the office alert was not sent", {
+        sessionId,
+        office,
+        error: result.error,
+      });
+    }
+
+    return NextResponse.json({ sent: result.sent, error: result.error, id: result.id, office });
   } catch (error) {
+    console.error("[notify] unexpected failure", {
+      sessionId,
+      message: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json({
       sent: false,
       error: error instanceof Error ? error.message : "Unexpected failure.",
